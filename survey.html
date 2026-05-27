@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herbelle — 体験アンケート</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; background: #fafaf8; color: #1a1a1a; min-height: 100vh; }
+    .wrap { max-width: 600px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    .herb-logo { font-size: 11px; letter-spacing: 0.2em; color: #999; text-transform: uppercase; margin-bottom: 2.5rem; }
+    .step-indicator { display: flex; gap: 6px; margin-bottom: 2rem; }
+    .step-dot { height: 3px; flex: 1; border-radius: 2px; background: #e0e0e0; transition: background 0.3s; }
+    .step-dot.active { background: #1D9E75; }
+    .step-dot.done { background: #5DCAA5; }
+    .question-label { font-size: 11px; letter-spacing: 0.12em; color: #1D9E75; margin-bottom: 0.5rem; text-transform: uppercase; }
+    .question-text { font-size: 20px; font-weight: 500; color: #1a1a1a; line-height: 1.5; margin-bottom: 0.5rem; }
+    .question-sub { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+    .options-grid { display: flex; flex-direction: column; gap: 10px; }
+    .option-btn { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px 18px; text-align: left; cursor: pointer; font-size: 15px; color: #1a1a1a; transition: all 0.15s; display: flex; align-items: center; gap: 12px; font-family: inherit; }
+    .option-btn:hover { border-color: #1D9E75; background: #E1F5EE; color: #0F6E56; }
+    .option-btn.selected { border-color: #1D9E75; background: #E1F5EE; color: #0F6E56; font-weight: 500; }
+    .option-icon { width: 32px; height: 32px; border-radius: 50%; background: #f5f5f3; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .stars { display: flex; gap: 12px; margin-bottom: 1rem; }
+    .star-btn { width: 56px; height: 56px; border-radius: 12px; border: 1px solid #e0e0e0; background: #fff; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+    .star-btn:hover { border-color: #1D9E75; background: #E1F5EE; }
+    .star-btn.selected { border-color: #1D9E75; background: #E1F5EE; }
+    .star-labels { display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 4px; padding: 0 4px; }
+    .textarea-wrap textarea { width: 100%; border: 1px solid #e0e0e0; border-radius: 12px; padding: 14px 16px; font-size: 15px; font-family: inherit; outline: none; resize: none; height: 120px; color: #1a1a1a; background: #fff; }
+    .textarea-wrap textarea:focus { border-color: #1D9E75; }
+    .nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 1.75rem; }
+    .btn-next { background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 14px 32px; font-size: 16px; cursor: pointer; transition: opacity 0.2s, background 0.2s; opacity: 0.4; pointer-events: none; font-family: inherit; }
+    .btn-next.enabled { opacity: 1; pointer-events: auto; }
+    .btn-next.enabled:hover { background: #0F6E56; }
+    .btn-back { background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 8px; font-family: inherit; }
+    .btn-back:hover { color: #1a1a1a; }
+    .thanks-area { display: none; text-align: center; padding: 3rem 0; }
+    .thanks-icon { font-size: 48px; margin-bottom: 1rem; }
+    .thanks-title { font-size: 22px; font-weight: 500; color: #085041; margin-bottom: 0.75rem; }
+    .thanks-msg { font-size: 15px; color: #555; line-height: 1.7; margin-bottom: 2rem; }
+    .thanks-sub { font-size: 13px; color: #888; }
+    .reset-btn { margin-top: 2rem; background: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 24px; font-size: 14px; color: #888; cursor: pointer; font-family: inherit; }
+    .reset-btn:hover { color: #1a1a1a; }
+    @media (max-width: 480px) { .question-text { font-size: 18px; } .wrap { padding: 1.5rem 1rem 3rem; } .star-btn { width: 48px; height: 48px; font-size: 20px; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="herb-logo">Herbelle — 体験アンケート</div>
+
+  <div id="survey-area">
+    <div class="step-indicator" id="step-indicator"></div>
+    <div id="question-area" style="min-height:280px"></div>
+    <div class="nav-row">
+      <button class="btn-back" id="btn-back" onclick="goBack()">← もどる</button>
+      <button class="btn-next" id="btn-next" onclick="goNext()">つぎへ</button>
+    </div>
+  </div>
+
+  <div class="thanks-area" id="thanks-area">
+    <div class="thanks-icon">🌿</div>
+    <div class="thanks-title">ありがとうございました</div>
+    <div class="thanks-msg">貴重なご意見をいただき、ありがとうございます。<br>またのご来店を心よりお待ちしております。</div>
+    <div class="thanks-sub">スタッフにお声がけください</div>
+    <button class="reset-btn" onclick="restart()">最初に戻る</button>
+  </div>
+</div>
+
+<script>
+const questions = [
+  {
+    id: "satisfaction",
+    label: "Q1 / 4",
+    text: "本日の体験はいかがでしたか？",
+    sub: "全体的な満足度をお聞かせください",
+    type: "star",
+    labels: ["もう少し", "", "", "", "大満足！"],
+    options: ["★1", "★2", "★3", "★4", "★5"],
+    emojis: ["😔", "😐", "🙂", "😊", "😍"]
+  },
+  {
+    id: "body_change",
+    label: "Q2 / 4",
+    text: "施術後、体の変化を感じましたか？",
+    sub: "",
+    type: "choice",
+    options: [
+      { icon: "🔥", text: "体がしっかり温まった" },
+      { icon: "💧", text: "むくみが軽くなった気がする" },
+      { icon: "😌", text: "リラックスできた" },
+      { icon: "✨", text: "肌がスッキリした感じがする" },
+      { icon: "🤔", text: "まだよくわからない" }
+    ]
+  },
+  {
+    id: "contract",
+    label: "Q3 / 4",
+    text: "定期的に通うことへの\nご興味はありますか？",
+    sub: "正直にお聞かせください",
+    type: "choice",
+    options: [
+      { icon: "💚", text: "ぜひ続けたい・契約を検討したい" },
+      { icon: "🤍", text: "もう少し考えたい" },
+      { icon: "💭", text: "料金や内容をもっと聞きたい" },
+      { icon: "🙏", text: "今回だけでよかった" }
+    ]
+  },
+  {
+    id: "comment",
+    label: "Q4 / 4",
+    text: "ご感想・ご要望があれば\nお聞かせください",
+    sub: "任意・スキップOKです",
+    type: "textarea",
+    optional: true
+  }
+];
+
+let current = 0, answers = {}, selectedIndex = null;
+
+function getLogs() { try { return JSON.parse(localStorage.getItem("herbelle_survey_logs") || "[]"); } catch { return []; } }
+function saveLogs(logs) { localStorage.setItem("herbelle_survey_logs", JSON.stringify(logs)); }
+function addLog(a) {
+  const logs = getLogs();
+  const now = new Date();
+  const p = n => String(n).padStart(2, "0");
+  logs.push({
+    datetime: `${now.getFullYear()}/${p(now.getMonth()+1)}/${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}`,
+    satisfaction: a.satisfaction !== undefined ? (a.satisfaction + 1) + "★" : "—",
+    body_change: questions[1].options[a.body_change]?.text || "—",
+    contract: questions[2].options[a.contract]?.text || "—",
+    comment: a.comment || ""
+  });
+  saveLogs(logs);
+}
+
+function renderQuestion() {
+  const q = questions[current];
+  selectedIndex = null;
+
+  document.getElementById("step-indicator").innerHTML = questions.map((_, i) =>
+    `<div class="step-dot${i < current ? " done" : i === current ? " active" : ""}"></div>`).join("");
+
+  let html = `<div class="question-label">${q.label}</div>
+    <div class="question-text">${q.text.replace(/\n/g, "<br>")}</div>
+    ${q.sub ? `<div class="question-sub">${q.sub}</div>` : ""}`;
+
+  if (q.type === "star") {
+    const prev = answers[q.id];
+    html += `<div class="stars">` +
+      q.emojis.map((e, i) => `<button class="star-btn${prev === i ? " selected" : ""}" onclick="selectStar(${i})" id="star-${i}">${e}</button>`).join("") +
+      `</div><div class="star-labels"><span>${q.labels[0]}</span><span>${q.labels[4]}</span></div>`;
+  } else if (q.type === "choice") {
+    const prev = answers[q.id];
+    html += `<div class="options-grid">` +
+      q.options.map((o, i) => `<button class="option-btn${prev === i ? " selected" : ""}" onclick="selectOption(${i})" id="opt-${i}">
+        <span class="option-icon">${o.icon}</span><span>${o.text}</span>
+      </button>`).join("") + `</div>`;
+  } else if (q.type === "textarea") {
+    const prev = answers[q.id] || "";
+    html += `<div class="textarea-wrap"><textarea id="textarea-input" placeholder="ここにご記入ください（任意）" oninput="onTextarea()">${prev}</textarea></div>`;
+  }
+
+  document.getElementById("question-area").innerHTML = html;
+
+  const prev = answers[q.id];
+  if (q.type === "star" && prev !== undefined) { selectedIndex = prev; setNextEnabled(true); }
+  else if (q.type === "choice" && prev !== undefined) { selectedIndex = prev; setNextEnabled(true); }
+  else if (q.type === "textarea") { setNextEnabled(true); }
+  else { setNextEnabled(false); }
+
+  document.getElementById("btn-next").textContent = current === questions.length - 1 ? "送信する" : "つぎへ";
+  document.getElementById("btn-back").style.visibility = current === 0 ? "hidden" : "visible";
+}
+
+function setNextEnabled(v) { document.getElementById("btn-next").classList.toggle("enabled", v); }
+
+function selectStar(i) {
+  document.querySelectorAll(".star-btn").forEach(b => b.classList.remove("selected"));
+  document.getElementById(`star-${i}`).classList.add("selected");
+  selectedIndex = i; setNextEnabled(true);
+}
+
+function selectOption(i) {
+  document.querySelectorAll(".option-btn").forEach(b => b.classList.remove("selected"));
+  document.getElementById(`opt-${i}`).classList.add("selected");
+  selectedIndex = i; setNextEnabled(true);
+}
+
+function onTextarea() { setNextEnabled(true); }
+
+function goNext() {
+  const q = questions[current];
+  if (q.type === "textarea") {
+    answers[q.id] = document.getElementById("textarea-input")?.value || "";
+  } else {
+    if (selectedIndex === null) return;
+    answers[q.id] = selectedIndex;
+  }
+  if (current < questions.length - 1) { current++; renderQuestion(); }
+  else { submitSurvey(); }
+}
+
+function goBack() { if (current > 0) { current--; renderQuestion(); } }
+
+function submitSurvey() {
+  addLog(answers);
+  document.getElementById("survey-area").style.display = "none";
+  document.getElementById("thanks-area").style.display = "block";
+  // 契約意向ありの場合は感謝メッセージを変える
+  if (answers.contract === 0) {
+    document.querySelector(".thanks-msg").innerHTML =
+      "ご契約にご興味をお持ちいただき、ありがとうございます。<br>スタッフより詳しいご案内をさせていただきます。";
+    document.querySelector(".thanks-sub").textContent = "このままスタッフにお声がけください";
+  }
+}
+
+function restart() {
+  current=0; answers={}; selectedIndex=null;
+  document.getElementById("thanks-area").style.display="none";
+  document.getElementById("survey-area").style.display="block";
+  renderQuestion();
+}
+
+renderQuestion();
+</script>
+</body>
+</html>
