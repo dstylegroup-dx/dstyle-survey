@@ -21,10 +21,10 @@
     .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
     .admin-title { font-size: 18px; font-weight: 500; }
     .logout-btn { font-size: 13px; color: #888; background: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 2rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 2rem; }
     .stat-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.25rem; }
     .stat-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #888; margin-bottom: 6px; }
-    .stat-value { font-size: 26px; font-weight: 500; color: #1a1a1a; }
+    .stat-value { font-size: 26px; font-weight: 500; }
     .stat-sub { font-size: 12px; color: #888; margin-top: 2px; }
     .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 2rem; }
     .chart-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.25rem; }
@@ -33,32 +33,25 @@
     .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #333; margin-bottom: 3px; }
     .bar-track { height: 7px; background: #f0f0ee; border-radius: 4px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; background: #1D9E75; transition: width 0.6s; }
-    .bar-contract { background: #1D9E75; } .bar-consider { background: #BA7517; } .bar-info { background: #378ADD; } .bar-once { background: #888; }
     .section-title { font-size: 13px; font-weight: 500; margin-bottom: 0.75rem; }
     .action-btns { display: flex; gap: 10px; margin-bottom: 2rem; }
     .action-btn { flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-family: inherit; cursor: pointer; border: 1px solid #e0e0e0; background: #fff; color: #333; }
     .action-btn.primary { background: #1D9E75; color: white; border-color: #1D9E75; font-weight: 500; }
     .action-btn.primary:hover { background: #0F6E56; }
-    .action-btn.danger { color: #c0392b; }
     .log-table-wrap { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; overflow-x: auto; margin-bottom: 2rem; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; }
     thead th { background: #f5f5f3; padding: 10px 12px; text-align: left; font-weight: 500; color: #555; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
     tbody td { padding: 9px 12px; border-bottom: 1px solid #f0f0ee; color: #333; vertical-align: top; line-height: 1.5; }
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:hover td { background: #fafaf8; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-    .badge-hot { background: #E1F5EE; color: #085041; }
-    .badge-warm { background: #FAEEDA; color: #633806; }
-    .badge-info { background: #E6F1FB; color: #0C447C; }
-    .badge-cold { background: #f0f0ee; color: #555; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+    .badge-hot{background:#E1F5EE;color:#085041} .badge-warm{background:#FAEEDA;color:#633806} .badge-info{background:#E6F1FB;color:#0C447C} .badge-cold{background:#f0f0ee;color:#555}
     .empty-state { padding: 3rem; text-align: center; color: #888; font-size: 14px; }
-    .comment-cell { font-size: 11px; color: #555; max-width: 160px; }
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="herb-logo">Herbelle — アンケート管理</div>
-
   <div class="login-box" id="login-box">
     <div class="login-title">管理者ログイン</div>
     <div class="login-sub">パスワードを入力してください</div>
@@ -66,154 +59,112 @@
     <button class="login-btn" onclick="doLogin()">ログイン</button>
     <div class="login-error" id="login-error">パスワードが違います</div>
   </div>
-
   <div class="admin-area" id="admin-area">
     <div class="admin-header">
       <div class="admin-title">体験アンケート 集計</div>
       <button class="logout-btn" onclick="doLogout()">ログアウト</button>
     </div>
-
     <div class="stats-grid" id="stats-grid"></div>
     <div class="chart-grid" id="chart-grid"></div>
-
     <div class="section-title">データ操作</div>
     <div class="action-btns">
       <button class="action-btn primary" onclick="downloadCSV()">CSVダウンロード</button>
-      <button class="action-btn danger" onclick="clearLogs()">ログをリセット</button>
+      <button class="action-btn" onclick="loadData()">最新データを読込</button>
     </div>
-
     <div class="section-title">アンケートログ 一覧</div>
-    <div class="log-table-wrap"><div id="log-table"></div></div>
+    <div class="log-table-wrap"><div id="log-table"><div class="empty-state">ログインしてデータを読み込んでください</div></div></div>
   </div>
 </div>
-
 <script>
 const PASS = "Herbelle19860701";
-const CONTRACT_LABELS = ["ぜひ続けたい・契約を検討したい", "もう少し考えたい", "料金や内容をもっと聞きたい", "今回だけでよかった"];
-const CONTRACT_BADGE = ["badge-hot", "badge-warm", "badge-info", "badge-cold"];
-const CONTRACT_BAR   = ["bar-contract", "bar-consider", "bar-info", "bar-once"];
-
-function getLogs() { try { return JSON.parse(localStorage.getItem("herbelle_survey_logs") || "[]"); } catch { return []; } }
+const SUPABASE_URL = "https://njhjqderykpytvsfcjwn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_0d90l4FAAkxE4IY7Inn2gQ_te7mxe6A";
+const CONTRACT_LABELS = ["ぜひ続けたい・契約を検討したい","もう少し考えたい","料金や内容をもっと聞きたい","今回だけでよかった"];
+const CONTRACT_BADGE = ["badge-hot","badge-warm","badge-info","badge-cold"];
+const CONTRACT_COLORS = ["#1D9E75","#BA7517","#378ADD","#888"];
+let allLogs = [];
 
 function doLogin() {
   if (document.getElementById("pw-input").value === PASS) {
-    sessionStorage.setItem("herbelle_survey_admin", "1");
-    document.getElementById("login-box").style.display = "none";
-    document.getElementById("admin-area").style.display = "block";
-    renderAdmin();
+    sessionStorage.setItem("herbelle_survey_admin","1");
+    document.getElementById("login-box").style.display="none";
+    document.getElementById("admin-area").style.display="block";
+    loadData();
   } else {
-    document.getElementById("login-error").style.display = "block";
-    document.getElementById("pw-input").value = "";
+    document.getElementById("login-error").style.display="block";
+    document.getElementById("pw-input").value="";
   }
 }
+function doLogout() { sessionStorage.removeItem("herbelle_survey_admin"); document.getElementById("admin-area").style.display="none"; document.getElementById("login-box").style.display="block"; }
 
-function doLogout() {
-  sessionStorage.removeItem("herbelle_survey_admin");
-  document.getElementById("admin-area").style.display = "none";
-  document.getElementById("login-box").style.display = "block";
-  document.getElementById("pw-input").value = "";
+async function loadData() {
+  document.getElementById("log-table").innerHTML = '<div class="empty-state">読み込み中...</div>';
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/survey_logs?select=*&order=created_at.desc&limit=500", {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    allLogs = await res.json();
+    renderAdmin();
+  } catch(e) { document.getElementById("log-table").innerHTML = '<div class="empty-state">データの読み込みに失敗しました</div>'; }
 }
 
 function renderAdmin() {
-  const logs = getLogs();
+  const logs = allLogs;
   const total = logs.length;
-
-  const satisfactionSum = logs.reduce((s, l) => s + (parseInt(l.satisfaction) || 0), 0);
-  const avgStar = total > 0 ? (satisfactionSum / total).toFixed(1) : "—";
-
-  const contractCounts = [0, 0, 0, 0];
-  logs.forEach(l => {
-    const idx = CONTRACT_LABELS.indexOf(l.contract);
-    if (idx >= 0) contractCounts[idx]++;
-  });
+  const starSum = logs.reduce((s,l) => s+(parseInt(l.satisfaction)||0), 0);
+  const avg = total > 0 ? (starSum/total).toFixed(1) : "—";
+  const contractCounts = [0,0,0,0];
+  logs.forEach(l => { const i=CONTRACT_LABELS.indexOf(l.contract); if(i>=0) contractCounts[i]++; });
   const hotCount = contractCounts[0];
-  const hotPct = total > 0 ? Math.round(hotCount / total * 100) : 0;
 
-  document.getElementById("stats-grid").innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">回答数</div>
-      <div class="stat-value">${total}<span style="font-size:16px;color:#888"> 件</span></div>
-      <div class="stat-sub">最終：${total > 0 ? logs[total-1].datetime : "—"}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">平均満足度</div>
-      <div class="stat-value">${avgStar}<span style="font-size:16px;color:#888"> ★</span></div>
-      <div class="stat-sub">5段階評価</div>
-    </div>
-    <div class="stat-card" style="border-left: 3px solid #1D9E75">
-      <div class="stat-label">契約検討あり</div>
-      <div class="stat-value" style="color:#085041">${hotCount}<span style="font-size:16px;color:#888"> 件</span></div>
-      <div class="stat-sub">全体の ${hotPct}%</div>
-    </div>`;
+  document.getElementById("stats-grid").innerHTML =
+    '<div class="stat-card"><div class="stat-label">回答数</div><div class="stat-value">' + total + '<span style="font-size:16px;color:#888"> 件</span></div><div class="stat-sub">最終：' + (total>0?logs[0].datetime:"—") + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">平均満足度</div><div class="stat-value">' + avg + '<span style="font-size:16px;color:#888"> ★</span></div><div class="stat-sub">5段階評価</div></div>' +
+    '<div class="stat-card" style="border-left:3px solid #1D9E75"><div class="stat-label">契約検討あり</div><div class="stat-value" style="color:#085041">' + hotCount + '<span style="font-size:16px;color:#888"> 件</span></div><div class="stat-sub">全体の ' + (total>0?Math.round(hotCount/total*100):0) + '%</div></div>';
 
-  // 契約意向チャート
-  const contractHTML = total === 0
-    ? `<div style="color:#888;font-size:13px">データがありません</div>`
-    : CONTRACT_LABELS.map((k, i) => `
-      <div class="bar-row">
-        <div class="bar-label"><span style="font-size:11px">${k}</span><span style="color:#888">${contractCounts[i]}件（${Math.round(contractCounts[i]/total*100)}%）</span></div>
-        <div class="bar-track"><div class="bar-fill ${CONTRACT_BAR[i]}" style="width:${Math.round(contractCounts[i]/total*100)}%"></div></div>
-      </div>`).join("");
+  const contractHTML = total===0 ? '<div style="color:#888;font-size:13px">データがありません</div>'
+    : CONTRACT_LABELS.map((k,i) =>
+      '<div class="bar-row"><div class="bar-label"><span style="font-size:11px">' + k + '</span><span style="color:#888">' + contractCounts[i] + '件（' + Math.round(contractCounts[i]/total*100) + '%）</span></div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + Math.round(contractCounts[i]/total*100) + '%;background:' + CONTRACT_COLORS[i] + '"></div></div></div>'
+    ).join("");
 
-  // 満足度分布
   const starCounts = [0,0,0,0,0];
   const emojis = ["😔","😐","🙂","😊","😍"];
-  logs.forEach(l => { const s = parseInt(l.satisfaction)-1; if(s>=0&&s<=4) starCounts[s]++; });
-  const starHTML = total === 0
-    ? `<div style="color:#888;font-size:13px">データがありません</div>`
-    : starCounts.map((c, i) => `
-      <div class="bar-row">
-        <div class="bar-label"><span>${emojis[i]} ${i+1}★</span><span style="color:#888">${c}件</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${total>0?Math.round(c/total*100):0}%;background:#1D9E75"></div></div>
-      </div>`).join("");
+  logs.forEach(l => { const s=parseInt(l.satisfaction)-1; if(s>=0&&s<=4) starCounts[s]++; });
+  const starHTML = total===0 ? '<div style="color:#888;font-size:13px">データがありません</div>'
+    : starCounts.map((c,i) =>
+      '<div class="bar-row"><div class="bar-label"><span>' + emojis[i] + ' ' + (i+1) + '★</span><span style="color:#888">' + c + '件</span></div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + (total>0?Math.round(c/total*100):0) + '%"></div></div></div>'
+    ).join("");
 
-  document.getElementById("chart-grid").innerHTML = `
-    <div class="chart-card"><div class="chart-title">契約意向 内訳</div>${contractHTML}</div>
-    <div class="chart-card"><div class="chart-title">満足度 分布</div>${starHTML}</div>`;
+  document.getElementById("chart-grid").innerHTML =
+    '<div class="chart-card"><div class="chart-title">契約意向 内訳</div>' + contractHTML + '</div>' +
+    '<div class="chart-card"><div class="chart-title">満足度 分布</div>' + starHTML + '</div>';
 
-  if (total === 0) {
-    document.getElementById("log-table").innerHTML = `<div class="empty-state">まだ回答がありません</div>`;
-    return;
-  }
-  const rows = [...logs].reverse().map(l => `
-    <tr>
-      <td style="white-space:nowrap;color:#888;font-size:11px">${l.datetime}</td>
-      <td style="text-align:center">${l.satisfaction}</td>
-      <td style="font-size:11px;color:#555;max-width:120px">${l.body_change}</td>
-      <td><span class="badge ${CONTRACT_BADGE[CONTRACT_LABELS.indexOf(l.contract)]||"badge-cold"}" style="font-size:10px;white-space:normal;line-height:1.4">${l.contract}</span></td>
-      <td class="comment-cell">${l.comment || "—"}</td>
-    </tr>`).join("");
-
-  document.getElementById("log-table").innerHTML = `
-    <table>
-      <thead><tr><th>日時</th><th>満足度</th><th>体の変化</th><th>契約意向</th><th>コメント</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  if (total===0) { document.getElementById("log-table").innerHTML='<div class="empty-state">まだ回答がありません</div>'; return; }
+  document.getElementById("log-table").innerHTML =
+    '<table><thead><tr><th>日時</th><th>満足度</th><th>体の変化</th><th>契約意向</th><th>コメント</th></tr></thead><tbody>' +
+    logs.map(l =>
+      '<tr><td style="white-space:nowrap;color:#888;font-size:11px">' + (l.datetime||"—") + '</td>' +
+      '<td style="text-align:center">' + (l.satisfaction||"—") + '</td>' +
+      '<td style="font-size:11px;color:#555;max-width:130px">' + (l.body_change||"—") + '</td>' +
+      '<td><span class="badge ' + (CONTRACT_BADGE[CONTRACT_LABELS.indexOf(l.contract)]||"badge-cold") + '" style="font-size:10px;white-space:normal;line-height:1.4">' + (l.contract||"—") + '</span></td>' +
+      '<td style="font-size:11px;color:#555;max-width:150px">' + (l.comment||"—") + '</td></tr>'
+    ).join("") + '</tbody></table>';
 }
 
 function downloadCSV() {
-  const logs = getLogs();
-  if (logs.length === 0) { alert("ログがまだありません"); return; }
+  if (allLogs.length===0) { alert("データがありません"); return; }
   const header = ["日時","満足度","体の変化","契約意向","コメント"];
-  const rows = logs.map(l => [l.datetime,l.satisfaction,l.body_change,l.contract,l.comment].map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(","));
+  const rows = allLogs.map(l => [l.datetime,l.satisfaction,l.body_change,l.contract,l.comment].map(v=>'"'+(v||"").replace(/"/g,'""')+'"').join(","));
   const csv = "\uFEFF" + [header.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href=url; a.download=`herbelle_survey_${new Date().toISOString().slice(0,10)}.csv`;
+  const a = document.createElement("a"); a.href=url; a.download="herbelle_survey_"+new Date().toISOString().slice(0,10)+".csv";
   a.click(); URL.revokeObjectURL(url);
 }
 
-function clearLogs() {
-  if (!confirm("全てのログを削除しますか？\nこの操作は取り消せません。")) return;
-  localStorage.removeItem("herbelle_survey_logs");
-  renderAdmin();
-}
-
-if (sessionStorage.getItem("herbelle_survey_admin") === "1") {
-  document.getElementById("login-box").style.display = "none";
-  document.getElementById("admin-area").style.display = "block";
-  renderAdmin();
-}
+if (sessionStorage.getItem("herbelle_survey_admin")==="1") { document.getElementById("login-box").style.display="none"; document.getElementById("admin-area").style.display="block"; loadData(); }
 </script>
 </body>
 </html>

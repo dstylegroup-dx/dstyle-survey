@@ -21,11 +21,10 @@
     .option-btn.selected { border-color: #1D9E75; background: #E1F5EE; color: #0F6E56; font-weight: 500; }
     .option-icon { width: 28px; height: 28px; border-radius: 50%; background: #f5f5f3; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
     .nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 1.75rem; }
-    .btn-next { background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 12px 28px; font-size: 15px; cursor: pointer; transition: opacity 0.2s, background 0.2s; opacity: 0.4; pointer-events: none; font-family: inherit; }
+    .btn-next { background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 12px 28px; font-size: 15px; cursor: pointer; transition: opacity 0.2s; opacity: 0.4; pointer-events: none; font-family: inherit; }
     .btn-next.enabled { opacity: 1; pointer-events: auto; }
     .btn-next.enabled:hover { background: #0F6E56; }
     .btn-back { background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 8px; font-family: inherit; }
-    .btn-back:hover { color: #1a1a1a; }
     .loading-area { display: none; text-align: center; padding: 4rem 0; }
     .loading-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; margin: 0 3px; animation: bounce 1.2s infinite; }
     .loading-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -42,10 +41,9 @@
     .recommend-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 0.75rem; }
     .recommend-name { font-size: 16px; font-weight: 500; color: #1a1a1a; margin-bottom: 4px; }
     .recommend-desc { font-size: 14px; color: #666; line-height: 1.6; }
-    .cta-btn { display: block; width: 100%; background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 1.5rem; text-align: center; text-decoration: none; font-family: inherit; transition: background 0.2s; }
+    .cta-btn { display: block; width: 100%; background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 1.5rem; text-align: center; text-decoration: none; font-family: inherit; }
     .cta-btn:hover { background: #0F6E56; }
     .retry-btn { background: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 16px; font-size: 13px; color: #888; cursor: pointer; margin: 1rem auto 0; display: block; font-family: inherit; }
-    .retry-btn:hover { color: #1a1a1a; }
     @media (max-width: 480px) { .question-text { font-size: 18px; } .wrap { padding: 1.5rem 1rem 3rem; } }
   </style>
 </head>
@@ -66,40 +64,31 @@
   </div>
   <div class="result-area" id="result-area"></div>
 </div>
-
 <script>
+const SUPABASE_URL = "https://njhjqderykpytvsfcjwn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_0d90l4FAAkxE4IY7Inn2gQ_te7mxe6A";
+
 const questions = [
   { id: "concern", label: "Q1 / 5", text: "いちばん気になっているお悩みは？", options: [
-    { icon: "🧊", text: "冷えがひどい、手足が冷たい" },
-    { icon: "💧", text: "むくみやすい、重だるい" },
-    { icon: "🌀", text: "PMS・生理痛がつらい" },
-    { icon: "😮‍💨", text: "疲れがとれない、だるい" },
-    { icon: "🌙", text: "眠れない、イライラしやすい" },
-    { icon: "✨", text: "肌荒れ・くすみが気になる" }
+    { icon: "🧊", text: "冷えがひどい、手足が冷たい" }, { icon: "💧", text: "むくみやすい、重だるい" },
+    { icon: "🌀", text: "PMS・生理痛がつらい" }, { icon: "😮‍💨", text: "疲れがとれない、だるい" },
+    { icon: "🌙", text: "眠れない、イライラしやすい" }, { icon: "✨", text: "肌荒れ・くすみが気になる" }
   ]},
   { id: "body", label: "Q2 / 5", text: "自分の体のタイプに近いのは？", options: [
-    { icon: "❄️", text: "いつも体が冷えている" },
-    { icon: "🔥", text: "のぼせやすい、上半身は熱い" },
-    { icon: "💧", text: "水分をとりすぎるとむくむ" },
-    { icon: "🌬️", text: "気分の波が大きい、ため息が多い" }
+    { icon: "❄️", text: "いつも体が冷えている" }, { icon: "🔥", text: "のぼせやすい、上半身は熱い" },
+    { icon: "💧", text: "水分をとりすぎるとむくむ" }, { icon: "🌬️", text: "気分の波が大きい、ため息が多い" }
   ]},
   { id: "lifestyle", label: "Q3 / 5", text: "日常生活で当てはまるのは？", options: [
-    { icon: "💻", text: "デスクワークが多く、座りっぱなし" },
-    { icon: "🏃", text: "体を動かすことが多い" },
-    { icon: "🌙", text: "夜型・睡眠不足になりがち" },
-    { icon: "🍱", text: "食事が不規則、外食が多い" }
+    { icon: "💻", text: "デスクワークが多く、座りっぱなし" }, { icon: "🏃", text: "体を動かすことが多い" },
+    { icon: "🌙", text: "夜型・睡眠不足になりがち" }, { icon: "🍱", text: "食事が不規則、外食が多い" }
   ]},
   { id: "stress", label: "Q4 / 5", text: "最近のストレスや気分は？", options: [
-    { icon: "😤", text: "仕事や人間関係でストレスが多い" },
-    { icon: "😶", text: "感情が揺れやすく、落ち込みやすい" },
-    { icon: "😌", text: "わりと安定している" },
-    { icon: "🫠", text: "なんとなくぼーっとしている" }
+    { icon: "😤", text: "仕事や人間関係でストレスが多い" }, { icon: "😶", text: "感情が揺れやすく、落ち込みやすい" },
+    { icon: "😌", text: "わりと安定している" }, { icon: "🫠", text: "なんとなくぼーっとしている" }
   ]},
   { id: "goal", label: "Q5 / 5", text: "よもぎ蒸しに何を求めていますか？", options: [
-    { icon: "🌿", text: "とにかく体を温めたい" },
-    { icon: "🧘", text: "心をリセット、リラックスしたい" },
-    { icon: "💆", text: "ホルモンバランスを整えたい" },
-    { icon: "✨", text: "美肌・デトックス効果がほしい" },
+    { icon: "🌿", text: "とにかく体を温めたい" }, { icon: "🧘", text: "心をリセット、リラックスしたい" },
+    { icon: "💆", text: "ホルモンバランスを整えたい" }, { icon: "✨", text: "美肌・デトックス効果がほしい" },
     { icon: "🔋", text: "疲労回復・体力をつけたい" }
   ]}
 ];
@@ -121,58 +110,47 @@ function getResultKey(a) {
   return "疲労・ストレス";
 }
 
-function getLogs() { try { return JSON.parse(localStorage.getItem("herbelle_logs") || "[]"); } catch { return []; } }
-function saveLogs(logs) { localStorage.setItem("herbelle_logs", JSON.stringify(logs)); }
-function addLog(a, resultKey) {
-  const logs = getLogs();
+async function saveToSupabase(a, resultKey) {
   const now = new Date();
   const p = n => String(n).padStart(2, "0");
-  logs.push({
-    datetime: `${now.getFullYear()}/${p(now.getMonth()+1)}/${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}`,
-    result: resultKey,
-    q1: questions[0].options[a.concern]?.text || "",
-    q2: questions[1].options[a.body]?.text || "",
-    q3: questions[2].options[a.lifestyle]?.text || "",
-    q4: questions[3].options[a.stress]?.text || "",
-    q5: questions[4].options[a.goal]?.text || ""
-  });
-  saveLogs(logs);
+  const datetime = now.getFullYear() + "/" + p(now.getMonth()+1) + "/" + p(now.getDate()) + " " + p(now.getHours()) + ":" + p(now.getMinutes());
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/shindan_logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
+      body: JSON.stringify({
+        datetime, result: resultKey,
+        q1: questions[0].options[a.concern]?.text || "",
+        q2: questions[1].options[a.body]?.text || "",
+        q3: questions[2].options[a.lifestyle]?.text || "",
+        q4: questions[3].options[a.stress]?.text || "",
+        q5: questions[4].options[a.goal]?.text || ""
+      })
+    });
+  } catch(e) { console.error("Supabase error:", e); }
 }
 
 function renderQuestion() {
   const q = questions[current];
   selectedIndex = null;
   document.getElementById("step-indicator").innerHTML = questions.map((_, i) =>
-    `<div class="step-dot${i < current ? " done" : i === current ? " active" : ""}"></div>`).join("");
-  document.getElementById("question-area").innerHTML = `
-    <div class="question-label">${q.label}</div>
-    <div class="question-text">${q.text}</div>
-    <div class="options-grid">${q.options.map((o, i) =>
-      `<button class="option-btn" onclick="selectOption(${i})" id="opt-${i}">
-        <span class="option-icon">${o.icon}</span><span>${o.text}</span>
-      </button>`).join("")}</div>`;
+    '<div class="step-dot' + (i < current ? " done" : i === current ? " active" : "") + '"></div>').join("");
+  document.getElementById("question-area").innerHTML =
+    '<div class="question-label">' + q.label + '</div>' +
+    '<div class="question-text">' + q.text + '</div>' +
+    '<div class="options-grid">' + q.options.map((o, i) =>
+      '<button class="option-btn" onclick="selectOption(' + i + ')" id="opt-' + i + '"><span class="option-icon">' + o.icon + '</span><span>' + o.text + '</span></button>'
+    ).join("") + '</div>';
   const prev = answers[q.id];
-  if (prev !== undefined) { selectedIndex = prev; document.getElementById(`opt-${prev}`)?.classList.add("selected"); setNextEnabled(true); }
+  if (prev !== undefined) { selectedIndex = prev; document.getElementById("opt-" + prev)?.classList.add("selected"); setNextEnabled(true); }
   else { setNextEnabled(false); }
   document.getElementById("btn-next").textContent = current === questions.length - 1 ? "診断する" : "つぎへ";
   document.getElementById("btn-back").style.visibility = current === 0 ? "hidden" : "visible";
 }
 
 function setNextEnabled(v) { document.getElementById("btn-next").classList.toggle("enabled", v); }
-
-function selectOption(i) {
-  document.querySelectorAll(".option-btn").forEach(b => b.classList.remove("selected"));
-  document.getElementById(`opt-${i}`).classList.add("selected");
-  selectedIndex = i; setNextEnabled(true);
-}
-
-function goNext() {
-  if (selectedIndex === null) return;
-  answers[questions[current].id] = selectedIndex;
-  if (current < questions.length - 1) { current++; renderQuestion(); }
-  else { showLoading(); }
-}
-
+function selectOption(i) { document.querySelectorAll(".option-btn").forEach(b => b.classList.remove("selected")); document.getElementById("opt-" + i).classList.add("selected"); selectedIndex = i; setNextEnabled(true); }
+function goNext() { if (selectedIndex === null) return; answers[questions[current].id] = selectedIndex; if (current < questions.length - 1) { current++; renderQuestion(); } else { showLoading(); } }
 function goBack() { if (current > 0) { current--; renderQuestion(); } }
 
 function showLoading() {
@@ -181,11 +159,11 @@ function showLoading() {
   const msgs = ["あなたの体質を分析中...", "東洋医学の観点で診断しています...", "おすすめのプランを選んでいます..."];
   let mi = 0;
   const iv = setInterval(() => { mi=(mi+1)%msgs.length; const el=document.getElementById("loading-text"); if(el) el.textContent=msgs[mi]; }, 1200);
-  setTimeout(() => {
+  setTimeout(async () => {
     clearInterval(iv);
     document.getElementById("loading-area").style.display = "none";
     const key = getResultKey(answers);
-    addLog(answers, key);
+    await saveToSupabase(answers, key);
     showResult(results[key]);
   }, 3000);
 }
@@ -193,43 +171,19 @@ function showLoading() {
 function showResult(r) {
   const area = document.getElementById("result-area");
   area.style.display = "block";
-  area.innerHTML = `
-    <div class="result-header">
-      <div class="result-type">あなたの体質タイプ</div>
-      <div class="result-title">${r.type}</div>
-    </div>
-    <div class="result-section">
-      <div class="result-section-text" style="font-size:16px;line-height:1.8">${r.message}</div>
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">体質分析</div>
-      <div class="result-section-text">${r.analysis}</div>
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">おすすめのコース</div>
-      ${r.recommend.map(rec => `<div class="recommend-card"><div class="recommend-name">${rec.name}</div><div class="recommend-desc">${rec.desc}</div></div>`).join("")}
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">おすすめ来店頻度</div>
-      <div class="result-section-text">${r.frequency}</div>
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">日常生活のアドバイス</div>
-      <div class="result-section-text">${r.lifestyle}</div>
-    </div>
-    <a class="cta-btn" href="https://dstylegroup.stores.jp/reserve/Herbelle/1346787" target="_blank">初回体験を予約する →</a>
-    <div style="text-align:center;margin-top:1rem">
-      <button class="retry-btn" onclick="restart()">もう一度診断する</button>
-    </div>`;
+  area.innerHTML =
+    '<div class="result-header"><div class="result-type">あなたの体質タイプ</div><div class="result-title">' + r.type + '</div></div>' +
+    '<div class="result-section"><div class="result-section-text" style="font-size:16px;line-height:1.8">' + r.message + '</div></div>' +
+    '<div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">体質分析</div><div class="result-section-text">' + r.analysis + '</div></div>' +
+    '<div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">おすすめのコース</div>' +
+    r.recommend.map(rec => '<div class="recommend-card"><div class="recommend-name">' + rec.name + '</div><div class="recommend-desc">' + rec.desc + '</div></div>').join("") + '</div>' +
+    '<div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">おすすめ来店頻度</div><div class="result-section-text">' + r.frequency + '</div></div>' +
+    '<div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">日常生活のアドバイス</div><div class="result-section-text">' + r.lifestyle + '</div></div>' +
+    '<a class="cta-btn" href="https://dstylegroup.stores.jp/reserve/Herbelle/1346787" target="_blank">初回体験を予約する →</a>' +
+    '<div style="text-align:center;margin-top:1rem"><button class="retry-btn" onclick="restart()">もう一度診断する</button></div>';
 }
 
-function restart() {
-  current=0; answers={}; selectedIndex=null;
-  document.getElementById("result-area").style.display="none";
-  document.getElementById("quiz-area").style.display="block";
-  renderQuestion();
-}
-
+function restart() { current=0; answers={}; selectedIndex=null; document.getElementById("result-area").style.display="none"; document.getElementById("quiz-area").style.display="block"; renderQuestion(); }
 renderQuestion();
 </script>
 </body>
