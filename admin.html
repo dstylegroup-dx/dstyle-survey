@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herbelle — 管理者ページ</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; background: #fafaf8; color: #1a1a1a; min-height: 100vh; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    .herb-logo { font-size: 11px; letter-spacing: 0.2em; color: #999; text-transform: uppercase; margin-bottom: 2.5rem; }
+
+    /* ログイン画面 */
+    .login-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 2rem; max-width: 360px; margin: 4rem auto; text-align: center; }
+    .login-title { font-size: 16px; font-weight: 500; color: #1a1a1a; margin-bottom: 0.5rem; }
+    .login-sub { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+    .login-input { width: 100%; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 14px; font-size: 15px; font-family: inherit; outline: none; margin-bottom: 10px; }
+    .login-input:focus { border-color: #1D9E75; }
+    .login-btn { width: 100%; background: #1D9E75; color: white; border: none; border-radius: 8px; padding: 12px; font-size: 15px; font-family: inherit; cursor: pointer; }
+    .login-btn:hover { background: #0F6E56; }
+    .login-error { font-size: 13px; color: #c0392b; margin-top: 8px; display: none; }
+
+    /* 管理画面 */
+    .admin-area { display: none; }
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .admin-title { font-size: 18px; font-weight: 500; color: #1a1a1a; }
+    .logout-btn { font-size: 13px; color: #888; background: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
+    .logout-btn:hover { color: #1a1a1a; }
+
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 2rem; }
+    .stat-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.25rem; }
+    .stat-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 500; color: #1a1a1a; }
+    .stat-sub { font-size: 13px; color: #888; margin-top: 2px; }
+
+    .result-bars { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; }
+    .result-bars-title { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-bottom: 1rem; }
+    .bar-row { margin-bottom: 14px; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 13px; color: #333; margin-bottom: 4px; }
+    .bar-count { color: #888; }
+    .bar-track { height: 8px; background: #f0f0ee; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .bar-cold   { background: #378ADD; }
+    .bar-pms    { background: #D4537E; }
+    .bar-stress { background: #BA7517; }
+    .bar-skin   { background: #639922; }
+
+    .section-title { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-bottom: 0.75rem; }
+    .action-btns { display: flex; gap: 10px; margin-bottom: 2rem; }
+    .action-btn { flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-family: inherit; cursor: pointer; border: 1px solid #e0e0e0; background: #fff; color: #333; }
+    .action-btn.primary { background: #1D9E75; color: white; border-color: #1D9E75; font-weight: 500; }
+    .action-btn.primary:hover { background: #0F6E56; }
+    .action-btn.danger { color: #c0392b; }
+    .action-btn.danger:hover { background: #fff5f5; }
+
+    .log-table-wrap { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: #f5f5f3; padding: 10px 12px; text-align: left; font-weight: 500; color: #555; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
+    tbody td { padding: 10px 12px; border-bottom: 1px solid #f0f0ee; color: #333; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #fafaf8; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+    .badge-cold   { background: #E6F1FB; color: #0C447C; }
+    .badge-pms    { background: #FBEAF0; color: #72243E; }
+    .badge-stress { background: #FAEEDA; color: #633806; }
+    .badge-skin   { background: #EAF3DE; color: #27500A; }
+    .empty-state { padding: 3rem; text-align: center; color: #888; font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="herb-logo">Herbelle — 管理者ページ</div>
+
+  <!-- ログイン -->
+  <div class="login-box" id="login-box">
+    <div class="login-title">管理者ログイン</div>
+    <div class="login-sub">パスワードを入力してください</div>
+    <input class="login-input" type="password" id="pw-input" placeholder="パスワード" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="login-error">パスワードが違います</div>
+  </div>
+
+  <!-- 管理画面 -->
+  <div class="admin-area" id="admin-area">
+    <div class="admin-header">
+      <div class="admin-title">診断ログ 集計</div>
+      <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+    </div>
+
+    <!-- サマリー -->
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- 結果別バー -->
+    <div class="result-bars">
+      <div class="result-bars-title">結果タイプ別 内訳</div>
+      <div id="bar-chart"></div>
+    </div>
+
+    <!-- アクション -->
+    <div class="section-title">データ操作</div>
+    <div class="action-btns">
+      <button class="action-btn primary" onclick="downloadCSV()">CSVダウンロード</button>
+      <button class="action-btn danger" onclick="clearLogs()">ログをリセット</button>
+    </div>
+
+    <!-- ログ一覧 -->
+    <div class="section-title">診断ログ 一覧</div>
+    <div class="log-table-wrap">
+      <div id="log-table"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PASS = "Herbelle19870701";
+const RESULT_LABELS = ["冷え・むくみ", "PMS・ホルモン", "疲労・ストレス", "美肌・デトックス"];
+const BADGE_CLASS = { "冷え・むくみ": "badge-cold", "PMS・ホルモン": "badge-pms", "疲労・ストレス": "badge-stress", "美肌・デトックス": "badge-skin" };
+const BAR_CLASS   = { "冷え・むくみ": "bar-cold",   "PMS・ホルモン": "bar-pms",   "疲労・ストレス": "bar-stress",   "美肌・デトックス": "bar-skin" };
+
+function getLogs() { try { return JSON.parse(localStorage.getItem("herbelle_logs") || "[]"); } catch { return []; } }
+
+function doLogin() {
+  const val = document.getElementById("pw-input").value;
+  if (val === PASS) {
+    sessionStorage.setItem("herbelle_admin", "1");
+    document.getElementById("login-box").style.display = "none";
+    document.getElementById("admin-area").style.display = "block";
+    renderAdmin();
+  } else {
+    document.getElementById("login-error").style.display = "block";
+    document.getElementById("pw-input").value = "";
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem("herbelle_admin");
+  document.getElementById("admin-area").style.display = "none";
+  document.getElementById("login-box").style.display = "block";
+  document.getElementById("pw-input").value = "";
+}
+
+function renderAdmin() {
+  const logs = getLogs();
+  const total = logs.length;
+  const counts = {};
+  RESULT_LABELS.forEach(k => counts[k] = 0);
+  logs.forEach(l => { if (counts[l.result] !== undefined) counts[l.result]++; });
+
+  // サマリーカード
+  const last = logs.length > 0 ? logs[logs.length-1].datetime : "—";
+  const top = total > 0 ? Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0] : "—";
+  document.getElementById("stats-grid").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">合計診断数</div>
+      <div class="stat-value">${total}<span style="font-size:16px;color:#888"> 件</span></div>
+      <div class="stat-sub">最終：${last}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">最多タイプ</div>
+      <div class="stat-value" style="font-size:18px;line-height:1.4">${top}</div>
+      <div class="stat-sub">${top !== "—" ? counts[top]+"件（"+Math.round(counts[top]/total*100)+"%）" : ""}</div>
+    </div>`;
+
+  // バーチャート
+  document.getElementById("bar-chart").innerHTML = total === 0
+    ? `<div style="color:#888;font-size:13px">データがありません</div>`
+    : RESULT_LABELS.map(k => `
+      <div class="bar-row">
+        <div class="bar-label"><span>${k}</span><span class="bar-count">${counts[k]}件（${Math.round(counts[k]/total*100)}%）</span></div>
+        <div class="bar-track"><div class="bar-fill ${BAR_CLASS[k]}" style="width:${total>0?Math.round(counts[k]/total*100):0}%"></div></div>
+      </div>`).join("");
+
+  // ログ一覧
+  if (total === 0) {
+    document.getElementById("log-table").innerHTML = `<div class="empty-state">まだログがありません</div>`;
+    return;
+  }
+  const rows = [...logs].reverse().map(l => `
+    <tr>
+      <td style="white-space:nowrap;color:#888">${l.datetime}</td>
+      <td><span class="badge ${BADGE_CLASS[l.result]||""}">${l.result}</span></td>
+      <td style="font-size:12px;color:#555">${l.q1}</td>
+      <td style="font-size:12px;color:#555">${l.q5}</td>
+    </tr>`).join("");
+  document.getElementById("log-table").innerHTML = `
+    <table>
+      <thead><tr><th>日時</th><th>結果</th><th>Q1：お悩み</th><th>Q5：期待</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function downloadCSV() {
+  const logs = getLogs();
+  if (logs.length === 0) { alert("ログがまだありません"); return; }
+  const header = ["日時","診断結果","Q1：お悩み","Q2：体のタイプ","Q3：生活習慣","Q4：ストレス","Q5：期待"];
+  const rows = logs.map(l => [l.datetime,l.result,l.q1,l.q2,l.q3,l.q4,l.q5].map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(","));
+  const csv = "\uFEFF" + [header.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`herbelle_log_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function clearLogs() {
+  if (!confirm("全てのログを削除しますか？\nこの操作は取り消せません。")) return;
+  localStorage.removeItem("herbelle_logs");
+  renderAdmin();
+}
+
+// セッション維持
+if (sessionStorage.getItem("herbelle_admin") === "1") {
+  document.getElementById("login-box").style.display = "none";
+  document.getElementById("admin-area").style.display = "block";
+  renderAdmin();
+}
+</script>
+</body>
+</html>

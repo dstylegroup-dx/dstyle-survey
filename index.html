@@ -6,240 +6,52 @@
   <title>Herbelle — 体質診断</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-      background: #fafaf8;
-      color: #1a1a1a;
-      min-height: 100vh;
-    }
-    .wrap {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 2.5rem 1.25rem 4rem;
-    }
-    .herb-logo {
-      font-size: 11px;
-      letter-spacing: 0.2em;
-      color: #999;
-      text-transform: uppercase;
-      margin-bottom: 2.5rem;
-    }
-    .step-indicator {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 2rem;
-    }
-    .step-dot {
-      height: 3px;
-      flex: 1;
-      border-radius: 2px;
-      background: #e0e0e0;
-      transition: background 0.3s;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; background: #fafaf8; color: #1a1a1a; min-height: 100vh; }
+    .wrap { max-width: 600px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    .herb-logo { font-size: 11px; letter-spacing: 0.2em; color: #999; text-transform: uppercase; margin-bottom: 2.5rem; }
+    .step-indicator { display: flex; gap: 6px; margin-bottom: 2rem; }
+    .step-dot { height: 3px; flex: 1; border-radius: 2px; background: #e0e0e0; transition: background 0.3s; }
     .step-dot.active { background: #1D9E75; }
     .step-dot.done { background: #5DCAA5; }
-    .question-label {
-      font-size: 11px;
-      letter-spacing: 0.12em;
-      color: #1D9E75;
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-    }
-    .question-text {
-      font-size: 20px;
-      font-weight: 500;
-      color: #1a1a1a;
-      line-height: 1.5;
-      margin-bottom: 1.75rem;
-    }
-    .options-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .option-btn {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 12px;
-      padding: 14px 18px;
-      text-align: left;
-      cursor: pointer;
-      font-size: 15px;
-      color: #1a1a1a;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-family: inherit;
-    }
-    .option-btn:hover {
-      border-color: #1D9E75;
-      background: #E1F5EE;
-      color: #0F6E56;
-    }
-    .option-btn.selected {
-      border-color: #1D9E75;
-      background: #E1F5EE;
-      color: #0F6E56;
-      font-weight: 500;
-    }
-    .option-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #f5f5f3;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-    .nav-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 1.75rem;
-    }
-    .btn-next {
-      background: #1D9E75;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      padding: 12px 28px;
-      font-size: 15px;
-      cursor: pointer;
-      transition: opacity 0.2s, background 0.2s;
-      opacity: 0.4;
-      pointer-events: none;
-      font-family: inherit;
-    }
+    .question-label { font-size: 11px; letter-spacing: 0.12em; color: #1D9E75; margin-bottom: 0.5rem; text-transform: uppercase; }
+    .question-text { font-size: 20px; font-weight: 500; color: #1a1a1a; line-height: 1.5; margin-bottom: 1.75rem; }
+    .options-grid { display: flex; flex-direction: column; gap: 10px; }
+    .option-btn { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 14px 18px; text-align: left; cursor: pointer; font-size: 15px; color: #1a1a1a; transition: all 0.15s; display: flex; align-items: center; gap: 12px; font-family: inherit; }
+    .option-btn:hover { border-color: #1D9E75; background: #E1F5EE; color: #0F6E56; }
+    .option-btn.selected { border-color: #1D9E75; background: #E1F5EE; color: #0F6E56; font-weight: 500; }
+    .option-icon { width: 28px; height: 28px; border-radius: 50%; background: #f5f5f3; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 1.75rem; }
+    .btn-next { background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 12px 28px; font-size: 15px; cursor: pointer; transition: opacity 0.2s, background 0.2s; opacity: 0.4; pointer-events: none; font-family: inherit; }
     .btn-next.enabled { opacity: 1; pointer-events: auto; }
     .btn-next.enabled:hover { background: #0F6E56; }
-    .btn-back {
-      background: none;
-      border: none;
-      color: #888;
-      font-size: 14px;
-      cursor: pointer;
-      padding: 8px;
-      font-family: inherit;
-    }
+    .btn-back { background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 8px; font-family: inherit; }
     .btn-back:hover { color: #1a1a1a; }
-    .loading-area {
-      display: none;
-      text-align: center;
-      padding: 4rem 0;
-    }
-    .loading-dots { margin-bottom: 1rem; }
-    .loading-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #1D9E75;
-      margin: 0 3px;
-      animation: bounce 1.2s infinite;
-    }
+    .loading-area { display: none; text-align: center; padding: 4rem 0; }
+    .loading-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; margin: 0 3px; animation: bounce 1.2s infinite; }
     .loading-dot:nth-child(2) { animation-delay: 0.2s; }
     .loading-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-      40% { transform: scale(1); opacity: 1; }
-    }
-    .loading-text { font-size: 14px; color: #888; }
+    @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+    .loading-text { font-size: 14px; color: #888; margin-top: 1rem; }
     .result-area { display: none; }
-    .result-header {
-      background: #E1F5EE;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      border: 1px solid #9FE1CB;
-    }
-    .result-type {
-      font-size: 11px;
-      letter-spacing: 0.12em;
-      color: #0F6E56;
-      text-transform: uppercase;
-      margin-bottom: 0.5rem;
-    }
-    .result-title {
-      font-size: 22px;
-      font-weight: 500;
-      color: #085041;
-      line-height: 1.4;
-    }
+    .result-header { background: #E1F5EE; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #9FE1CB; }
+    .result-type { font-size: 11px; letter-spacing: 0.12em; color: #0F6E56; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .result-title { font-size: 22px; font-weight: 500; color: #085041; line-height: 1.4; }
     .result-section { margin-bottom: 1.5rem; }
-    .result-section-label {
-      font-size: 11px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #1D9E75;
-      margin-bottom: 0.5rem;
-    }
-    .result-section-text {
-      font-size: 15px;
-      color: #333;
-      line-height: 1.75;
-    }
-    .recommend-card {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 0.75rem;
-    }
-    .recommend-name {
-      font-size: 16px;
-      font-weight: 500;
-      color: #1a1a1a;
-      margin-bottom: 4px;
-    }
-    .recommend-desc {
-      font-size: 14px;
-      color: #666;
-      line-height: 1.6;
-    }
-    .cta-btn {
-      display: block;
-      width: 100%;
-      background: #1D9E75;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      padding: 16px;
-      font-size: 16px;
-      font-weight: 500;
-      cursor: pointer;
-      margin-top: 1.5rem;
-      text-align: center;
-      text-decoration: none;
-      font-family: inherit;
-      transition: background 0.2s;
-    }
+    .result-section-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #1D9E75; margin-bottom: 0.5rem; }
+    .result-section-text { font-size: 15px; color: #333; line-height: 1.75; }
+    .recommend-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 0.75rem; }
+    .recommend-name { font-size: 16px; font-weight: 500; color: #1a1a1a; margin-bottom: 4px; }
+    .recommend-desc { font-size: 14px; color: #666; line-height: 1.6; }
+    .cta-btn { display: block; width: 100%; background: #1D9E75; color: white; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 1.5rem; text-align: center; text-decoration: none; font-family: inherit; transition: background 0.2s; }
     .cta-btn:hover { background: #0F6E56; }
-    .retry-btn {
-      background: none;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 8px 16px;
-      font-size: 13px;
-      color: #888;
-      cursor: pointer;
-      margin: 1rem auto 0;
-      display: block;
-      font-family: inherit;
-    }
+    .retry-btn { background: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 16px; font-size: 13px; color: #888; cursor: pointer; margin: 1rem auto 0; display: block; font-family: inherit; }
     .retry-btn:hover { color: #1a1a1a; }
-    @media (max-width: 480px) {
-      .question-text { font-size: 18px; }
-      .wrap { padding: 1.5rem 1rem 3rem; }
-    }
+    @media (max-width: 480px) { .question-text { font-size: 18px; } .wrap { padding: 1.5rem 1rem 3rem; } }
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="herb-logo">Herbelle — 体質診断</div>
-
   <div id="quiz-area">
     <div class="step-indicator" id="step-indicator"></div>
     <div id="question-area" style="min-height:300px"></div>
@@ -248,226 +60,132 @@
       <button class="btn-next" id="btn-next" onclick="goNext()">つぎへ</button>
     </div>
   </div>
-
   <div class="loading-area" id="loading-area">
-    <div class="loading-dots">
-      <div class="loading-dot"></div>
-      <div class="loading-dot"></div>
-      <div class="loading-dot"></div>
-    </div>
+    <div><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>
     <div class="loading-text" id="loading-text">あなたの体質を分析中...</div>
   </div>
-
   <div class="result-area" id="result-area"></div>
+</div>
+  <div id="admin-stats"></div>
+  <div class="admin-btns">
+    <button class="admin-btn primary" onclick="downloadCSV()">CSVダウンロード</button>
+    <button class="admin-btn danger" onclick="clearLogs()">リセット</button>
+  </div>
 </div>
 
 <script>
 const questions = [
-  {
-    id: "concern",
-    label: "Q1 / 5",
-    text: "いちばん気になっているお悩みは？",
-    options: [
-      { icon: "🧊", text: "冷えがひどい、手足が冷たい" },
-      { icon: "💧", text: "むくみやすい、重だるい" },
-      { icon: "🌀", text: "PMS・生理痛がつらい" },
-      { icon: "😮‍💨", text: "疲れがとれない、だるい" },
-      { icon: "🌙", text: "眠れない、イライラしやすい" },
-      { icon: "✨", text: "肌荒れ・くすみが気になる" }
-    ]
-  },
-  {
-    id: "body",
-    label: "Q2 / 5",
-    text: "自分の体のタイプに近いのは？",
-    options: [
-      { icon: "❄️", text: "いつも体が冷えている" },
-      { icon: "🔥", text: "のぼせやすい、上半身は熱い" },
-      { icon: "💧", text: "水分をとりすぎるとむくむ" },
-      { icon: "🌬️", text: "気分の波が大きい、ため息が多い" }
-    ]
-  },
-  {
-    id: "lifestyle",
-    label: "Q3 / 5",
-    text: "日常生活で当てはまるのは？",
-    options: [
-      { icon: "💻", text: "デスクワークが多く、座りっぱなし" },
-      { icon: "🏃", text: "体を動かすことが多い" },
-      { icon: "🌙", text: "夜型・睡眠不足になりがち" },
-      { icon: "🍱", text: "食事が不規則、外食が多い" }
-    ]
-  },
-  {
-    id: "stress",
-    label: "Q4 / 5",
-    text: "最近のストレスや気分は？",
-    options: [
-      { icon: "😤", text: "仕事や人間関係でストレスが多い" },
-      { icon: "😶", text: "感情が揺れやすく、落ち込みやすい" },
-      { icon: "😌", text: "わりと安定している" },
-      { icon: "🫠", text: "なんとなくぼーっとしている" }
-    ]
-  },
-  {
-    id: "goal",
-    label: "Q5 / 5",
-    text: "よもぎ蒸しに何を求めていますか？",
-    options: [
-      { icon: "🌿", text: "とにかく体を温めたい" },
-      { icon: "🧘", text: "心をリセット、リラックスしたい" },
-      { icon: "💆", text: "ホルモンバランスを整えたい" },
-      { icon: "✨", text: "美肌・デトックス効果がほしい" },
-      { icon: "🔋", text: "疲労回復・体力をつけたい" }
-    ]
-  }
+  { id: "concern", label: "Q1 / 5", text: "いちばん気になっているお悩みは？", options: [
+    { icon: "🧊", text: "冷えがひどい、手足が冷たい" },
+    { icon: "💧", text: "むくみやすい、重だるい" },
+    { icon: "🌀", text: "PMS・生理痛がつらい" },
+    { icon: "😮‍💨", text: "疲れがとれない、だるい" },
+    { icon: "🌙", text: "眠れない、イライラしやすい" },
+    { icon: "✨", text: "肌荒れ・くすみが気になる" }
+  ]},
+  { id: "body", label: "Q2 / 5", text: "自分の体のタイプに近いのは？", options: [
+    { icon: "❄️", text: "いつも体が冷えている" },
+    { icon: "🔥", text: "のぼせやすい、上半身は熱い" },
+    { icon: "💧", text: "水分をとりすぎるとむくむ" },
+    { icon: "🌬️", text: "気分の波が大きい、ため息が多い" }
+  ]},
+  { id: "lifestyle", label: "Q3 / 5", text: "日常生活で当てはまるのは？", options: [
+    { icon: "💻", text: "デスクワークが多く、座りっぱなし" },
+    { icon: "🏃", text: "体を動かすことが多い" },
+    { icon: "🌙", text: "夜型・睡眠不足になりがち" },
+    { icon: "🍱", text: "食事が不規則、外食が多い" }
+  ]},
+  { id: "stress", label: "Q4 / 5", text: "最近のストレスや気分は？", options: [
+    { icon: "😤", text: "仕事や人間関係でストレスが多い" },
+    { icon: "😶", text: "感情が揺れやすく、落ち込みやすい" },
+    { icon: "😌", text: "わりと安定している" },
+    { icon: "🫠", text: "なんとなくぼーっとしている" }
+  ]},
+  { id: "goal", label: "Q5 / 5", text: "よもぎ蒸しに何を求めていますか？", options: [
+    { icon: "🌿", text: "とにかく体を温めたい" },
+    { icon: "🧘", text: "心をリセット、リラックスしたい" },
+    { icon: "💆", text: "ホルモンバランスを整えたい" },
+    { icon: "✨", text: "美肌・デトックス効果がほしい" },
+    { icon: "🔋", text: "疲労回復・体力をつけたい" }
+  ]}
 ];
 
 const results = {
-  "冷え・むくみ": {
-    type: "冷え性・水滞タイプ",
-    message: "体の深部から冷えが滞り、水の巡りが乱れているサインです。忙しい毎日の中で、あなたの体は「温めてほしい」と静かに訴えています。Herbelleのよもぎ蒸しで、その声にそっと応えてあげましょう。",
-    analysis: "東洋医学では「水滞（すいたい）」と呼ばれる状態で、体内の水分代謝が低下しています。よもぎの蒸気が全身を包むことで、毛細血管が開き、滞った水分と冷えを同時にほぐしていきます。",
-    recommend: [
-      { name: "温活よもぎ蒸し 60分", desc: "よもぎ+ショウガブレンドで体の芯から温めます。冷え性の方に最もおすすめのコースです。" },
-      { name: "デトックスよもぎ蒸し 90分", desc: "発汗を促しながら余分な水分をしっかり排出。むくみが気になる方に特におすすめです。" }
-    ],
-    frequency: "最初の1ヶ月は週1〜2回の集中ケアがおすすめです。体が温まりやすくなってきたら、月2〜3回のペースに移行していきましょう。",
-    lifestyle: "足首・手首・首を冷やさないよう意識し、白湯を毎朝1杯飲む習慣を取り入れてみてください。",
-    cta: "https://dstylegroup.stores.jp/reserve/Herbelle/1346787"
-  },
-  "PMS・ホルモン": {
-    type: "気滞・血虚タイプ",
-    message: "気の流れが滞り、ホルモンバランスが乱れやすい状態です。月のリズムに振り回されてしまうのは、あなたのせいではありません。Herbelleで、体の内側から整える時間をつくりましょう。",
-    analysis: "「気滞（きたい）・血虚（けっきょ）」のサインで、ストレスや血の不足が影響しています。よもぎ蒸しは子宮周辺を直接温め、骨盤内の血流を促進することで生理痛やPMSの緩和に働きかけます。",
-    recommend: [
-      { name: "婦人科系ケアよもぎ蒸し 75分", desc: "よもぎ+ラベンダーブレンドで骨盤まわりを集中的に温めます。ホルモンバランスを整えたい方に。" },
-      { name: "リラックスよもぎ蒸し 60分", desc: "心と体をゆるめることでストレス性の気滞をほぐします。生理前の不調が強い週に特におすすめです。" }
-    ],
-    frequency: "生理の1週間前から生理終了後にかけて集中的に来店いただくのが効果的です。月2〜4回を目安にしてみてください。",
-    lifestyle: "生理前はカフェインを控え、鉄分を含む食事（小松菜・ひじき・レバー）を意識して摂るとより効果的です。",
-    cta: "https://dstylegroup.stores.jp/reserve/Herbelle/1346787"
-  },
-  "疲労・ストレス": {
-    type: "気虚・肝鬱タイプ",
-    message: "エネルギーの消耗が続き、気力が底をつきかけているサインです。「疲れているのに休めない」そんなあなたに、Herbelleはただ委ねるだけでいい時間を用意しています。",
-    analysis: "「気虚（ききょ）・肝鬱（かんうつ）」の状態で、慢性的なエネルギー不足とストレスによる気の停滞が重なっています。よもぎの香り成分（シネオール）が自律神経を整え、全身温熱が副交感神経を優位にします。",
-    recommend: [
-      { name: "リストアよもぎ蒸し 90分", desc: "アロマブレンドでゆっくり深部体温を上げながら疲労回復を促します。心が疲れているときに特におすすめ。" },
-      { name: "温活よもぎ蒸し 60分", desc: "シンプルによもぎで整えるベーシックコース。まず体を温めることで免疫力と体力の底上げを図ります。" }
-    ],
-    frequency: "週1回のペースで体をリセットする習慣をつくることをおすすめします。1ヶ月続けると、疲れにくい体の変化を実感される方が多いです。",
-    lifestyle: "就寝1時間前のスマホを控え、ぬるめ（38〜40℃）のお風呂に10分つかる習慣が自律神経の回復を助けます。",
-    cta: "https://dstylegroup.stores.jp/reserve/Herbelle/1346787"
-  },
-  "美肌・デトックス": {
-    type: "血熱・湿熱タイプ",
-    message: "体内に余分な熱と湿気が溜まり、肌に影響が出やすい状態です。外からのケアだけでなく、内側からのデトックスが今のあなたには必要です。Herbelleで、本来の透明感を取り戻しましょう。",
-    analysis: "「血熱（けつねつ）・湿熱（しつねつ）」タイプで、体内の老廃物が排出しきれていないサインです。よもぎ蒸しの発汗作用が毛穴の詰まりをほぐし、リンパの流れを促進して肌の代謝を高めます。",
-    recommend: [
-      { name: "クリアリングよもぎ蒸し 75分", desc: "よもぎ+緑茶ブレンドでデトックスと抗酸化を同時にアプローチ。肌荒れ・くすみが気になる方に。" },
-      { name: "デトックスよもぎ蒸し 90分", desc: "しっかり発汗することで老廃物を排出。肌の透明感を上げたい方に特におすすめのコースです。" }
-    ],
-    frequency: "肌の細胞は約28日周期でターンオーバーします。2週に1回のペースで3ヶ月継続すると、肌質の変化を実感しやすくなります。",
-    lifestyle: "砂糖・アルコール・脂質の多い食事を控え、水分を1日1.5L意識して摂ることでデトックス効果が高まります。",
-    cta: "https://dstylegroup.stores.jp/reserve/Herbelle/1346787"
-  }
+  "冷え・むくみ": { type: "冷え性・水滞タイプ", message: "体の深部から冷えが滞り、水の巡りが乱れているサインです。忙しい毎日の中で、あなたの体は「温めてほしい」と静かに訴えています。Herbelleのよもぎ蒸しで、その声にそっと応えてあげましょう。", analysis: "東洋医学では「水滞（すいたい）」と呼ばれる状態で、体内の水分代謝が低下しています。よもぎの蒸気が全身を包むことで、毛細血管が開き、滞った水分と冷えを同時にほぐしていきます。", recommend: [{ name: "温活よもぎ蒸し 60分", desc: "よもぎ+ショウガブレンドで体の芯から温めます。冷え性の方に最もおすすめのコースです。" }, { name: "デトックスよもぎ蒸し 90分", desc: "発汗を促しながら余分な水分をしっかり排出。むくみが気になる方に特におすすめです。" }], frequency: "最初の1ヶ月は週1〜2回の集中ケアがおすすめです。体が温まりやすくなってきたら、月2〜3回のペースに移行していきましょう。", lifestyle: "足首・手首・首を冷やさないよう意識し、白湯を毎朝1杯飲む習慣を取り入れてみてください。" },
+  "PMS・ホルモン": { type: "気滞・血虚タイプ", message: "気の流れが滞り、ホルモンバランスが乱れやすい状態です。月のリズムに振り回されてしまうのは、あなたのせいではありません。Herbelleで、体の内側から整える時間をつくりましょう。", analysis: "「気滞（きたい）・血虚（けっきょ）」のサインで、ストレスや血の不足が影響しています。よもぎ蒸しは子宮周辺を直接温め、骨盤内の血流を促進することで生理痛やPMSの緩和に働きかけます。", recommend: [{ name: "婦人科系ケアよもぎ蒸し 75分", desc: "よもぎ+ラベンダーブレンドで骨盤まわりを集中的に温めます。ホルモンバランスを整えたい方に。" }, { name: "リラックスよもぎ蒸し 60分", desc: "心と体をゆるめることでストレス性の気滞をほぐします。生理前の不調が強い週に特におすすめです。" }], frequency: "生理の1週間前から生理終了後にかけて集中的に来店いただくのが効果的です。月2〜4回を目安にしてみてください。", lifestyle: "生理前はカフェインを控え、鉄分を含む食事（小松菜・ひじき・レバー）を意識して摂るとより効果的です。" },
+  "疲労・ストレス": { type: "気虚・肝鬱タイプ", message: "エネルギーの消耗が続き、気力が底をつきかけているサインです。「疲れているのに休めない」そんなあなたに、Herbelleはただ委ねるだけでいい時間を用意しています。", analysis: "「気虚（ききょ）・肝鬱（かんうつ）」の状態で、慢性的なエネルギー不足とストレスによる気の停滞が重なっています。よもぎの香り成分（シネオール）が自律神経を整え、全身温熱が副交感神経を優位にします。", recommend: [{ name: "リストアよもぎ蒸し 90分", desc: "アロマブレンドでゆっくり深部体温を上げながら疲労回復を促します。心が疲れているときに特におすすめ。" }, { name: "温活よもぎ蒸し 60分", desc: "シンプルによもぎで整えるベーシックコース。まず体を温めることで免疫力と体力の底上げを図ります。" }], frequency: "週1回のペースで体をリセットする習慣をつくることをおすすめします。1ヶ月続けると、疲れにくい体の変化を実感される方が多いです。", lifestyle: "就寝1時間前のスマホを控え、ぬるめ（38〜40℃）のお風呂に10分つかる習慣が自律神経の回復を助けます。" },
+  "美肌・デトックス": { type: "血熱・湿熱タイプ", message: "体内に余分な熱と湿気が溜まり、肌に影響が出やすい状態です。外からのケアだけでなく、内側からのデトックスが今のあなたには必要です。Herbelleで、本来の透明感を取り戻しましょう。", analysis: "「血熱（けつねつ）・湿熱（しつねつ）」タイプで、体内の老廃物が排出しきれていないサインです。よもぎ蒸しの発汗作用が毛穴の詰まりをほぐし、リンパの流れを促進して肌の代謝を高めます。", recommend: [{ name: "クリアリングよもぎ蒸し 75分", desc: "よもぎ+緑茶ブレンドでデトックスと抗酸化を同時にアプローチ。肌荒れ・くすみが気になる方に。" }, { name: "デトックスよもぎ蒸し 90分", desc: "しっかり発汗することで老廃物を排出。肌の透明感を上げたい方に特におすすめのコースです。" }], frequency: "肌の細胞は約28日周期でターンオーバーします。2週に1回のペースで3ヶ月継続すると、肌質の変化を実感しやすくなります。", lifestyle: "砂糖・アルコール・脂質の多い食事を控え、水分を1日1.5L意識して摂ることでデトックス効果が高まります。" }
 };
 
-let current = 0;
-let answers = {};
-let selectedIndex = null;
+let current = 0, answers = {}, selectedIndex = null;
 
 function getResultKey(a) {
-  const c = a.concern || 0;
-  const g = a.goal || 0;
+  const c = a.concern || 0, g = a.goal || 0;
   if (c === 2 || g === 2) return "PMS・ホルモン";
   if (c === 5 || g === 3) return "美肌・デトックス";
   if (c === 0 || c === 1) return "冷え・むくみ";
   return "疲労・ストレス";
 }
 
+function getLogs() { try { return JSON.parse(localStorage.getItem("herbelle_logs") || "[]"); } catch { return []; } }
+function saveLogs(logs) { localStorage.setItem("herbelle_logs", JSON.stringify(logs)); }
+function addLog(a, resultKey) {
+  const logs = getLogs();
+  const now = new Date();
+  const p = n => String(n).padStart(2, "0");
+  logs.push({
+    datetime: `${now.getFullYear()}/${p(now.getMonth()+1)}/${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}`,
+    result: resultKey,
+    q1: questions[0].options[a.concern]?.text || "",
+    q2: questions[1].options[a.body]?.text || "",
+    q3: questions[2].options[a.lifestyle]?.text || "",
+    q4: questions[3].options[a.stress]?.text || "",
+    q5: questions[4].options[a.goal]?.text || ""
+  });
+  saveLogs(logs);
+}
+
 function renderQuestion() {
   const q = questions[current];
   selectedIndex = null;
-
-  const indicator = document.getElementById("step-indicator");
-  indicator.innerHTML = questions.map((_, i) => {
-    let cls = "step-dot";
-    if (i < current) cls += " done";
-    else if (i === current) cls += " active";
-    return `<div class="${cls}"></div>`;
-  }).join("");
-
-  const area = document.getElementById("question-area");
-  area.innerHTML = `
+  document.getElementById("step-indicator").innerHTML = questions.map((_, i) => `<div class="step-dot${i < current ? " done" : i === current ? " active" : ""}"></div>`).join("");
+  document.getElementById("question-area").innerHTML = `
     <div class="question-label">${q.label}</div>
     <div class="question-text">${q.text}</div>
-    <div class="options-grid">
-      ${q.options.map((o, i) => `
-        <button class="option-btn" onclick="selectOption(${i})" id="opt-${i}">
-          <span class="option-icon">${o.icon}</span>
-          <span>${o.text}</span>
-        </button>
-      `).join("")}
-    </div>
-  `;
-
+    <div class="options-grid">${q.options.map((o, i) => `<button class="option-btn" onclick="selectOption(${i})" id="opt-${i}"><span class="option-icon">${o.icon}</span><span>${o.text}</span></button>`).join("")}</div>`;
   const prev = answers[q.id];
-  if (prev !== undefined) {
-    selectedIndex = prev;
-    document.getElementById(`opt-${prev}`)?.classList.add("selected");
-    setNextEnabled(true);
-  } else {
-    setNextEnabled(false);
-  }
-
-  const nextBtn = document.getElementById("btn-next");
-  nextBtn.textContent = current === questions.length - 1 ? "診断する" : "つぎへ";
+  if (prev !== undefined) { selectedIndex = prev; document.getElementById(`opt-${prev}`)?.classList.add("selected"); setNextEnabled(true); }
+  else { setNextEnabled(false); }
+  document.getElementById("btn-next").textContent = current === questions.length - 1 ? "診断する" : "つぎへ";
   document.getElementById("btn-back").style.visibility = current === 0 ? "hidden" : "visible";
 }
 
-function setNextEnabled(v) {
-  document.getElementById("btn-next").classList.toggle("enabled", v);
-}
-
+function setNextEnabled(v) { document.getElementById("btn-next").classList.toggle("enabled", v); }
 function selectOption(i) {
   document.querySelectorAll(".option-btn").forEach(b => b.classList.remove("selected"));
   document.getElementById(`opt-${i}`).classList.add("selected");
-  selectedIndex = i;
-  setNextEnabled(true);
+  selectedIndex = i; setNextEnabled(true);
 }
-
 function goNext() {
   if (selectedIndex === null) return;
   answers[questions[current].id] = selectedIndex;
-  if (current < questions.length - 1) {
-    current++;
-    renderQuestion();
-  } else {
-    showLoading();
-  }
+  if (current < questions.length - 1) { current++; renderQuestion(); }
+  else { showLoading(); }
 }
-
-function goBack() {
-  if (current > 0) { current--; renderQuestion(); }
-}
+function goBack() { if (current > 0) { current--; renderQuestion(); } }
 
 function showLoading() {
   document.getElementById("quiz-area").style.display = "none";
-  const la = document.getElementById("loading-area");
-  la.style.display = "block";
+  document.getElementById("loading-area").style.display = "block";
   const msgs = ["あなたの体質を分析中...", "東洋医学の観点で診断しています...", "おすすめのプランを選んでいます..."];
   let mi = 0;
-  const iv = setInterval(() => {
-    mi = (mi + 1) % msgs.length;
-    const el = document.getElementById("loading-text");
-    if (el) el.textContent = msgs[mi];
-  }, 1200);
+  const iv = setInterval(() => { mi=(mi+1)%msgs.length; const el=document.getElementById("loading-text"); if(el) el.textContent=msgs[mi]; }, 1200);
   setTimeout(() => {
     clearInterval(iv);
-    la.style.display = "none";
-    showResult(results[getResultKey(answers)]);
+    document.getElementById("loading-area").style.display = "none";
+    const key = getResultKey(answers);
+    addLog(answers, key);
+    showResult(results[key]);
   }, 3000);
 }
 
@@ -475,47 +193,26 @@ function showResult(r) {
   const area = document.getElementById("result-area");
   area.style.display = "block";
   area.innerHTML = `
-    <div class="result-header">
-      <div class="result-type">あなたの体質タイプ</div>
-      <div class="result-title">${r.type}</div>
-    </div>
-    <div class="result-section">
-      <div class="result-section-text" style="font-size:16px;line-height:1.8">${r.message}</div>
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">体質分析</div>
-      <div class="result-section-text">${r.analysis}</div>
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">おすすめのコース</div>
-      ${r.recommend.map(rec => `
-        <div class="recommend-card">
-          <div class="recommend-name">${rec.name}</div>
-          <div class="recommend-desc">${rec.desc}</div>
-        </div>
-      `).join("")}
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">おすすめ来店頻度</div>
-      <div class="result-section-text">${r.frequency}</div>
-    </div>
-    <div class="result-section" style="margin-top:1.25rem">
-      <div class="result-section-label">日常生活のアドバイス</div>
-      <div class="result-section-text">${r.lifestyle}</div>
-    </div>
-    <a class="cta-btn" href="${r.cta}" target="_blank">初回体験を予約する →</a>
-    <div style="text-align:center;margin-top:1rem">
-      <button class="retry-btn" onclick="restart()">もう一度診断する</button>
-    </div>
-  `;
+    <div class="result-header"><div class="result-type">あなたの体質タイプ</div><div class="result-title">${r.type}</div></div>
+    <div class="result-section"><div class="result-section-text" style="font-size:16px;line-height:1.8">${r.message}</div></div>
+    <div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">体質分析</div><div class="result-section-text">${r.analysis}</div></div>
+    <div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">おすすめのコース</div>${r.recommend.map(rec=>`<div class="recommend-card"><div class="recommend-name">${rec.name}</div><div class="recommend-desc">${rec.desc}</div></div>`).join("")}</div>
+    <div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">おすすめ来店頻度</div><div class="result-section-text">${r.frequency}</div></div>
+    <div class="result-section" style="margin-top:1.25rem"><div class="result-section-label">日常生活のアドバイス</div><div class="result-section-text">${r.lifestyle}</div></div>
+    <a class="cta-btn" href="https://dstylegroup.stores.jp/reserve/Herbelle/1346787" target="_blank">初回体験を予約する →</a>
+    <div style="text-align:center;margin-top:1rem"><button class="retry-btn" onclick="restart()">もう一度診断する</button></div>`;
 }
 
 function restart() {
-  current = 0; answers = {}; selectedIndex = null;
-  document.getElementById("result-area").style.display = "none";
-  document.getElementById("quiz-area").style.display = "block";
+  current=0; answers={}; selectedIndex=null;
+  document.getElementById("result-area").style.display="none";
+  document.getElementById("quiz-area").style.display="block";
   renderQuestion();
 }
+
+
+
+
 
 renderQuestion();
 </script>
