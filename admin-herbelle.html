@@ -148,7 +148,7 @@
     const loginError = document.getElementById('loginError');
     loginError.style.display = 'none';
     try {
-      const res = await fetch('/api/auth', {
+      const res = await fetch('https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw, tenant: tenant })
@@ -185,7 +185,7 @@
     document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="loading">読み込み中...</td></tr>';
     try {
       const token = sessionStorage.getItem('adminToken');
-      const res = await fetch(`/api/log?tenant=${tenant}&type=${type}`, {
+      const res = await fetch(`https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/log?tenant=${tenant}&type=${type}`, {
         headers: { 'x-admin-token': token }
       });
       if (!res.ok) throw new Error('取得失敗');
@@ -240,7 +240,7 @@
     if (!confirm('このデータを削除しますか？')) return;
     try {
       const token = sessionStorage.getItem('adminToken');
-      const res = await fetch(`/api/log?id=${id}&tenant=${tenant}`, {
+      const res = await fetch(`https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/log?id=${id}&tenant=${tenant}`, {
         method: 'DELETE',
         headers: { 'x-admin-token': token }
       });
