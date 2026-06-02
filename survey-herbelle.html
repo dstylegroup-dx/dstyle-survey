@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herbelle 体験後アンケート</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f7f9fa; color: #333; line-height: 1.6; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { font-size: 20px; text-align: center; color: #4A5D4E; margin-bottom: 20px; }
+        p { font-size: 14px; color: #666; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; }
+        input[type="text"], select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        textarea { height: 100px; resize: vertical; }
+        .radio-group { margin-top: 5px; }
+        .radio-group label { display: inline-block; font-weight: normal; margin-right: 15px; cursor: pointer; }
+        button { width: 100%; padding: 12px; background-color: #4A5D4E; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #3b4d3f; }
+        .message { margin-top: 20px; padding: 10px; border-radius: 4px; font-weight: bold; text-align: center; display: none; }
+        .success { background-color: #e6f4ea; color: #137333; }
+        .error { background-color: #fce8e6; color: #c5221f; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Herbelle 無料体験アンケート</h1>
+    <p>本日は無料体験にお越しいただきありがとうございました。今後のサービス向上のため、率直なご感想をお聞かせいただけますと幸いです。</p>
+    
+    <form id="surveyForm">
+        <div class="form-group">
+            <label for="customerName">お名前（必須）</label>
+            <input type="text" id="customerName" required placeholder="山田 花子">
+        </div>
+
+        <div class="form-group">
+            <label for="menu">本日体験されたメニュー</label>
+            <select id="menu">
+                <option value="よもぎ蒸し">よもぎ蒸し</option>
+                <option value="ヨガ">ヨガ</option>
+                <option value="ピラティス">ピラティス</option>
+                <option value="コンビネーション">メニューの組み合わせ</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>本日の満足度はいかがでしたか？</label>
+            <div class="radio-group">
+                <label><input type="radio" name="satisfaction" value="大変満足" checked> 大変満足</label>
+                <label><input type="radio" name="satisfaction" value="満足"> 満足</label>
+                <label><input type="radio" name="satisfaction" value="普通"> 普通</label>
+                <label><input type="radio" name="satisfaction" value="やや不満"> やや不満</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>リラクゼーションテック（発汗量や体調データの可視化）機能に興味はありますか？</label>
+            <div class="radio-group">
+                <label><input type="radio" name="techInterest" value="とても興味がある" checked> とても興味がある</label>
+                <label><input type="radio" name="techInterest" value="少し興味がある"> 少し興味がある</label>
+                <label><input type="radio" name="techInterest" value="あまり興味はない"> あまり興味はない</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="feedback">ご意見・ご感想、スタッフへのメッセージなど</label>
+            <textarea id="feedback" placeholder="温まり具合や、スタジオの雰囲気など自由にご記入ください。"></textarea>
+        </div>
+
+        <button type="submit">アンケートを送信する</button>
+    </form>
+
+    <div id="statusMessage" class="message"></div>
+</div>
+
+<script>
+    document.getElementById('surveyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.style.display = 'none';
+
+        // フォームから入力値を取得してまとめる
+        const inputData = {
+            customerName: document.getElementById('customerName').value,
+            menu: document.getElementById('menu').value,
+            satisfaction: document.querySelector('input[name="satisfaction"]:checked').value,
+            techInterest: document.querySelector('input[name="techInterest"]:checked').value,
+            feedback: document.getElementById('feedback').value
+        };
+
+        // 💡 汎用APIのルールに合わせて箱詰めする
+        const payload = {
+            tenant: "herbelle-chitosehunabashi",            // 👈 テナント名（これで他と区別できます）
+            type: "free_trial_survey",          // 👈 データの種類（無料体験アンケート）
+            data: inputData                     // 👈 集めたアンケートの回答中身
+        };
+
+        try {
+            // 先ほど開通させたAPIのエンドポイントへ送信
+            const response = await fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                statusMessage.className = "message success";
+                statusMessage.innerText = "✅ アンケートが正常に送信されました。ご協力ありがとうございました！";
+                document.getElementById('surveyForm').reset(); // フォームをクリア
+            } else {
+                const errData = await response.json();
+                throw new Error(errData.error || '送信エラーが発生しました');
+            }
+        } catch (error) {
+            statusMessage.className = "message error";
+            statusMessage.innerText = `❌ エラー: ${error.message}`;
+        }
+        
+        statusMessage.style.display = 'block';
+    });
+</script>
+</body>
+</html>
