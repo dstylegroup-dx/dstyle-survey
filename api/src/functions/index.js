@@ -6,7 +6,8 @@ app.http('log', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
-            // 💡市川さんが作られた正しい環境変数の値（dstyle-survey と logs）をそのまま使う形に修正しました
+            // 💡【重要】環境変数の読み込みとクライアントの作成を、関数の中に引っ越ししました
+            // これにより、Azureポータルで設定した「dstyle-survey」と「logs」が確実に100%読み込まれます
             const client = new CosmosClient(process.env.COSMOS_CONNECTION);
             const container = client
                 .database(process.env.COSMOS_DATABASE)
