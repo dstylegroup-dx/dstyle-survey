@@ -8,7 +8,6 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7f5; color: #333; }
 
-    /* ログイン */
     .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .login-box { background: white; border-radius: 12px; padding: 40px 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
     .login-box h2 { color: #4A5D4E; margin-bottom: 24px; font-size: 22px; }
@@ -17,7 +16,6 @@
     .login-box button:hover { background: #3b4d3f; }
     .login-error { color: #c0392b; font-size: 14px; margin-top: 10px; display: none; }
 
-    /* メイン */
     #adminContent { display: none; }
     .topbar { background: #4A5D4E; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
     .topbar h1 { font-size: 18px; }
@@ -25,7 +23,6 @@
 
     .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
-    /* サマリーカード */
     .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
     .card { background: white; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .card .num { font-size: 32px; font-weight: bold; color: #4A5D4E; }
@@ -35,7 +32,6 @@
     .card .num.green { color: #27ae60; }
     .card .num.red { color: #e74c3c; }
 
-    /* ツールバー */
     .toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
     .toolbar button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
     .btn-refresh { background: #4A5D4E; color: white; }
@@ -44,7 +40,6 @@
     .btn-csv:hover { background: #219a52; }
     .filter-select { padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
 
-    /* テーブル */
     .table-wrap { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
     .table-scroll { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -53,14 +48,12 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #f9fbf9; }
 
-    /* バッジ */
     .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; }
     .badge-green { background: #e8f5e9; color: #2e7d32; }
     .badge-yellow { background: #fff8e1; color: #e65100; }
     .badge-gray { background: #f5f5f5; color: #777; }
     .badge-red { background: #fce8e6; color: #c62828; }
 
-    /* 削除ボタン */
     .btn-delete { background: none; border: 1px solid #ddd; color: #999; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
     .btn-delete:hover { border-color: #e74c3c; color: #e74c3c; }
 
@@ -88,15 +81,13 @@
   </div>
 
   <div class="main">
-    <!-- サマリー -->
-    <div class="summary" id="summaryCards">
+    <div class="summary">
       <div class="card highlight"><div class="num" id="totalCount">—</div><div class="label">総回答数</div></div>
       <div class="card highlight"><div class="num green" id="continueCount">—</div><div class="label">継続希望</div></div>
       <div class="card alert"><div class="num red" id="considerCount">—</div><div class="label">検討中</div></div>
       <div class="card"><div class="num" id="referralCount">—</div><div class="label">紹介できる</div></div>
     </div>
 
-    <!-- ツールバー -->
     <div class="toolbar">
       <button class="btn-refresh" onclick="fetchData()">🔄 更新</button>
       <button class="btn-csv" onclick="downloadCSV()">📥 CSVダウンロード</button>
@@ -116,7 +107,6 @@
       </select>
     </div>
 
-    <!-- テーブル -->
     <div class="table-wrap">
       <div class="table-scroll">
         <table>
@@ -144,34 +134,60 @@
 </div>
 
 <script>
-  const SECRET_PW = "Herbelle19860701";
   let allData = [];
-
-  function checkPassword() {
-    if (document.getElementById('passwordInput').value === SECRET_PW) {
-      document.getElementById('loginArea').style.display = 'none';
-      document.getElementById('adminContent').style.display = 'block';
-      fetchData();
-    } else {
-      document.getElementById('loginError').style.display = 'block';
-    }
-  }
-  document.getElementById('passwordInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkPassword(); });
-
-  function logout() {
-    document.getElementById('loginArea').style.display = 'flex';
-    document.getElementById('adminContent').style.display = 'none';
-    document.getElementById('passwordInput').value = '';
-  }
 
   const params = new URLSearchParams(location.search);
   const tenant = params.get('tenant') || 'herbelle-chitosefunabashi';
   const type = params.get('type') || 'free_trial_survey';
 
+  // ----------------------------------------------------
+  // 🔐 認証
+  // ----------------------------------------------------
+  async function checkPassword() {
+    const pw = document.getElementById('passwordInput').value;
+    const loginError = document.getElementById('loginError');
+    loginError.style.display = 'none';
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw, tenant: tenant })
+      });
+      if (res.ok) {
+        const { token } = await res.json();
+        sessionStorage.setItem('adminToken', token);
+        document.getElementById('loginArea').style.display = 'none';
+        document.getElementById('adminContent').style.display = 'block';
+        fetchData();
+      } else {
+        loginError.style.display = 'block';
+      }
+    } catch (e) {
+      loginError.style.display = 'block';
+    }
+  }
+
+  document.getElementById('passwordInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter') checkPassword();
+  });
+
+  function logout() {
+    sessionStorage.removeItem('adminToken');
+    document.getElementById('loginArea').style.display = 'flex';
+    document.getElementById('adminContent').style.display = 'none';
+    document.getElementById('passwordInput').value = '';
+  }
+
+  // ----------------------------------------------------
+  // 📊 データ取得
+  // ----------------------------------------------------
   async function fetchData() {
     document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="loading">読み込み中...</td></tr>';
     try {
-      const res = await fetch(`/api/log?tenant=${tenant}&type=${type}`);
+      const token = sessionStorage.getItem('adminToken');
+      const res = await fetch(`/api/log?tenant=${tenant}&type=${type}`, {
+        headers: { 'x-admin-token': token }
+      });
       if (!res.ok) throw new Error('取得失敗');
       allData = await res.json();
       allData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -212,15 +228,22 @@
         <td style="font-size:13px;white-space:nowrap">${d.frequency || '—'}</td>
         <td style="font-size:13px">${d.referral || '—'}</td>
         <td style="font-size:13px;max-width:200px">${d.feedback || ''}</td>
-        <td><button class="btn-delete" onclick="deleteItem('${d.id}')">削除</button></td>
+        <td><button class="btn-delete" onclick="deleteItem(&quot;${d.id}&quot;)">削除</button></td>
       </tr>`;
     }).join('');
   }
 
+  // ----------------------------------------------------
+  // 🗑️ 削除
+  // ----------------------------------------------------
   async function deleteItem(id) {
     if (!confirm('このデータを削除しますか？')) return;
     try {
-      const res = await fetch(`/api/log?id=${id}&tenant=${tenant}`, { method: 'DELETE' });
+      const token = sessionStorage.getItem('adminToken');
+      const res = await fetch(`/api/log?id=${id}&tenant=${tenant}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-token': token }
+      });
       if (res.ok) {
         allData = allData.filter(d => d.id !== id);
         updateSummary();
@@ -229,6 +252,9 @@
     } catch (e) { alert('削除エラー: ' + e.message); }
   }
 
+  // ----------------------------------------------------
+  // 📥 CSVダウンロード
+  // ----------------------------------------------------
   function downloadCSV() {
     if (allData.length === 0) { alert('データがありません'); return; }
     const headers = ['日時','お名前','メニュー','満足度','体の変化','継続意向','通える頻度','紹介','ご意見'];
