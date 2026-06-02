@@ -31,10 +31,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Flex Consumption
+      - name: Deploy to Azure Functions
         run: |
           az functionapp deployment source config-zip \
             --resource-group rg-dstyle-survey \
-            --name func-dstyle-survey \
-            --src ./func-package.zip \
-            --build-remote true
+            --name func-dstyle-survey2 \
+            --src ./func-package.zip
