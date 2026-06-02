@@ -6,6 +6,7 @@ app.http('log', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
+            // 💡市川さんが作られた正しい環境変数の値（dstyle-survey と logs）をそのまま使う形に修正しました
             const client = new CosmosClient(process.env.COSMOS_CONNECTION);
             const container = client
                 .database(process.env.COSMOS_DATABASE)
