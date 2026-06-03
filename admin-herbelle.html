@@ -7,7 +7,6 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7f5; color: #333; }
-
     .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .login-box { background: white; border-radius: 12px; padding: 40px 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
     .login-box h2 { color: #4A5D4E; margin-bottom: 24px; font-size: 22px; }
@@ -15,14 +14,11 @@
     .login-box button { width: 100%; padding: 14px; background: #4A5D4E; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .login-box button:hover { background: #3b4d3f; }
     .login-error { color: #c0392b; font-size: 14px; margin-top: 10px; display: none; }
-
     #adminContent { display: none; }
     .topbar { background: #4A5D4E; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
     .topbar h1 { font-size: 18px; }
     .topbar .logout { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
-
     .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
-
     .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
     .card { background: white; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .card .num { font-size: 32px; font-weight: bold; color: #4A5D4E; }
@@ -31,7 +27,6 @@
     .card.alert { border-left: 4px solid #e74c3c; }
     .card .num.green { color: #27ae60; }
     .card .num.red { color: #e74c3c; }
-
     .toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
     .toolbar button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
     .btn-refresh { background: #4A5D4E; color: white; }
@@ -39,7 +34,6 @@
     .btn-refresh:hover { background: #3b4d3f; }
     .btn-csv:hover { background: #219a52; }
     .filter-select { padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
-
     .table-wrap { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
     .table-scroll { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -47,23 +41,18 @@
     td { padding: 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #f9fbf9; }
-
     .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; }
     .badge-green { background: #e8f5e9; color: #2e7d32; }
     .badge-yellow { background: #fff8e1; color: #e65100; }
     .badge-gray { background: #f5f5f5; color: #777; }
     .badge-red { background: #fce8e6; color: #c62828; }
-
     .btn-delete { background: none; border: 1px solid #ddd; color: #999; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
     .btn-delete:hover { border-color: #e74c3c; color: #e74c3c; }
-
     .loading { text-align: center; padding: 40px; color: #888; font-size: 16px; }
     .empty { text-align: center; padding: 40px; color: #888; }
   </style>
 </head>
 <body>
-
-<!-- ログイン画面 -->
 <div class="login-wrap" id="loginArea">
   <div class="login-box">
     <h2>🌿 Herbelle 管理画面</h2>
@@ -72,14 +61,11 @@
     <div class="login-error" id="loginError">⚠️ パスワードが違います</div>
   </div>
 </div>
-
-<!-- 管理画面 -->
 <div id="adminContent">
   <div class="topbar">
     <h1>🌿 Herbelle アンケート管理</h1>
     <button class="logout" onclick="logout()">ログアウト</button>
   </div>
-
   <div class="main">
     <div class="summary">
       <div class="card highlight"><div class="num" id="totalCount">—</div><div class="label">総回答数</div></div>
@@ -87,7 +73,6 @@
       <div class="card alert"><div class="num red" id="considerCount">—</div><div class="label">検討中</div></div>
       <div class="card"><div class="num" id="referralCount">—</div><div class="label">紹介できる</div></div>
     </div>
-
     <div class="toolbar">
       <button class="btn-refresh" onclick="fetchData()">🔄 更新</button>
       <button class="btn-csv" onclick="downloadCSV()">📥 CSVダウンロード</button>
@@ -106,22 +91,14 @@
         <option value="やや不満">やや不満</option>
       </select>
     </div>
-
     <div class="table-wrap">
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>日時</th>
-              <th>お名前</th>
-              <th>メニュー</th>
-              <th>満足度</th>
-              <th>体の変化</th>
-              <th>継続意向</th>
-              <th>頻度</th>
-              <th>紹介</th>
-              <th>ご意見</th>
-              <th>操作</th>
+              <th>日時</th><th>お名前</th><th>メニュー</th><th>満足度</th>
+              <th>体の変化</th><th>継続意向</th><th>頻度</th><th>紹介</th>
+              <th>ご意見</th><th>操作</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -132,23 +109,22 @@
     </div>
   </div>
 </div>
-
 <script>
-  let allData = [];
+  const BASE_URL = location.hostname === 'localhost'
+    ? 'http://localhost:7071'
+    : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
 
+  let allData = [];
   const params = new URLSearchParams(location.search);
   const tenant = params.get('tenant') || 'herbelle-chitosefunabashi';
   const type = params.get('type') || 'free_trial_survey';
 
-  // ----------------------------------------------------
-  // 🔐 認証
-  // ----------------------------------------------------
   async function checkPassword() {
     const pw = document.getElementById('passwordInput').value;
     const loginError = document.getElementById('loginError');
     loginError.style.display = 'none';
     try {
-      const res = await fetch('https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/auth', {
+      const res = await fetch(`${BASE_URL}/api/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw, tenant: tenant })
@@ -178,14 +154,11 @@
     document.getElementById('passwordInput').value = '';
   }
 
-  // ----------------------------------------------------
-  // 📊 データ取得
-  // ----------------------------------------------------
   async function fetchData() {
     document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="loading">読み込み中...</td></tr>';
     try {
       const token = sessionStorage.getItem('adminToken');
-      const res = await fetch(`https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/log?tenant=${tenant}&type=${type}`, {
+      const res = await fetch(`${BASE_URL}/api/log?tenant=${tenant}&type=${type}`, {
         headers: { 'x-admin-token': token }
       });
       if (!res.ok) throw new Error('取得失敗');
@@ -233,14 +206,11 @@
     }).join('');
   }
 
-  // ----------------------------------------------------
-  // 🗑️ 削除
-  // ----------------------------------------------------
   async function deleteItem(id) {
     if (!confirm('このデータを削除しますか？')) return;
     try {
       const token = sessionStorage.getItem('adminToken');
-      const res = await fetch(`https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/log?id=${id}&tenant=${tenant}`, {
+      const res = await fetch(`${BASE_URL}/api/log?id=${id}&tenant=${tenant}`, {
         method: 'DELETE',
         headers: { 'x-admin-token': token }
       });
@@ -252,9 +222,6 @@
     } catch (e) { alert('削除エラー: ' + e.message); }
   }
 
-  // ----------------------------------------------------
-  // 📥 CSVダウンロード
-  // ----------------------------------------------------
   function downloadCSV() {
     if (allData.length === 0) { alert('データがありません'); return; }
     const headers = ['日時','お名前','メニュー','満足度','体の変化','継続意向','通える頻度','紹介','ご意見'];

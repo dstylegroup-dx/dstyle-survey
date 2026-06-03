@@ -8,22 +8,14 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7f5; color: #333; padding: 20px 16px 40px; }
     .container { max-width: 640px; margin: 0 auto; }
-
-    /* ヘッダー */
     .header { background: #4A5D4E; color: white; border-radius: 12px 12px 0 0; padding: 28px 24px; text-align: center; }
     .header h1 { font-size: 22px; margin-bottom: 8px; }
     .header p { font-size: 14px; opacity: 0.85; line-height: 1.6; }
-
-    /* 本体 */
     .body { background: white; border-radius: 0 0 12px 12px; padding: 28px 24px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-
-    /* セクション */
     .section { margin-bottom: 28px; }
     .section-label { font-weight: bold; font-size: 16px; color: #4A5D4E; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
     .section-label .num { background: #4A5D4E; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
     .required { color: #c0392b; font-size: 12px; margin-left: 4px; }
-
-    /* テキスト入力 */
     input[type="text"], select, textarea {
       width: 100%; padding: 14px; border: 1.5px solid #ddd; border-radius: 8px;
       font-size: 16px; background: #fafafa; -webkit-appearance: none; appearance: none;
@@ -31,8 +23,6 @@
     }
     input[type="text"]:focus, select:focus, textarea:focus { border-color: #4A5D4E; background: #fff; outline: none; }
     textarea { height: 110px; resize: vertical; }
-
-    /* ラジオグループ */
     .radio-group { display: flex; flex-direction: column; gap: 10px; }
     .radio-label {
       display: flex; align-items: center; padding: 14px 16px;
@@ -42,8 +32,6 @@
     .radio-label:hover { border-color: #4A5D4E; background: #f0f4f0; }
     .radio-label input[type="radio"] { margin-right: 12px; width: 20px; height: 20px; accent-color: #4A5D4E; flex-shrink: 0; }
     .radio-label.selected { border-color: #4A5D4E; background: #eef3ee; font-weight: bold; }
-
-    /* 送信ボタン */
     .submit-btn {
       width: 100%; padding: 18px; background: #4A5D4E; color: white;
       border: none; border-radius: 10px; font-size: 18px; font-weight: bold;
@@ -52,15 +40,10 @@
     }
     .submit-btn:hover { background: #3b4d3f; }
     .submit-btn:disabled { background: #999; cursor: not-allowed; }
-
-    /* メッセージ */
     .message { margin-top: 20px; padding: 16px; border-radius: 8px; font-weight: bold; text-align: center; display: none; font-size: 16px; }
     .success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
     .error-msg { background: #fce8e6; color: #c5221f; border: 1px solid #f5c6c2; }
-
-    /* 仕切り線 */
     .divider { border: none; border-top: 1px solid #eee; margin: 8px 0 28px; }
-
     @media (min-width: 480px) {
       .radio-group.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     }
@@ -72,17 +55,12 @@
     <h1>🌿 無料体験アンケート</h1>
     <p>本日はHerbelleにお越しいただきありがとうございました。<br>率直なご感想をお聞かせください（約2分）</p>
   </div>
-
   <div class="body">
     <form id="surveyForm">
-
-      <!-- Q1 お名前 -->
       <div class="section">
         <div class="section-label"><span class="num">1</span>お名前<span class="required">※必須</span></div>
         <input type="text" id="customerName" required placeholder="山田 花子">
       </div>
-
-      <!-- Q2 メニュー -->
       <div class="section">
         <div class="section-label"><span class="num">2</span>本日体験されたメニュー</div>
         <select id="menu">
@@ -92,10 +70,7 @@
           <option value="コンビネーション">メニューの組み合わせ</option>
         </select>
       </div>
-
       <hr class="divider">
-
-      <!-- Q3 満足度 -->
       <div class="section">
         <div class="section-label"><span class="num">3</span>本日の体験の満足度は？</div>
         <div class="radio-group two-col" id="satisfactionGroup">
@@ -105,8 +80,6 @@
           <label class="radio-label"><input type="radio" name="satisfaction" value="やや不満"> 😕 やや不満</label>
         </div>
       </div>
-
-      <!-- Q4 体の変化 -->
       <div class="section">
         <div class="section-label"><span class="num">4</span>施術後、体の変化を感じましたか？</div>
         <div class="radio-group" id="bodyChangeGroup">
@@ -116,8 +89,6 @@
           <label class="radio-label"><input type="radio" name="bodyChange" value="わからない"> ❓ まだわからない</label>
         </div>
       </div>
-
-      <!-- Q5 継続意向 -->
       <div class="section">
         <div class="section-label"><span class="num">5</span>継続してよもぎ蒸しを続けたいと思いますか？</div>
         <div class="radio-group" id="continuationGroup">
@@ -127,8 +98,6 @@
           <label class="radio-label"><input type="radio" name="continuation" value="今は難しい"> ⏸ 今はまだ難しい</label>
         </div>
       </div>
-
-      <!-- Q6 通える頻度 -->
       <div class="section">
         <div class="section-label"><span class="num">6</span>月にどのくらい通えそうですか？</div>
         <div class="radio-group two-col" id="frequencyGroup">
@@ -138,8 +107,6 @@
           <label class="radio-label"><input type="radio" name="frequency" value="月1回以下"> 月1回以下</label>
         </div>
       </div>
-
-      <!-- Q7 紹介 -->
       <div class="section">
         <div class="section-label"><span class="num">7</span>ご紹介できそうなお友達・ご家族はいますか？</div>
         <div class="radio-group two-col" id="referralGroup">
@@ -148,24 +115,21 @@
           <label class="radio-label"><input type="radio" name="referral" value="検討する"> 💭 検討してみる</label>
         </div>
       </div>
-
       <hr class="divider">
-
-      <!-- Q8 自由記入 -->
       <div class="section">
         <div class="section-label"><span class="num">8</span>ご意見・スタッフへのメッセージ（自由記入）</div>
         <textarea id="feedback" placeholder="温まり具合、スタジオの雰囲気、スタッフへのメッセージなど、自由にご記入ください。"></textarea>
       </div>
-
       <button type="submit" class="submit-btn" id="submitBtn">アンケートを送信する 📩</button>
     </form>
-
     <div id="statusMessage" class="message"></div>
   </div>
 </div>
-
 <script>
-  // ラジオ選択時にハイライト
+  const BASE_URL = location.hostname === 'localhost'
+    ? 'http://localhost:7071'
+    : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
+
   document.querySelectorAll('.radio-group').forEach(group => {
     group.querySelectorAll('.radio-label').forEach(label => {
       label.addEventListener('click', () => {
@@ -204,7 +168,7 @@
     };
 
     try {
-      const res = await fetch('https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net/api/log', {
+      const res = await fetch(`${BASE_URL}/api/log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
