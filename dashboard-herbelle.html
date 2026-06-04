@@ -278,6 +278,7 @@
   var currentSurvey = null;
   var allResponses = [];
   var editingQuestionIndex = -1;
+  var responseAbortController = null; // ★これを追加
 
   async function doLogin() {
     var pw = document.getElementById('passwordInput').value;
@@ -669,19 +670,32 @@
     await savePeriod();
   }
 
-  async function fetchResponses() {
+async function fetchResponses() {
     if (!currentSurvey) return;
+    
+    // ★がちゃがちゃ対策：前の通信がまだ実行中ならキャンセルする
+    if (responseAbortController) {
+      responseAbortController.abort();
+    }
+    responseAbortController = new AbortController();
+
     document.getElementById('tableBody').innerHTML = '<tr><td class="loading">読み込み中...</td></tr>';
+    
     try {
       var res = await fetch(BASE_URL + '/api/response?surveyId=' + currentSurvey.id + '&tenant=' + TENANT, {
-        headers: { 'x-admin-token': token() }
+        headers: { 'x-admin-token': token() },
+        signal: responseAbortController.signal // ★キャンセル信号をセット
       });
       if (res.status === 401) { doLogout(); return; }
       if (!res.ok) throw new Error('取得失敗');
+      
       allResponses = await res.json();
       allResponses.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
       renderResponseTable();
     } catch (e) {
+      // ★通信がキャンセルされた場合はエラーとして扱わず、何もしない
+      if (e.name === 'AbortError') return; 
+      
       document.getElementById('tableBody').innerHTML = '<tr><td class="empty">❌ ' + e.message + '</td></tr>';
     }
   }
