@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>アンケート</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7f5; color: #333; padding: 20px 16px 40px; }
@@ -230,6 +231,7 @@
     var color = getColor();
     document.getElementById('surveyHeader').style.background = color;
     document.getElementById('surveyTitle').textContent = survey.title;
+    document.title = survey.title;
     if (survey.description) document.getElementById('surveyDescription').textContent = survey.description;
     var badge = document.getElementById('periodBadge');
     if (endDate && badge) badge.textContent = '📅 受付期間：' + formatDate(endDate) + ' まで';
