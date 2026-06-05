@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Diana ダッシュボード</title>
+  <title>Herbelle ダッシュボード</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -12,13 +12,13 @@
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7f5; color: #333; }
     .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .login-box { background: white; border-radius: 12px; padding: 40px 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
-    .login-box h2 { color: #7B4F6E; margin-bottom: 24px; font-size: 22px; }
+    .login-box h2 { color: #4A5D4E; margin-bottom: 24px; font-size: 22px; }
     .login-box input { width: 100%; padding: 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 16px; margin-bottom: 16px; text-align: center; }
-    .login-box button { width: 100%; padding: 14px; background: #7B4F6E; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
-    .login-box button:hover { background: #6a4060; }
+    .login-box button { width: 100%; padding: 14px; background: #4A5D4E; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .login-box button:hover { background: #3b4d3f; }
     .login-error { color: #c0392b; font-size: 14px; margin-top: 10px; display: none; }
     #dashContent { display: none; }
-    .topbar { background: #7B4F6E; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .topbar { background: #4A5D4E; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .topbar h1 { font-size: 18px; white-space: nowrap; }
     .topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .topbar select { padding: 8px 12px; border-radius: 6px; border: none; font-size: 14px; background: rgba(255,255,255,0.9); color: #333; min-width: 200px; }
@@ -26,15 +26,15 @@
     .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
     .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid #ddd; }
     .tab-btn { padding: 10px 20px; border: none; background: none; font-size: 14px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
-    .tab-btn.active { color: #7B4F6E; border-bottom-color: #7B4F6E; }
-    .tab-btn:hover { color: #7B4F6E; }
+    .tab-btn.active { color: #4A5D4E; border-bottom-color: #4A5D4E; }
+    .tab-btn:hover { color: #4A5D4E; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .panel { background: white; border-radius: 10px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
-    .panel h2 { font-size: 16px; color: #7B4F6E; margin-bottom: 16px; font-weight: bold; }
+    .panel h2 { font-size: 16px; color: #4A5D4E; margin-bottom: 16px; font-weight: bold; }
     .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-    .btn-primary { background: #7B4F6E; color: white; }
-    .btn-primary:hover { background: #6a4060; }
+    .btn-primary { background: #4A5D4E; color: white; }
+    .btn-primary:hover { background: #3b4d3f; }
     .btn-success { background: #27ae60; color: white; }
     .btn-success:hover { background: #219a52; }
     .btn-danger { background: #e74c3c; color: white; }
@@ -46,7 +46,7 @@
     .btn-sm { padding: 6px 12px; font-size: 12px; }
     .survey-list { display: flex; flex-direction: column; gap: 12px; }
     .survey-item { border: 1.5px solid #ddd; border-radius: 8px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #fafafa; }
-    .survey-item:hover { border-color: #7B4F6E; background: #f0f4f0; }
+    .survey-item:hover { border-color: #4A5D4E; background: #f0f4f0; }
     .survey-item.inactive { opacity: 0.6; }
     .survey-item-info { flex: 1; }
     .survey-item-title { font-weight: bold; font-size: 15px; color: #333; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -58,34 +58,34 @@
     .form-group { display: flex; flex-direction: column; gap: 6px; }
     .form-group label { font-size: 13px; font-weight: bold; color: #555; }
     .form-group input, .form-group textarea, .form-group select { padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; -webkit-appearance: none; appearance: none; }
-    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #7B4F6E; outline: none; background: #fff; }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #4A5D4E; outline: none; background: #fff; }
     .form-group textarea { height: 80px; resize: vertical; }
     .questions-list { display: flex; flex-direction: column; gap: 12px; }
     .question-item { border: 1.5px solid #ddd; border-radius: 8px; padding: 16px; background: #fafafa; }
     .question-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-    .question-num { background: #7B4F6E; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+    .question-num { background: #4A5D4E; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
     .question-type-badge { background: #e8f5e9; color: #2e7d32; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
     .question-label-text { flex: 1; font-weight: bold; font-size: 14px; }
     .question-actions { display: flex; gap: 6px; margin-left: auto; }
     .options-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .option-tag { background: #f0f4f0; border: 1px solid #c8d8c8; padding: 4px 10px; border-radius: 20px; font-size: 13px; color: #7B4F6E; }
+    .option-tag { background: #f0f4f0; border: 1px solid #c8d8c8; padding: 4px 10px; border-radius: 20px; font-size: 13px; color: #4A5D4E; }
     .add-question-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 16px; border: 2px dashed #ddd; border-radius: 8px; background: #fafafa; }
     .add-question-bar select { flex: 1; min-width: 160px; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; }
     .period-form { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
     .period-field { display: flex; flex-direction: column; gap: 6px; }
     .period-field label { font-size: 13px; color: #888; font-weight: bold; }
     .period-field input[type="date"] { padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; cursor: pointer; }
-    .period-field input[type="date"]:focus { border-color: #7B4F6E; outline: none; }
+    .period-field input[type="date"]:focus { border-color: #4A5D4E; outline: none; }
     .period-status { font-size: 13px; margin-top: 10px; padding: 8px 12px; border-radius: 6px; display: none; }
     .period-status.success { background: #e8f5e9; color: #2e7d32; display: block; }
     .period-status.error { background: #fce8e6; color: #c62828; display: block; }
     .current-period { font-size: 13px; color: #666; margin-top: 8px; }
-    .current-period span { font-weight: bold; color: #7B4F6E; }
+    .current-period span { font-weight: bold; color: #4A5D4E; }
     .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 20px; }
     .card { background: white; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .card .num { font-size: 28px; font-weight: bold; color: #7B4F6E; }
+    .card .num { font-size: 28px; font-weight: bold; color: #4A5D4E; }
     .card .label { font-size: 12px; color: #888; margin-top: 4px; }
-    .card.hl { border-left: 4px solid #7B4F6E; }
+    .card.hl { border-left: 4px solid #4A5D4E; }
     .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 8px; }
     .chart-card { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 16px; }
     .chart-card h3 { font-size: 13px; color: #555; margin-bottom: 12px; font-weight: bold; }
@@ -93,13 +93,13 @@
     .filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 12px 16px; background: #f0f4f0; border-radius: 8px; margin-bottom: 16px; }
     .filter-row label { font-size: 13px; font-weight: bold; color: #555; }
     .filter-row input[type="date"] { padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 14px; background: white; }
-    .btn-filter { background: #7B4F6E; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .btn-filter { background: #4A5D4E; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .btn-filter-clear { background: #f5f5f5; color: #666; border: 1px solid #ddd; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
     .table-wrap { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
     .table-scroll { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { background: #7B4F6E; color: white; padding: 12px; text-align: left; white-space: nowrap; }
+    th { background: #4A5D4E; color: white; padding: 12px; text-align: left; white-space: nowrap; }
     td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; font-size: 13px; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #f9fbf9; }
@@ -110,19 +110,25 @@
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
     .modal-overlay.show { display: flex; }
     .modal { background: white; border-radius: 12px; padding: 28px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-    .modal h2 { font-size: 18px; color: #7B4F6E; margin-bottom: 20px; }
+    .modal h2 { font-size: 18px; color: #4A5D4E; margin-bottom: 20px; }
     .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
     .options-input-area { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .option-row { display: flex; gap: 8px; align-items: center; }
     .option-row input { flex: 1; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 14px; }
     .option-row button { background: none; border: 1px solid #ddd; color: #999; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
     .option-row button:hover { border-color: #e74c3c; color: #e74c3c; }
-    .add-option-btn { background: #f0f4f0; border: 1.5px dashed #7B4F6E; color: #7B4F6E; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
-    .survey-url-box { background: #f0f4f0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #7B4F6E; word-break: break-all; margin-top: 8px; }
+    .add-option-btn { background: #f0f4f0; border: 1.5px dashed #4A5D4E; color: #4A5D4E; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+    .survey-url-box { background: #f0f4f0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #4A5D4E; word-break: break-all; margin-top: 8px; }
     .status-msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; display: none; }
     .status-msg.success { background: #e8f5e9; color: #2e7d32; display: block; }
     .status-msg.error { background: #fce8e6; color: #c62828; display: block; }
     .qr-box { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 16px; }
+    .logo-preview { max-width: 200px; max-height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: white; }
+    .logo-upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; background: #fafafa; transition: all 0.2s; }
+    .logo-upload-area:hover { border-color: #4A5D4E; background: #f0f4f0; }
+    .color-swatch { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .color-chip { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; }
+    .color-chip:hover, .color-chip.selected { border-color: #333; transform: scale(1.15); }
     #qrcode { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block; }
   </style>
 </head>
@@ -130,7 +136,7 @@
 
 <div class="login-wrap" id="loginArea">
   <div class="login-box">
-    <h2>🌿 Diana ダッシュボード</h2>
+    <h2>🌿 Herbelle ダッシュボード</h2>
     <input type="password" id="passwordInput" placeholder="パスワードを入力">
     <button onclick="doLogin()">ログイン</button>
     <div class="login-error" id="loginError">⚠️ パスワードが違います</div>
@@ -139,7 +145,7 @@
 
 <div id="dashContent">
   <div class="topbar">
-    <h1>🌿 Diana ダッシュボード</h1>
+    <h1>🌿 Herbelle ダッシュボード</h1>
     <div class="topbar-right">
       <select id="surveySelect" onchange="onSurveyChange()">
         <option value="">アンケートを選択...</option>
@@ -174,7 +180,7 @@
           <input type="date" id="filterTo">
           <button class="btn-filter" onclick="applyFilter()">絞り込み</button>
           <button class="btn-filter-clear" onclick="clearFilter()">クリア</button>
-          <span id="filterCount" style="font-size:13px;color:#7B4F6E;font-weight:bold"></span>
+          <span id="filterCount" style="font-size:13px;color:#4A5D4E;font-weight:bold"></span>
         </div>
 
         <div class="toolbar">
@@ -205,6 +211,46 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
               <div class="status-msg" id="infoStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ デザイン設定 -->
+        <div class="panel">
+          <h2>🎨 デザイン設定</h2>
+          <div class="builder-form">
+            <div class="form-group">
+              <label>ロゴ画像</label>
+              <div id="logoPreviewWrap" style="margin-bottom:8px;display:none">
+                <img id="logoPreview" class="logo-preview" src="" alt="ロゴ">
+                <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="removeLogo()">🗑️ ロゴを削除</button>
+              </div>
+              <div class="logo-upload-area" onclick="document.getElementById('logoFileInput').click()">
+                <div style="font-size:24px;margin-bottom:8px">🖼️</div>
+                <div style="font-size:13px;color:#888">クリックして画像を選択<br>PNG・JPG・SVG（推奨サイズ：横400px以内）</div>
+              </div>
+              <input type="file" id="logoFileInput" accept="image/*" style="display:none" onchange="onLogoSelected(event)">
+            </div>
+            <div class="form-group">
+              <label>ヘッダー背景色</label>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <input type="color" id="headerColorPicker" value="#4A5D4E" style="width:48px;height:48px;border:none;border-radius:8px;cursor:pointer;padding:2px">
+                <div class="color-swatch" id="colorSwatches">
+                  <div class="color-chip" style="background:#4A5D4E" onclick="setColor('#4A5D4E')" title="グリーン（デフォルト）"></div>
+                  <div class="color-chip" style="background:#2C3E50" onclick="setColor('#2C3E50')" title="ネイビー"></div>
+                  <div class="color-chip" style="background:#7B4F6E" onclick="setColor('#7B4F6E')" title="パープル"></div>
+                  <div class="color-chip" style="background:#2980B9" onclick="setColor('#2980B9')" title="ブルー"></div>
+                  <div class="color-chip" style="background:#E74C3C" onclick="setColor('#E74C3C')" title="レッド"></div>
+                  <div class="color-chip" style="background:#D35400" onclick="setColor('#D35400')" title="オレンジ"></div>
+                  <div class="color-chip" style="background:#8E44AD" onclick="setColor('#8E44AD')" title="バイオレット"></div>
+                  <div class="color-chip" style="background:#1ABC9C" onclick="setColor('#1ABC9C')" title="ターコイズ"></div>
+                </div>
+              </div>
+              <div style="margin-top:8px;font-size:12px;color:#888" id="colorPreviewLabel">現在の色：<span id="colorHexLabel">#4A5D4E</span></div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="saveDesignSettings()">💾 デザインを保存</button>
+              <div class="status-msg" id="designStatus"></div>
             </div>
           </div>
         </div>
@@ -290,7 +336,7 @@
       <div class="form-group" id="placeholderGroup"><label>記入例（任意）</label><input type="text" id="qPlaceholder" placeholder="例）山田 花子"></div>
       <div class="form-group" id="qRequiredGroup">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:normal">
-          <input type="checkbox" id="qRequired" style="width:20px;height:20px;accent-color:#7B4F6E;flex-shrink:0;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer">
+          <input type="checkbox" id="qRequired" style="width:20px;height:20px;accent-color:#4A5D4E;flex-shrink:0;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer">
           必須項目にする
         </label>
       </div>
@@ -323,7 +369,7 @@
 </div>
 
 <script>
-  var TENANT = 'diana';
+  var TENANT = 'herbelle';
   var BASE_URL = location.hostname === 'localhost'
     ? 'http://localhost:7071'
     : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
@@ -411,11 +457,11 @@
       document.getElementById('noSurveyMsg2').style.display = '';
       document.getElementById('builderContent').style.display = 'none';
       document.getElementById('currentPeriod').textContent = '読み込み中...';
-      document.title = 'Diana ダッシュボード';
+      document.title = 'Herbelle ダッシュボード';
       return;
     }
     currentSurvey = allSurveys.find(function(s) { return s.id === id; });
-    document.title = currentSurvey.title + ' - Dianaアンケート';
+    document.title = currentSurvey.title + ' - Herbelleアンケート';
     document.getElementById('noSurveyMsg').style.display = 'none';
     document.getElementById('responseContent').style.display = 'block';
     document.getElementById('noSurveyMsg2').style.display = 'none';
@@ -423,6 +469,7 @@
     clearFilter();
     loadBuilderData();
     fetchPeriod();
+    fetchDesignSettings();
     setTimeout(function() { fetchResponses(); }, 100);
   }
 
@@ -449,7 +496,7 @@
   function showQR() {
     var url = document.getElementById('surveyUrlBox').textContent;
     document.getElementById('qrcode').innerHTML = '';
-    qrInstance = new QRCode(document.getElementById('qrcode'), { text: url, width: 180, height: 180, colorDark: '#7B4F6E', colorLight: '#ffffff' });
+    qrInstance = new QRCode(document.getElementById('qrcode'), { text: url, width: 180, height: 180, colorDark: '#4A5D4E', colorLight: '#ffffff' });
     document.getElementById('qrArea').style.display = 'flex';
   }
 
@@ -593,7 +640,7 @@
         '<div class="survey-item-info">' +
         '<div class="survey-item-title">' + s.title +
         '<span class="' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? '公開中' : '非公開') + '</span></div>' +
-        '<div class="survey-item-meta">作成日：' + date + '　質問数：' + qCount + '件　回答数：<span id="cnt_' + s.id + '" style="color:#7B4F6E;font-weight:bold">...</span>件</div>' +
+        '<div class="survey-item-meta">作成日：' + date + '　質問数：' + qCount + '件　回答数：<span id="cnt_' + s.id + '" style="color:#4A5D4E;font-weight:bold">...</span>件</div>' +
         '</div><div class="survey-item-actions">' +
         '<button class="btn ' + (isActive ? 'btn-warning' : 'btn-success') + ' btn-sm" onclick="toggleActive(\'' + s.id + '\')">' + (isActive ? '⏸ 非公開' : '▶ 公開') + '</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="duplicateSurvey(\'' + s.id + '\')">📋 複製</button>' +
@@ -794,7 +841,7 @@
     grid.innerHTML = '';
     if (questions.length === 0 || filteredResponses.length === 0) { panel.style.display = 'none'; return; }
     panel.style.display = '';
-    var colors = ['#7B4F6E','#27ae60','#2980b9','#8e44ad','#e67e22','#e74c3c','#1abc9c','#f39c12'];
+    var colors = ['#4A5D4E','#27ae60','#2980b9','#8e44ad','#e67e22','#e74c3c','#1abc9c','#f39c12'];
     questions.forEach(function(q) {
       var counts = {};
       (q.options || []).forEach(function(o) { counts[o] = 0; });
@@ -857,6 +904,93 @@
   }
 
 
+
+
+  // ============================================================
+  // デザイン設定（ロゴ・背景色）
+  // ============================================================
+  var currentLogoBase64 = '';
+  var currentHeaderColor = '#4A5D4E';
+
+  async function fetchDesignSettings() {
+    try {
+      var res = await fetch(BASE_URL + '/api/tenantsettings?tenant=' + TENANT);
+      if (!res.ok) return;
+      var settings = await res.json();
+      if (settings.logoBase64) {
+        currentLogoBase64 = settings.logoBase64;
+        document.getElementById('logoPreview').src = settings.logoBase64;
+        document.getElementById('logoPreviewWrap').style.display = 'block';
+      } else {
+        currentLogoBase64 = '';
+        document.getElementById('logoPreviewWrap').style.display = 'none';
+      }
+      if (settings.headerColor) {
+        currentHeaderColor = settings.headerColor;
+        document.getElementById('headerColorPicker').value = settings.headerColor;
+        document.getElementById('colorHexLabel').textContent = settings.headerColor;
+        updateColorChips(settings.headerColor);
+      }
+    } catch(e) {}
+  }
+
+  function onLogoSelected(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { alert('画像サイズは500KB以下にしてください'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      currentLogoBase64 = e.target.result;
+      document.getElementById('logoPreview').src = currentLogoBase64;
+      document.getElementById('logoPreviewWrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeLogo() {
+    currentLogoBase64 = '';
+    document.getElementById('logoPreview').src = '';
+    document.getElementById('logoPreviewWrap').style.display = 'none';
+    document.getElementById('logoFileInput').value = '';
+  }
+
+  function setColor(color) {
+    currentHeaderColor = color;
+    document.getElementById('headerColorPicker').value = color;
+    document.getElementById('colorHexLabel').textContent = color;
+    updateColorChips(color);
+  }
+
+  function updateColorChips(color) {
+    document.querySelectorAll('.color-chip').forEach(function(chip) {
+      chip.classList.toggle('selected', chip.style.background.toUpperCase() === color.toUpperCase() ||
+        rgbToHex(chip.style.background).toUpperCase() === color.toUpperCase());
+    });
+  }
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (!m) return rgb;
+    return '#' + [m[1],m[2],m[3]].map(function(x) { return parseInt(x).toString(16).padStart(2,'0'); }).join('').toUpperCase();
+  }
+
+  document.getElementById('headerColorPicker').addEventListener('input', function(e) {
+    currentHeaderColor = e.target.value;
+    document.getElementById('colorHexLabel').textContent = e.target.value;
+    updateColorChips(e.target.value);
+  });
+
+  async function saveDesignSettings() {
+    try {
+      var res = await apiFetch(BASE_URL + '/api/tenantsettings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant: TENANT, logoBase64: currentLogoBase64, headerColor: currentHeaderColor })
+      });
+      if (res.ok) { showStatus('designStatus', '✅ 保存しました', 'success'); }
+      else { showStatus('designStatus', '❌ 保存失敗', 'error'); }
+    } catch(e) { showStatus('designStatus', '❌ エラー: ' + e.message, 'error'); }
+  }
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'F5') { e.preventDefault(); if (currentSurvey) fetchResponses(); }

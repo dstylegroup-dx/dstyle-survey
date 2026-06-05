@@ -235,6 +235,42 @@ app.post('/api/responsecounts', async (req, res) => {
     } catch (e) { return res.json({}); }
 });
 
+
+// ----------------------------------------------------
+// 🎨 テナント設定（ロゴ・背景色）
+// ----------------------------------------------------
+app.get('/api/tenantsettings', async (req, res) => {
+    const { tenant } = req.query;
+    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
+    try {
+        const container = await getContainer();
+        const { resource } = await container.item('settings_' + tenant, tenant).read();
+        return res.json(resource || {});
+    } catch (e) { return res.json({}); }
+});
+
+app.post('/api/tenantsettings', async (req, res) => {
+    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
+    const { tenant, logoBase64, logoName, headerColor } = req.body;
+    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
+    try {
+        const container = await getContainer();
+        const existing = await container.item('settings_' + tenant, tenant).read().then(r => r.resource || {}).catch(() => ({}));
+        const updated = {
+            ...existing,
+            id: 'settings_' + tenant,
+            docType: 'tenant_settings',
+            tenant,
+            logoBase64: logoBase64 !== undefined ? logoBase64 : (existing.logoBase64 || ''),
+            logoName: logoName !== undefined ? logoName : (existing.logoName || ''),
+            headerColor: headerColor !== undefined ? headerColor : (existing.headerColor || ''),
+            updatedAt: new Date().toISOString()
+        };
+        await container.items.upsert(updated);
+        return res.json(updated);
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
 // ----------------------------------------------------
 // 既存ログ互換
 // ----------------------------------------------------

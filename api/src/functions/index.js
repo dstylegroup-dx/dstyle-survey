@@ -366,6 +366,54 @@ app.http('responsecounts', {
 });
 
 // ----------------------------------------------------
+// 🎨 【テナント設定】ロゴ・背景色
+// ----------------------------------------------------
+app.http('tenantsettings', {
+    methods: ['GET', 'POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const url = new URL(request.url);
+            const container = await getContainer();
+
+            if (request.method === 'GET') {
+                const tenant = url.searchParams.get('tenant');
+                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                try {
+                    const { resource } = await container.item('settings_' + tenant, tenant).read();
+                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource || {} };
+                } catch (e) {
+                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: {} };
+                }
+            }
+
+            if (request.method === 'POST') {
+                const token = request.headers.get('x-admin-token');
+                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                const body = await request.json().catch(() => ({}));
+                const { tenant, logoBase64, logoName, headerColor } = body;
+                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                const existing = await container.item('settings_' + tenant, tenant).read().then(r => r.resource || {}).catch(() => ({}));
+                const updated = {
+                    ...existing,
+                    id: 'settings_' + tenant,
+                    docType: 'tenant_settings',
+                    tenant,
+                    logoBase64: logoBase64 !== undefined ? logoBase64 : (existing.logoBase64 || ''),
+                    logoName: logoName !== undefined ? logoName : (existing.logoName || ''),
+                    headerColor: headerColor !== undefined ? headerColor : (existing.headerColor || ''),
+                    updatedAt: new Date().toISOString()
+                };
+                await container.items.upsert(updated);
+                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
+            }
+        } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
 // ⏰ 【タイマー】期限切れトークンの自動削除（毎日深夜2時）
 // ----------------------------------------------------
 app.timer('cleanupExpiredTokens', {

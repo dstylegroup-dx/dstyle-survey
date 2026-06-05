@@ -123,6 +123,12 @@
     .status-msg.success { background: #e8f5e9; color: #2e7d32; display: block; }
     .status-msg.error { background: #fce8e6; color: #c62828; display: block; }
     .qr-box { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 16px; }
+    .logo-preview { max-width: 200px; max-height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: white; }
+    .logo-upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; background: #fafafa; transition: all 0.2s; }
+    .logo-upload-area:hover { border-color: #4A5D4E; background: #f0f4f0; }
+    .color-swatch { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .color-chip { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; }
+    .color-chip:hover, .color-chip.selected { border-color: #333; transform: scale(1.15); }
     #qrcode { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block; }
   </style>
 </head>
@@ -205,6 +211,46 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
               <div class="status-msg" id="infoStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ デザイン設定 -->
+        <div class="panel">
+          <h2>🎨 デザイン設定</h2>
+          <div class="builder-form">
+            <div class="form-group">
+              <label>ロゴ画像</label>
+              <div id="logoPreviewWrap" style="margin-bottom:8px;display:none">
+                <img id="logoPreview" class="logo-preview" src="" alt="ロゴ">
+                <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="removeLogo()">🗑️ ロゴを削除</button>
+              </div>
+              <div class="logo-upload-area" onclick="document.getElementById('logoFileInput').click()">
+                <div style="font-size:24px;margin-bottom:8px">🖼️</div>
+                <div style="font-size:13px;color:#888">クリックして画像を選択<br>PNG・JPG・SVG（推奨サイズ：横400px以内）</div>
+              </div>
+              <input type="file" id="logoFileInput" accept="image/*" style="display:none" onchange="onLogoSelected(event)">
+            </div>
+            <div class="form-group">
+              <label>ヘッダー背景色</label>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <input type="color" id="headerColorPicker" value="#4A5D4E" style="width:48px;height:48px;border:none;border-radius:8px;cursor:pointer;padding:2px">
+                <div class="color-swatch" id="colorSwatches">
+                  <div class="color-chip" style="background:#4A5D4E" onclick="setColor('#4A5D4E')" title="グリーン（デフォルト）"></div>
+                  <div class="color-chip" style="background:#2C3E50" onclick="setColor('#2C3E50')" title="ネイビー"></div>
+                  <div class="color-chip" style="background:#7B4F6E" onclick="setColor('#7B4F6E')" title="パープル"></div>
+                  <div class="color-chip" style="background:#2980B9" onclick="setColor('#2980B9')" title="ブルー"></div>
+                  <div class="color-chip" style="background:#E74C3C" onclick="setColor('#E74C3C')" title="レッド"></div>
+                  <div class="color-chip" style="background:#D35400" onclick="setColor('#D35400')" title="オレンジ"></div>
+                  <div class="color-chip" style="background:#8E44AD" onclick="setColor('#8E44AD')" title="バイオレット"></div>
+                  <div class="color-chip" style="background:#1ABC9C" onclick="setColor('#1ABC9C')" title="ターコイズ"></div>
+                </div>
+              </div>
+              <div style="margin-top:8px;font-size:12px;color:#888" id="colorPreviewLabel">現在の色：<span id="colorHexLabel">#4A5D4E</span></div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="saveDesignSettings()">💾 デザインを保存</button>
+              <div class="status-msg" id="designStatus"></div>
             </div>
           </div>
         </div>
@@ -423,6 +469,7 @@
     clearFilter();
     loadBuilderData();
     fetchPeriod();
+    fetchDesignSettings();
     setTimeout(function() { fetchResponses(); }, 100);
   }
 
@@ -857,6 +904,93 @@
   }
 
 
+
+
+  // ============================================================
+  // デザイン設定（ロゴ・背景色）
+  // ============================================================
+  var currentLogoBase64 = '';
+  var currentHeaderColor = '#4A5D4E';
+
+  async function fetchDesignSettings() {
+    try {
+      var res = await fetch(BASE_URL + '/api/tenantsettings?tenant=' + TENANT);
+      if (!res.ok) return;
+      var settings = await res.json();
+      if (settings.logoBase64) {
+        currentLogoBase64 = settings.logoBase64;
+        document.getElementById('logoPreview').src = settings.logoBase64;
+        document.getElementById('logoPreviewWrap').style.display = 'block';
+      } else {
+        currentLogoBase64 = '';
+        document.getElementById('logoPreviewWrap').style.display = 'none';
+      }
+      if (settings.headerColor) {
+        currentHeaderColor = settings.headerColor;
+        document.getElementById('headerColorPicker').value = settings.headerColor;
+        document.getElementById('colorHexLabel').textContent = settings.headerColor;
+        updateColorChips(settings.headerColor);
+      }
+    } catch(e) {}
+  }
+
+  function onLogoSelected(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { alert('画像サイズは500KB以下にしてください'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      currentLogoBase64 = e.target.result;
+      document.getElementById('logoPreview').src = currentLogoBase64;
+      document.getElementById('logoPreviewWrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeLogo() {
+    currentLogoBase64 = '';
+    document.getElementById('logoPreview').src = '';
+    document.getElementById('logoPreviewWrap').style.display = 'none';
+    document.getElementById('logoFileInput').value = '';
+  }
+
+  function setColor(color) {
+    currentHeaderColor = color;
+    document.getElementById('headerColorPicker').value = color;
+    document.getElementById('colorHexLabel').textContent = color;
+    updateColorChips(color);
+  }
+
+  function updateColorChips(color) {
+    document.querySelectorAll('.color-chip').forEach(function(chip) {
+      chip.classList.toggle('selected', chip.style.background.toUpperCase() === color.toUpperCase() ||
+        rgbToHex(chip.style.background).toUpperCase() === color.toUpperCase());
+    });
+  }
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (!m) return rgb;
+    return '#' + [m[1],m[2],m[3]].map(function(x) { return parseInt(x).toString(16).padStart(2,'0'); }).join('').toUpperCase();
+  }
+
+  document.getElementById('headerColorPicker').addEventListener('input', function(e) {
+    currentHeaderColor = e.target.value;
+    document.getElementById('colorHexLabel').textContent = e.target.value;
+    updateColorChips(e.target.value);
+  });
+
+  async function saveDesignSettings() {
+    try {
+      var res = await apiFetch(BASE_URL + '/api/tenantsettings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant: TENANT, logoBase64: currentLogoBase64, headerColor: currentHeaderColor })
+      });
+      if (res.ok) { showStatus('designStatus', '✅ 保存しました', 'success'); }
+      else { showStatus('designStatus', '❌ 保存失敗', 'error'); }
+    } catch(e) { showStatus('designStatus', '❌ エラー: ' + e.message, 'error'); }
+  }
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'F5') { e.preventDefault(); if (currentSurvey) fetchResponses(); }
