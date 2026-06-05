@@ -20,12 +20,33 @@ app.http('auth', {
             const correctPW = process.env[envKey];
             if (!correctPW) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'このテナントは設定されていません' } };
 
+            const client = new CosmosClient(process.env.COSMOS_CONNECTION);
+            const container = client.database(process.env.COSMOS_DATABASE).container(process.env.COSMOS_CONTAINER);
+
             if (password === correctPW) {
                 const token = crypto.randomBytes(16).toString('hex');
                 validTokens.add(token);
                 setTimeout(() => validTokens.delete(token), 24 * 60 * 60 * 1000);
+                // ★ アクセスログ記録（成功）
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'access_log',
+                    tenant,
+                    result: 'success',
+                    ip: request.headers.get('x-forwarded-for') || request.headers.get('client-ip') || 'unknown',
+                    createdAt: new Date().toISOString()
+                }).catch(() => {});
                 return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
             }
+            // ★ アクセスログ記録（失敗）
+            await container.items.create({
+                id: crypto.randomUUID(),
+                docType: 'access_log',
+                tenant,
+                result: 'failure',
+                ip: request.headers.get('x-forwarded-for') || request.headers.get('client-ip') || 'unknown',
+                createdAt: new Date().toISOString()
+            }).catch(() => {});
             return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'パスワードが違います' } };
         } catch (e) {
             return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
@@ -134,17 +155,14 @@ app.http('surveys', {
             const client = new CosmosClient(process.env.COSMOS_CONNECTION);
             const container = client.database(process.env.COSMOS_DATABASE).container(process.env.COSMOS_CONTAINER);
 
-            // GET
             if (request.method === 'GET') {
                 const tenant = url.searchParams.get('tenant');
                 const id = url.searchParams.get('id');
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
-
                 if (id) {
                     const { resource } = await container.item(id, tenant).read();
                     return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource };
                 }
-
                 const { resources } = await container.items.query({
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: tenant }]
@@ -152,23 +170,21 @@ app.http('surveys', {
                 return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
             }
 
-            // 認証チェック（POST/PUT/DELETE）
             const token = request.headers.get('x-admin-token');
             if (!token || !validTokens.has(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
 
-            // POST: 新規作成
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, title, description, questions, active } = body;
+                const { tenant, title, description, questions, active, thanksMessage } = body;
                 if (!tenant || !title) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と title は必須です' } };
                 const newSurvey = {
                     id: 'survey_' + crypto.randomUUID(),
                     docType: 'survey_definition',
-                    tenant,
-                    title,
+                    tenant, title,
                     description: description || '',
                     questions: questions || [],
                     active: active !== undefined ? active : true,
+                    thanksMessage: thanksMessage || '',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
@@ -176,10 +192,9 @@ app.http('surveys', {
                 return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: newSurvey };
             }
 
-            // PUT: 更新
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
-                const { id, tenant, title, description, questions, active } = body;
+                const { id, tenant, title, description, questions, active, thanksMessage } = body;
                 if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
@@ -188,13 +203,13 @@ app.http('surveys', {
                     description: description ?? existing.description,
                     questions: questions ?? existing.questions,
                     active: active !== undefined ? active : existing.active,
+                    thanksMessage: thanksMessage !== undefined ? thanksMessage : (existing.thanksMessage || ''),
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
                 return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
             }
 
-            // DELETE
             if (request.method === 'DELETE') {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
@@ -226,23 +241,14 @@ app.http('response', {
                 if (!token || !validTokens.has(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
             }
 
-            // POST: 回答保存（認証不要）
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
                 const { surveyId, tenant, answers } = body;
                 if (!surveyId || !tenant || !answers) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
-                await container.items.create({
-                    id: crypto.randomUUID(),
-                    docType: 'survey_response',
-                    surveyId,
-                    tenant,
-                    answers,
-                    createdAt: new Date().toISOString()
-                });
+                await container.items.create({ id: crypto.randomUUID(), docType: 'survey_response', surveyId, tenant, answers, createdAt: new Date().toISOString() });
                 return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok' } };
             }
 
-            // GET: 回答一覧取得
             if (request.method === 'GET') {
                 const surveyId = url.searchParams.get('surveyId');
                 const tenant = url.searchParams.get('tenant');
@@ -254,7 +260,6 @@ app.http('response', {
                 return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
             }
 
-            // DELETE: 回答削除
             if (request.method === 'DELETE') {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
@@ -265,6 +270,71 @@ app.http('response', {
 
         } catch (e) {
             return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 📊 【アクセスログ】取得
+// ----------------------------------------------------
+app.http('accesslog', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const token = request.headers.get('x-admin-token');
+            if (!token || !validTokens.has(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+
+            const client = new CosmosClient(process.env.COSMOS_CONNECTION);
+            const container = client.database(process.env.COSMOS_DATABASE).container(process.env.COSMOS_CONTAINER);
+            const url = new URL(request.url);
+            const tenant = url.searchParams.get('tenant');
+
+            let query = "SELECT TOP 200 * FROM c WHERE c.docType = 'access_log' ORDER BY c.createdAt DESC";
+            let parameters = [];
+            if (tenant) {
+                query = "SELECT TOP 200 * FROM c WHERE c.docType = 'access_log' AND c.tenant = @tenant ORDER BY c.createdAt DESC";
+                parameters = [{ name: "@tenant", value: tenant }];
+            }
+            const { resources } = await container.items.query({ query, parameters }).fetchAll();
+            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+        } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 📊 【回答数サマリー】アンケートIDリストで一括取得
+// ----------------------------------------------------
+app.http('responsecounts', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const token = request.headers.get('x-admin-token');
+            if (!token || !validTokens.has(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+
+            const body = await request.json().catch(() => ({}));
+            const { tenant, surveyIds } = body;
+            if (!tenant || !surveyIds || !surveyIds.length) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と surveyIds は必須です' } };
+
+            const client = new CosmosClient(process.env.COSMOS_CONNECTION);
+            const container = client.database(process.env.COSMOS_DATABASE).container(process.env.COSMOS_CONTAINER);
+
+            const counts = {};
+            surveyIds.forEach(id => counts[id] = 0);
+
+            const { resources } = await container.items.query({
+                query: "SELECT c.surveyId, COUNT(1) as cnt FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND ARRAY_CONTAINS(@ids, c.surveyId) GROUP BY c.surveyId",
+                parameters: [{ name: "@tenant", value: tenant }, { name: "@ids", value: surveyIds }]
+            }).fetchAll();
+
+            resources.forEach(r => { counts[r.surveyId] = r.cnt; });
+            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: counts };
+        } catch (e) {
+            // GROUP BYが使えない場合のフォールバック
+            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: {} };
         }
     }
 });

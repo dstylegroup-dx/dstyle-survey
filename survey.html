@@ -42,6 +42,10 @@
     .thanks-message { font-size: 16px; color: #555; line-height: 1.8; margin-bottom: 24px; }
     .thanks-sub { font-size: 14px; color: #888; line-height: 1.7; padding: 16px; background: #f5f7f5; border-radius: 8px; }
     .divider { border: none; border-top: 1px solid #eee; margin: 8px 0 28px; }
+    .field-error input, .field-error textarea, .field-error select { border-color: #e74c3c !important; background: #fff8f8 !important; }
+    .field-error .radio-group .radio-label { border-color: #e74c3c; }
+    .field-error-msg { color: #e74c3c; font-size: 13px; margin-top: 6px; display: none; }
+    .field-error .field-error-msg { display: block; }
     @media (min-width: 480px) { .radio-group.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } }
   </style>
 </head>
@@ -135,29 +139,34 @@
     var color = getColor();
     var html = '';
     survey.questions.forEach(function(q, i) {
-      html += '<div class="section">';
+      html += '<div class="section" id="section_' + q.id + '">';
       html += '<div class="section-label" style="color:' + color + '">';
       html += '<span class="num" style="background:' + color + '">' + (i + 1) + '</span>';
       html += q.label;
       if (q.required) html += '<span class="required">※必須</span>';
       html += '</div>';
       if (q.type === 'text') {
-        html += '<input type="text" id="q_' + q.id + '" ' + (q.required ? 'required' : '') + ' placeholder="' + (q.placeholder || '') + '">';
+        html += '<input type="text" id="q_' + q.id + '" placeholder="' + (q.placeholder || '') + '">';
+        if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'textarea') {
         html += '<textarea id="q_' + q.id + '" placeholder="' + (q.placeholder || '') + '"></textarea>';
+        if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'select') {
         html += '<select id="q_' + q.id + '"><option value="">選択してください</option>';
         (q.options || []).forEach(function(opt) { html += '<option value="' + opt + '">' + opt + '</option>'; });
         html += '</select>';
+        if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'radio') {
         var cols = (q.options || []).length <= 4 ? ' two-col' : '';
         html += '<div class="radio-group' + cols + '" id="group_' + q.id + '">';
         (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="radio" name="q_' + q.id + '" value="' + opt + '"> ' + opt + '</label>'; });
         html += '</div>';
+        if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
       } else if (q.type === 'checkbox') {
         html += '<div class="radio-group" id="group_' + q.id + '">';
         (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="checkbox" name="q_' + q.id + '" value="' + opt + '"> ' + opt + '</label>'; });
         html += '</div>';
+        if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
       }
       html += '</div>';
       if (i === survey.questions.length - 2) html += '<hr class="divider">';
@@ -188,6 +197,38 @@
       btn.disabled = true;
       btn.textContent = '送信中...';
       errorMsg.style.display = 'none';
+      // 全エラークリア
+      document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('field-error'); });
+
+      // バリデーション
+      var hasError = false;
+      survey.questions.forEach(function(q) {
+        if (!q.required) return;
+        var section = document.getElementById('section_' + q.id);
+        var isEmpty = false;
+        if (q.type === 'text' || q.type === 'textarea') {
+          var el = document.getElementById('q_' + q.id);
+          if (!el || !el.value.trim()) isEmpty = true;
+        } else if (q.type === 'select') {
+          var el = document.getElementById('q_' + q.id);
+          if (!el || !el.value) isEmpty = true;
+        } else if (q.type === 'radio') {
+          var checked = document.querySelector('input[name="q_' + q.id + '"]:checked');
+          if (!checked) isEmpty = true;
+        } else if (q.type === 'checkbox') {
+          var checked = document.querySelectorAll('input[name="q_' + q.id + '"]:checked');
+          if (!checked.length) isEmpty = true;
+        }
+        if (isEmpty && section) { section.classList.add('field-error'); hasError = true; }
+      });
+      if (hasError) {
+        var firstError = document.querySelector('.field-error');
+        if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        btn.disabled = false;
+        btn.textContent = 'アンケートを送信する 📩';
+        return;
+      }
+
       var answers = {};
       survey.questions.forEach(function(q) {
         if (q.type === 'text' || q.type === 'textarea' || q.type === 'select') {
@@ -232,6 +273,9 @@
     document.getElementById('surveyHeader').style.background = color;
     document.getElementById('surveyTitle').textContent = survey.title;
     document.title = survey.title;
+    if (survey.thanksMessage) {
+      document.querySelector('.thanks-message').innerHTML = survey.thanksMessage.replace(/\n/g, '<br>');
+    }
     if (survey.description) document.getElementById('surveyDescription').textContent = survey.description;
     var badge = document.getElementById('periodBadge');
     if (endDate && badge) badge.textContent = '📅 受付期間：' + formatDate(endDate) + ' まで';

@@ -152,6 +152,7 @@
       <button class="tab-btn active" onclick="switchTab('responses')">📊 回答データ</button>
       <button class="tab-btn" onclick="switchTab('builder')">⚙️ アンケート設定</button>
       <button class="tab-btn" onclick="switchTab('surveys')">📋 アンケート管理</button>
+      <button class="tab-btn" onclick="switchTab('accesslog')">🔐 アクセスログ</button>
     </div>
 
     <!-- タブ1: 回答データ -->
@@ -201,6 +202,7 @@
           <div class="builder-form">
             <div class="form-group"><label>アンケートタイトル</label><input type="text" id="surveyTitle" placeholder="例）無料体験アンケート"></div>
             <div class="form-group"><label>説明文（任意）</label><textarea id="surveyDescription" placeholder="例）本日はお越しいただきありがとうございました。率直なご感想をお聞かせください（約2分）"></textarea></div>
+            <div class="form-group"><label>回答完了メッセージ（任意）</label><textarea id="surveyThanksMessage" placeholder="例）本日はご来店いただきありがとうございました。またのご来店をお待ちしております。"></textarea></div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
               <div class="status-msg" id="infoStatus"></div>
@@ -254,6 +256,25 @@
           <div class="qr-box" id="qrArea" style="display:none">
             <div id="qrcode"></div>
             <button class="btn btn-secondary btn-sm" onclick="downloadQR()">⬇️ QRコードをダウンロード</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- タブ4: アクセスログ -->
+    <div id="tab-accesslog" class="tab-content">
+      <div class="panel">
+        <h2>🔐 アクセスログ</h2>
+        <div class="summary" id="logSummaryArea"></div>
+        <div class="toolbar" style="margin-top:0">
+          <button class="btn btn-primary btn-sm" onclick="fetchAccessLog()">🔄 更新</button>
+        </div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>日時</th><th>テナント</th><th>IPアドレス</th><th>結果</th></tr></thead>
+              <tbody id="logTableBody"><tr><td colspan="4" class="loading">タブを開くと読み込みます</td></tr></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -383,6 +404,7 @@
     document.querySelector('[onclick="switchTab(\'' + name + '\')"]').classList.add('active');
     document.getElementById('tab-' + name).classList.add('active');
     if (name === 'surveys') renderSurveyList();
+    if (name === 'accesslog') fetchAccessLog();
   }
 
   async function loadSurveys() {
@@ -429,6 +451,7 @@
     if (!currentSurvey) return;
     document.getElementById('surveyTitle').value = currentSurvey.title || '';
     document.getElementById('surveyDescription').value = currentSurvey.description || '';
+    document.getElementById('surveyThanksMessage').value = currentSurvey.thanksMessage || '';
     renderQuestions();
     updateSurveyUrl();
     document.getElementById('qrArea').style.display = 'none';
@@ -466,8 +489,9 @@
     var description = document.getElementById('surveyDescription').value.trim();
     if (!title) { alert('タイトルを入力してください'); return; }
     try {
-      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description }) });
-      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
+      var thanksMessage = document.getElementById('surveyThanksMessage').value.trim();
+      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage }) });
+      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
       else { showStatus('infoStatus', '❌ 保存失敗', 'error'); }
     } catch (e) { showStatus('infoStatus', '❌ エラー: ' + e.message, 'error'); }
   }
@@ -590,7 +614,7 @@
         '<div class="survey-item-info">' +
         '<div class="survey-item-title">' + s.title +
         '<span class="' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? '公開中' : '非公開') + '</span></div>' +
-        '<div class="survey-item-meta">作成日：' + date + '　質問数：' + qCount + '件</div>' +
+        '<div class="survey-item-meta">作成日：' + date + '　質問数：' + qCount + '件　回答数：<span id="cnt_' + s.id + '" style="color:#4A5D4E;font-weight:bold">...</span>件</div>' +
         '</div><div class="survey-item-actions">' +
         '<button class="btn ' + (isActive ? 'btn-warning' : 'btn-success') + ' btn-sm" onclick="toggleActive(\'' + s.id + '\')">' + (isActive ? '⏸ 非公開' : '▶ 公開') + '</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="duplicateSurvey(\'' + s.id + '\')">📋 複製</button>' +
@@ -598,6 +622,21 @@
         '<button class="btn btn-danger btn-sm" onclick="deleteSurvey(\'' + s.id + '\')">削除</button>' +
         '</div></div>';
     }).join('');
+  }
+
+  async function loadResponseCounts() {
+    if (!allSurveys.length) return;
+    var ids = allSurveys.map(function(s) { return s.id; });
+    try {
+      var res = await apiFetch(BASE_URL + '/api/responsecounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenant: TENANT, surveyIds: ids }) });
+      if (res.ok) {
+        var counts = await res.json();
+        ids.forEach(function(id) {
+          var el = document.getElementById('cnt_' + id);
+          if (el) el.textContent = counts[id] !== undefined ? counts[id] : '—';
+        });
+      }
+    } catch(e) {}
   }
 
   function selectSurveyFromList(id) {
@@ -836,6 +875,36 @@
     el.textContent = msg;
     el.style.display = 'inline-block';
     setTimeout(function() { el.style.display = 'none'; }, 3000);
+  }
+
+
+  async function fetchAccessLog() {
+    var tbody = document.getElementById('logTableBody');
+    tbody.innerHTML = '<tr><td colspan="4" class="loading">読み込み中...</td></tr>';
+    try {
+      var res = await apiFetch(BASE_URL + '/api/accesslog');
+      if (!res.ok) throw new Error('取得失敗');
+      var logs = await res.json();
+      var summaryArea = document.getElementById('logSummaryArea');
+      var todayStr = new Date().toISOString().slice(0, 10);
+      var todayCount = logs.filter(function(l) { return l.createdAt.slice(0,10) === todayStr; }).length;
+      var successCount = logs.filter(function(l) { return l.result === 'success'; }).length;
+      var failCount = logs.filter(function(l) { return l.result === 'failure'; }).length;
+      summaryArea.innerHTML =
+        '<div class="card hl"><div class="num">' + todayCount + '</div><div class="label">本日のログイン</div></div>' +
+        '<div class="card hl"><div class="num">' + successCount + '</div><div class="label">成功（直近200件）</div></div>' +
+        '<div class="card hl"><div class="num" style="color:#e74c3c">' + failCount + '</div><div class="label">失敗（直近200件）</div></div>';
+      if (!logs.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">ログがありません</td></tr>'; return; }
+      tbody.innerHTML = logs.map(function(l) {
+        var date = new Date(l.createdAt).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        var badge = l.result === 'success'
+          ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold">成功</span>'
+          : '<span style="background:#fce8e6;color:#c62828;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold">失敗</span>';
+        return '<tr><td style="white-space:nowrap;color:#888">' + date + '</td><td>' + (l.tenant||'—') + '</td><td style="color:#888;font-size:12px">' + (l.ip||'—') + '</td><td>' + badge + '</td></tr>';
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">❌ ' + e.message + '</td></tr>';
+    }
   }
 
   document.addEventListener('keydown', function(e) {

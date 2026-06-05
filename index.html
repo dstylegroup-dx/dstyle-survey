@@ -4,11 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DStyle DX フォーム管理ポータル</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; color: #333; line-height: 1.6; padding: 40px 20px; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f7f6; color: #333; line-height: 1.6; }
+
+        /* ログイン画面 */
+        .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .login-box { background: white; border-radius: 12px; padding: 40px 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
+        .login-box h2 { color: #2c3e50; margin-bottom: 8px; font-size: 20px; }
+        .login-box p { color: #888; font-size: 13px; margin-bottom: 24px; }
+        .login-box input { width: 100%; padding: 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 16px; margin-bottom: 16px; text-align: center; }
+        .login-box input:focus { border-color: #2c3e50; outline: none; }
+        .login-box button { width: 100%; padding: 14px; background: #2c3e50; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .login-box button:hover { background: #1a252f; }
+        .login-error { color: #c0392b; font-size: 14px; margin-top: 10px; display: none; }
+
+        /* ポータル本体 */
+        #portalContent { display: none; padding: 40px 20px; min-height: 100vh; }
         .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h1 { font-size: 26px; color: #2c3e50; margin-top: 0; margin-bottom: 10px; border-bottom: 2px solid #2c3e50; padding-bottom: 15px; }
-        .subtitle { color: #7f8c8d; font-size: 15px; margin-bottom: 30px; }
+        .portal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
+        h1 { font-size: 26px; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 15px; flex: 1; }
+        .logout-btn { background: #f5f5f5; border: 1px solid #ddd; color: #666; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+        .logout-btn:hover { background: #eee; }
+        .subtitle { color: #7f8c8d; font-size: 15px; margin-bottom: 30px; margin-top: 10px; }
         .project-section { margin-bottom: 35px; background: #fafbfc; border: 1px solid #e1e8ed; border-radius: 8px; padding: 24px; }
         .project-title { font-size: 18px; font-weight: bold; color: #4A5D4E; margin-top: 0; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
         .link-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
@@ -17,43 +36,106 @@
         .btn-link:hover { background: #2c3e50; color: white; border-color: #2c3e50; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .btn-link.dashboard:hover { background: #4A5D4E; border-color: #4A5D4E; }
         .btn-link.dashboard-diana:hover { background: #7B4F6E; border-color: #7B4F6E; }
-        .system-status { margin-top: 40px; font-size: 13px; color: #95a5a6; border-top: 1px dashed #ccc; padding-top: 15px; display: flex; justify-content: space-between; }
+        .system-status { margin-top: 40px; font-size: 13px; color: #95a5a6; border-top: 1px dashed #ccc; padding-top: 15px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>DStyle DX フォーム管理ポータル</h1>
-    <div class="subtitle">構築済みの汎用API基盤を活用した、各種アンケート・フォームのリンク集です。</div>
 
-    <!-- 🌿 Herbelle -->
-    <div class="project-section">
-        <div class="project-title">🌿 よもぎ蒸しサロン Herbelle（千歳船橋）</div>
-        <div class="link-grid">
-            <a href="dashboard-herbelle.html" class="btn-link dashboard" target="_blank">📊 Herbelle ダッシュボード</a>
-        </div>
-    </div>
-
-    <!-- 👗 Diana -->
-    <div class="project-section">
-        <div class="project-title" style="color: #7B4F6E;">👗 Diana（補正下着 試着体験）</div>
-        <div class="link-grid">
-            <a href="dashboard-diana.html" class="btn-link dashboard-diana" target="_blank">📊 Diana ダッシュボード</a>
-        </div>
-    </div>
-
-    <!--
-    <div class="project-section">
-        <div class="project-title">🏢 新しいプロジェクト名</div>
-        <div class="link-grid">
-            <a href="dashboard-new.html" class="btn-link dashboard" target="_blank">📊 ダッシュボード</a>
-        </div>
-    </div>
-    -->
-
-    <div class="system-status">
-        <span>DStyle DX フォーム管理ポータル</span>
-        <span>ディライトテクノロジーズ事業部</span>
+<!-- ログイン画面 -->
+<div class="login-wrap" id="loginArea">
+    <div class="login-box">
+        <h2>📋 DStyle DX</h2>
+        <p>フォーム管理ポータル<br>パスワードを入力してください</p>
+        <input type="password" id="passwordInput" placeholder="パスワードを入力">
+        <button onclick="doLogin()">ログイン</button>
+        <div class="login-error" id="loginError">⚠️ パスワードが違います</div>
     </div>
 </div>
+
+<!-- ポータル本体 -->
+<div id="portalContent">
+    <div class="container">
+        <div class="portal-header">
+            <h1>DStyle DX フォーム管理ポータル</h1>
+            <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+        </div>
+        <div class="subtitle">構築済みの汎用API基盤を活用した、各種アンケート・フォームのリンク集です。</div>
+
+        <!-- 🌿 Herbelle -->
+        <div class="project-section">
+            <div class="project-title">🌿 よもぎ蒸しサロン Herbelle（千歳船橋）</div>
+            <div class="link-grid">
+                <a href="dashboard-herbelle.html" class="btn-link dashboard" target="_blank">📊 Herbelle ダッシュボード</a>
+            </div>
+        </div>
+
+        <!-- 👗 Diana -->
+        <div class="project-section">
+            <div class="project-title" style="color: #7B4F6E;">👗 Diana（補正下着 試着体験）</div>
+            <div class="link-grid">
+                <a href="dashboard-diana.html" class="btn-link dashboard-diana" target="_blank">📊 Diana ダッシュボード</a>
+            </div>
+        </div>
+
+        <!--
+        <div class="project-section">
+            <div class="project-title">🏢 新しいプロジェクト名</div>
+            <div class="link-grid">
+                <a href="dashboard-new.html" class="btn-link dashboard" target="_blank">📊 ダッシュボード</a>
+            </div>
+        </div>
+        -->
+
+        <div class="system-status">
+            <span>DStyle DX フォーム管理ポータル</span>
+            <span>ディライトテクノロジーズ事業部</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    var BASE_URL = location.hostname === 'localhost'
+        ? 'http://localhost:7071'
+        : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
+
+    async function doLogin() {
+        var pw = document.getElementById('passwordInput').value;
+        var loginError = document.getElementById('loginError');
+        loginError.style.display = 'none';
+        try {
+            var res = await fetch(BASE_URL + '/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pw, tenant: 'portal' })
+            });
+            if (res.ok) {
+                sessionStorage.setItem('portalAuth', 'ok');
+                document.getElementById('loginArea').style.display = 'none';
+                document.getElementById('portalContent').style.display = 'block';
+            } else {
+                loginError.style.display = 'block';
+            }
+        } catch (e) {
+            loginError.style.display = 'block';
+        }
+    }
+
+    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') doLogin();
+    });
+
+    function doLogout() {
+        sessionStorage.removeItem('portalAuth');
+        location.reload();
+    }
+
+    // ページ読み込み時に認証済みか確認
+    (function() {
+        if (sessionStorage.getItem('portalAuth') === 'ok') {
+            document.getElementById('loginArea').style.display = 'none';
+            document.getElementById('portalContent').style.display = 'block';
+        }
+    })();
+</script>
 </body>
 </html>
