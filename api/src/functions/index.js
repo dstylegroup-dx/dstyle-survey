@@ -364,3 +364,28 @@ app.http('responsecounts', {
         }
     }
 });
+
+// ----------------------------------------------------
+// ⏰ 【タイマー】期限切れトークンの自動削除（毎日深夜2時）
+// ----------------------------------------------------
+app.timer('cleanupExpiredTokens', {
+    schedule: '0 0 2 * * *',
+    handler: async (myTimer, context) => {
+        try {
+            const container = await getContainer();
+            const now = new Date().toISOString();
+            const { resources } = await container.items.query({
+                query: "SELECT c.id FROM c WHERE c.docType = 'auth_token' AND c.expiresAt < @now",
+                parameters: [{ name: "@now", value: now }]
+            }).fetchAll();
+            let deleted = 0;
+            for (const item of resources) {
+                await container.item(item.id, 'auth_token').delete().catch(() => {});
+                deleted++;
+            }
+            context.log(`期限切れトークン削除完了: ${deleted}件`);
+        } catch (e) {
+            context.log('トークン削除エラー: ' + e.message);
+        }
+    }
+});
