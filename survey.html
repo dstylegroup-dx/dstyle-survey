@@ -142,7 +142,7 @@
       html += '<div class="section" id="section_' + q.id + '">';
       html += '<div class="section-label" style="color:' + color + '">';
       html += '<span class="num" style="background:' + color + '">' + (i + 1) + '</span>';
-      html += q.label;
+      html += esc(q.label);
       if (q.required) html += '<span class="required">※必須</span>';
       html += '</div>';
       if (q.type === 'text') {
@@ -153,18 +153,18 @@
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'select') {
         html += '<select id="q_' + q.id + '"><option value="">選択してください</option>';
-        (q.options || []).forEach(function(opt) { html += '<option value="' + opt + '">' + opt + '</option>'; });
+        (q.options || []).forEach(function(opt) { html += '<option value="' + esc(opt) + '">' + esc(opt) + '</option>'; });
         html += '</select>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'radio') {
         var cols = (q.options || []).length <= 4 ? ' two-col' : '';
         html += '<div class="radio-group' + cols + '" id="group_' + q.id + '">';
-        (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="radio" name="q_' + q.id + '" value="' + opt + '"> ' + opt + '</label>'; });
+        (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="radio" name="q_' + esc(q.id) + '" value="' + esc(opt) + '"> ' + esc(opt) + '</label>'; });
         html += '</div>';
         if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
       } else if (q.type === 'checkbox') {
         html += '<div class="radio-group" id="group_' + q.id + '">';
-        (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="checkbox" name="q_' + q.id + '" value="' + opt + '"> ' + opt + '</label>'; });
+        (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="checkbox" name="q_' + esc(q.id) + '" value="' + esc(opt) + '"> ' + esc(opt) + '</label>'; });
         html += '</div>';
         if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
       }

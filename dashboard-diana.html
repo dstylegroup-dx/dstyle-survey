@@ -434,6 +434,18 @@
 </div>
 
 <script>
+
+  // XSS対策：文字列をエスケープする
+  function esc(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   var TENANT = 'diana';
   var BASE_URL = location.hostname === 'localhost'
     ? 'http://localhost:7071'
@@ -883,7 +895,7 @@
   function renderResponseTable() {
     if (!currentSurvey) return;
     var questions = currentSurvey.questions || [];
-    document.getElementById('tableHead').innerHTML = '<tr><th>日時</th>' + questions.map(function(q) { return '<th>' + q.label + '</th>'; }).join('') + '<th>操作</th></tr>';
+    document.getElementById('tableHead').innerHTML = '<tr><th>日時</th>' + questions.map(function(q) { return '<th>' + esc(q.label) + '</th>'; }).join('') + '<th>操作</th></tr>';
     var summaryArea = document.getElementById('summaryArea');
     summaryArea.innerHTML = '<div class="card hl"><div class="num">' + allResponses.length + '</div><div class="label">総回答数</div></div>' +
       (filteredResponses.length !== allResponses.length ? '<div class="card hl"><div class="num" style="color:#e67e22">' + filteredResponses.length + '</div><div class="label">フィルター後</div></div>' : '');
@@ -891,7 +903,7 @@
     if (filteredResponses.length === 0) { tbody.innerHTML = '<tr><td colspan="' + (questions.length + 2) + '" class="empty">回答データがありません</td></tr>'; return; }
     tbody.innerHTML = filteredResponses.map(function(r) {
       var date = new Date(r.createdAt).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-      var cells = questions.map(function(q) { var val = r.answers ? (r.answers[q.id] || '—') : '—'; return '<td style="max-width:180px">' + val + '</td>'; }).join('');
+      var cells = questions.map(function(q) { var val = r.answers ? (r.answers[q.id] || '—') : '—'; return '<td style="max-width:180px">' + esc(val) + '</td>'; }).join('');
       return '<tr><td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
     }).join('');
   }
@@ -921,7 +933,7 @@
       if (data.reduce(function(a,b){return a+b;},0) === 0) return;
       var card = document.createElement('div');
       card.className = 'chart-card';
-      card.innerHTML = '<h3>' + q.label + '</h3><canvas id="chart_' + q.id + '"></canvas>';
+      card.innerHTML = '<h3>' + esc(q.label) + '</h3><canvas id="chart_' + q.id + '"></canvas>';
       grid.appendChild(card);
       var chart = new Chart(document.getElementById('chart_' + q.id).getContext('2d'), {
         type: q.type === 'checkbox' ? 'bar' : 'doughnut',

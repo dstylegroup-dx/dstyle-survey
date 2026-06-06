@@ -3,6 +3,21 @@ const { app } = require('@azure/functions');
 const { CosmosClient } = require('@azure/cosmos');
 const crypto = require('crypto');
 
+
+// ----------------------------------------------------
+// 🔒 セキュリティヘッダー共通設定
+// ----------------------------------------------------
+const SECURITY_HEADERS = {
+    'Content-Type': 'application/json',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Cache-Control': 'no-store'
+};
+
+function secureJson(body, status = 200) {
+    return { status, headers: SECURITY_HEADERS, jsonBody: body };
+}
+
 // ----------------------------------------------------
 // 🔑 トークン管理（Cosmos DB永続化）
 // ----------------------------------------------------
@@ -70,7 +85,7 @@ app.http('auth', {
                     ip: request.headers.get('x-forwarded-for') || request.headers.get('client-ip') || 'unknown',
                     createdAt: new Date().toISOString()
                 }).catch(() => {});
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
+                return secureJson({ token });
             }
             // アクセスログ記録（失敗）
             await container.items.create({
@@ -81,7 +96,7 @@ app.http('auth', {
                 ip: request.headers.get('x-forwarded-for') || request.headers.get('client-ip') || 'unknown',
                 createdAt: new Date().toISOString()
             }).catch(() => {});
-            return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'パスワードが違います' } };
+            return secureJson({ error: 'パスワードが違います' }, 401);
         } catch (e) {
             return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
         }
