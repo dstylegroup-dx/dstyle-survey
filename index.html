@@ -31,13 +31,15 @@
         .tab-content.active { display: block; }
         .panel { background: white; border-radius: 10px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
         .panel h2 { font-size: 16px; color: #2c3e50; margin-bottom: 16px; font-weight: bold; }
-        .project-section { margin-bottom: 20px; background: #fafbfc; border: 1px solid #e1e8ed; border-radius: 8px; padding: 24px; }
-        .project-title { font-size: 18px; font-weight: bold; color: #4A5D4E; margin-top: 0; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .project-section { margin-bottom: 16px; background: #fafbfc; border: 1px solid #e1e8ed; border-radius: 8px; padding: 20px 24px; }
+        .project-title { font-size: 17px; font-weight: bold; color: #4A5D4E; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         .link-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media(min-width: 600px) { .link-grid { grid-template-columns: 1fr 1fr; } }
         .btn-link { display: flex; align-items: center; justify-content: center; padding: 14px; background: #fff; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; font-weight: bold; color: #333; text-decoration: none; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .btn-link.dashboard:hover { background: #4A5D4E; color: white; border-color: #4A5D4E; transform: translateY(-2px); }
-        .btn-link.dashboard-diana:hover { background: #7B4F6E; color: white; border-color: #7B4F6E; transform: translateY(-2px); }
+        .btn-link:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .btn-herbelle:hover { background: #4A5D4E; color: white; border-color: #4A5D4E; }
+        .btn-diana:hover { background: #7B4F6E; color: white; border-color: #7B4F6E; }
+        .btn-dstylehd:hover { background: #1A6FA8; color: white; border-color: #1A6FA8; }
         .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 20px; }
         .card { background: white; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .card .num { font-size: 28px; font-weight: bold; color: #2c3e50; }
@@ -94,26 +96,42 @@
 
             <!-- タブ1: ポータル -->
             <div id="tab-portal" class="tab-content active">
+
+                <!-- Herbelle -->
                 <div class="project-section">
-                    <div class="project-title">🌿 よもぎ蒸しサロン Herbelle（千歳船橋）</div>
+                    <div class="project-title" style="color:#4A5D4E;">🌿 よもぎ蒸しサロン Herbelle（千歳船橋）</div>
                     <div class="link-grid">
-                        <a href="dashboard-herbelle.html" class="btn-link dashboard" target="_blank">📊 Herbelle ダッシュボード</a>
+                        <a href="dashboard-herbelle.html" class="btn-link btn-herbelle" target="_blank">📊 Herbelle ダッシュボード</a>
                     </div>
                 </div>
+
+                <!-- Diana -->
                 <div class="project-section">
                     <div class="project-title" style="color:#7B4F6E;">👗 Diana（補正下着 試着体験）</div>
                     <div class="link-grid">
-                        <a href="dashboard-diana.html" class="btn-link dashboard-diana" target="_blank">📊 Diana ダッシュボード</a>
+                        <a href="dashboard-diana.html" class="btn-link btn-diana" target="_blank">📊 Diana ダッシュボード</a>
                     </div>
                 </div>
-                <!--
+
+                <!-- DstyleHD -->
                 <div class="project-section">
-                    <div class="project-title">🏢 新しいプロジェクト名</div>
+                    <div class="project-title" style="color:#1A6FA8;">🏢 DstyleHD</div>
                     <div class="link-grid">
-                        <a href="dashboard-new.html" class="btn-link dashboard" target="_blank">📊 ダッシュボード</a>
+                        <a href="dashboard-dstylehd.html" class="btn-link btn-dstylehd" target="_blank">📊 DstyleHD ダッシュボード</a>
                     </div>
                 </div>
+
+                <!--
+                新しい事業部を追加する場合はここにコピーしてください：
+                <div class="project-section">
+                    <div class="project-title" style="color:#色コード;">絵文字 事業部名</div>
+                    <div class="link-grid">
+                        <a href="dashboard-テナントID.html" class="btn-link btn-テナントID" target="_blank">📊 事業部名 ダッシュボード</a>
+                    </div>
+                </div>
+                対応するCSSも追加：.btn-テナントID:hover { background: #色コード; color: white; border-color: #色コード; }
                 -->
+
                 <div class="system-status">
                     <span>DStyle DX フォーム管理ポータル</span>
                     <span>ディライトテクノロジーズ事業部</span>
@@ -136,6 +154,7 @@
                             <option value="">すべて</option>
                             <option value="herbelle">herbelle</option>
                             <option value="diana">diana</option>
+                            <option value="dstylehd">dstylehd</option>
                             <option value="portal">portal</option>
                         </select>
                         <label style="margin-left:8px">結果：</label>
@@ -158,6 +177,7 @@
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
