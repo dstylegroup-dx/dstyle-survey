@@ -134,6 +134,12 @@
     .rte-editor:empty:before { content: attr(placeholder); color: #aaa; pointer-events: none; }
     .rte-editor a { color: #2980B9; text-decoration: underline; }
     .rte-editor:focus { border-color: #4A5D4E; }
+
+    .img-upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 14px; text-align: center; cursor: pointer; background: #fafafa; transition: all 0.2s; margin-top: 6px; }
+    .img-upload-area:hover { border-color: #4A5D4E; background: #f0f4f0; }
+    .img-preview-wrap { position: relative; display: inline-block; margin-top: 8px; }
+    .img-preview-wrap img { max-width: 200px; max-height: 120px; border-radius: 8px; border: 1px solid #ddd; object-fit: contain; }
+    .img-preview-remove { position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px; line-height: 22px; text-align: center; }
     .logo-preview { max-width: 200px; max-height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: white; }
     .bg-preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 8px; }
     .bg-preset { border-radius: 10px; height: 64px; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; display: flex; align-items: flex-end; padding: 6px 8px; }
@@ -399,6 +405,7 @@
                 <option value="tel">📞 電話番号</option>
                 <option value="email">📧 メールアドレス</option>
                 <option value="date">📅 日付選択</option>
+                <option value="image_choice">🖼️ 画像選択</option>
               </select>
               <button class="btn btn-primary" onclick="openAddQuestion()">＋ 追加</button>
             </div>
@@ -464,10 +471,31 @@
           必須項目にする
         </label>
       </div>
+      <div class="form-group" id="questionImageGroup">
+        <label>質問画像（任意）</label>
+        <p style="font-size:12px;color:#888;margin-bottom:6px">質問文の下に表示される画像です。PNG・JPG（1MB以内）</p>
+        <div id="qImgPreviewWrap" class="img-preview-wrap" style="display:none">
+          <img id="qImgPreview" src="" alt="質問画像">
+          <button class="img-preview-remove" onclick="removeQuestionImage()">✕</button>
+        </div>
+        <div class="img-upload-area" onclick="document.getElementById('qImgFileInput').click()">
+          <div style="font-size:20px;margin-bottom:4px">🖼️</div>
+          <div style="font-size:12px;color:#888">クリックして画像を選択</div>
+        </div>
+        <input type="file" id="qImgFileInput" accept="image/*" style="display:none" onchange="onQuestionImageSelected(event)">
+      </div>
+
       <div class="form-group" id="optionsGroup" style="display:none">
-        <label>選択肢</label>
+        <label id="optionsLabel">選択肢</label>
         <div class="options-input-area" id="optionsList"></div>
         <button class="add-option-btn" onclick="addOptionRow()">＋ 選択肢を追加</button>
+      </div>
+
+      <div class="form-group" id="imageChoiceGroup" style="display:none">
+        <label>画像選択肢</label>
+        <p style="font-size:12px;color:#888;margin-bottom:8px">各選択肢に画像とラベルを設定します。PNG・JPG（500KB以内）</p>
+        <div id="imageChoiceList"></div>
+        <button class="add-option-btn" onclick="addImageChoiceRow()">＋ 画像選択肢を追加</button>
       </div>
       <div class="form-group" id="ratingGroup" style="display:none">
         <label>最大評価数</label>
@@ -678,7 +706,7 @@
     var list = document.getElementById('questionsList');
     var questions = currentSurvey.questions || [];
     if (questions.length === 0) { list.innerHTML = '<div class="empty">質問がありません。下の「＋ 追加」から追加してください。</div>'; return; }
-    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付' };
+    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択' };
     list.innerHTML = questions.map(function(q, i) {
       var opts = (q.options || []).map(function(o) { return '<span class="option-tag">' + o + '</span>'; }).join('');
       return '<div class="question-item"><div class="question-item-header">' +
@@ -724,6 +752,10 @@
     document.getElementById('qType').value = document.getElementById('newQuestionType').value;
     document.getElementById('qPlaceholder').value = '';
     document.getElementById('qRequired').checked = false;
+    currentQImageBase64 = '';
+    document.getElementById('qImgPreviewWrap').style.display = 'none';
+    document.getElementById('qImgFileInput').value = '';
+    document.getElementById('imageChoiceList').innerHTML = '';
     onQTypeChange();
     document.getElementById('optionsList').innerHTML = '';
     addOptionRow(); addOptionRow();
@@ -746,6 +778,19 @@
       document.getElementById('qMin').value = q.min !== undefined ? q.min : '';
       document.getElementById('qMax').value = q.max !== undefined ? q.max : '';
     }
+    // 質問画像復元
+    currentQImageBase64 = q.imageBase64 || '';
+    if (currentQImageBase64) {
+      document.getElementById('qImgPreview').src = currentQImageBase64;
+      document.getElementById('qImgPreviewWrap').style.display = 'block';
+    } else {
+      document.getElementById('qImgPreviewWrap').style.display = 'none';
+    }
+    // 画像選択肢復元
+    if (q.type === 'image_choice') {
+      document.getElementById('imageChoiceList').innerHTML = '';
+      (q.imageChoices || []).forEach(function(c) { addImageChoiceRow(c.label, c.imageBase64); });
+    }
     document.getElementById('questionModal').classList.add('show');
   }
 
@@ -757,6 +802,10 @@
     document.getElementById('placeholderGroup').style.display = needsPlaceholder ? '' : 'none';
     document.getElementById('ratingGroup').style.display = type === 'rating' ? '' : 'none';
     document.getElementById('numberRangeGroup').style.display = type === 'number' ? '' : 'none';
+    document.getElementById('imageChoiceGroup').style.display = type === 'image_choice' ? '' : 'none';
+    if (type === 'image_choice' && document.getElementById('imageChoiceList').children.length === 0) {
+      addImageChoiceRow(); addImageChoiceRow();
+    }
   }
 
   function addOptionRow(value) {
@@ -788,6 +837,8 @@
       if (minVal !== '') q.min = parseInt(minVal);
       if (maxVal !== '') q.max = parseInt(maxVal);
     }
+    if (currentQImageBase64) q.imageBase64 = currentQImageBase64;
+    if (type === 'image_choice') q.imageChoices = getImageChoices();
     if (!currentSurvey.questions) currentSurvey.questions = [];
     if (editingQuestionIndex >= 0) { q.id = currentSurvey.questions[editingQuestionIndex].id; currentSurvey.questions[editingQuestionIndex] = q; }
     else { currentSurvey.questions.push(q); }
@@ -1199,6 +1250,90 @@
     document.getElementById('privacyBgColorLabel').textContent = e.target.value;
   });
 
+
+
+  // ============================================================
+  // 質問画像・画像選択肢
+  // ============================================================
+  var currentQImageBase64 = '';
+
+  function onQuestionImageSelected(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) { alert('画像サイズは1MB以下にしてください'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      currentQImageBase64 = e.target.result;
+      document.getElementById('qImgPreview').src = currentQImageBase64;
+      document.getElementById('qImgPreviewWrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeQuestionImage() {
+    currentQImageBase64 = '';
+    document.getElementById('qImgPreview').src = '';
+    document.getElementById('qImgPreviewWrap').style.display = 'none';
+    document.getElementById('qImgFileInput').value = '';
+  }
+
+  function addImageChoiceRow(label, imgBase64) {
+    var list = document.getElementById('imageChoiceList');
+    var idx = list.children.length;
+    var div = document.createElement('div');
+    div.className = 'option-row';
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;background:#fafafa;padding:8px;border-radius:8px;border:1px solid #eee';
+    div.innerHTML =
+      '<div style="flex:1;min-width:180px">' +
+        '<input type="text" placeholder="ラベル（例：Aプラン）" value="' + (label || '') + '" style="width:100%;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px">' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px">' +
+        '<div id="icImgWrap_' + idx + '" style="' + (imgBase64 ? '' : 'display:none') + '">' +
+          '<img src="' + (imgBase64 || '') + '" style="max-width:60px;max-height:60px;border-radius:4px;border:1px solid #ddd;object-fit:contain">' +
+        '</div>' +
+        '<label style="padding:6px 10px;background:#f0f4f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:12px">🖼️ 画像' +
+          '<input type="file" accept="image/*" style="display:none" onchange="onImageChoiceFileSelected(this, ' + idx + ')">' +
+        '</label>' +
+        '<button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="padding:6px 10px;font-size:12px">✕</button>' +
+      '</div>';
+    // Base64を保持するdata属性
+    div.dataset.imgBase64 = imgBase64 || '';
+    list.appendChild(div);
+  }
+
+  function onImageChoiceFileSelected(input, idx) {
+    var file = input.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { alert('画像サイズは500KB以下にしてください'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var row = input.closest('.option-row');
+      row.dataset.imgBase64 = e.target.result;
+      var wrap = document.getElementById('icImgWrap_' + idx);
+      if (wrap) { wrap.style.display = ''; wrap.querySelector('img').src = e.target.result; }
+      else {
+        var newWrap = document.createElement('div');
+        newWrap.id = 'icImgWrap_' + idx;
+        var img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.cssText = 'max-width:60px;max-height:60px;border-radius:4px;border:1px solid #ddd;object-fit:contain';
+        newWrap.appendChild(img);
+        input.closest('.option-row').querySelector('div:last-child').prepend(newWrap);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function getImageChoices() {
+    var rows = document.getElementById('imageChoiceList').querySelectorAll('.option-row');
+    var choices = [];
+    rows.forEach(function(row) {
+      var label = row.querySelector('input[type="text"]').value.trim();
+      var img = row.dataset.imgBase64 || '';
+      if (label || img) choices.push({ label: label, imageBase64: img });
+    });
+    return choices;
+  }
 
   // ============================================================
   // リッチテキストエディタ（プライバシーポリシー用）

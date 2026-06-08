@@ -46,6 +46,14 @@ input[type="number"]::-webkit-inner-spin-button,
     .radio-label input[type="radio"], .radio-label input[type="checkbox"] { margin-right: 12px; width: 20px; height: 20px; accent-color: #4A5D4E; flex-shrink: 0; }
     .radio-label.selected { border-color: #4A5D4E; background: #eef3ee; font-weight: bold; }
 
+
+    .image-choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 8px; }
+    .image-choice-item { border: 2px solid #ddd; border-radius: 10px; padding: 8px; cursor: pointer; text-align: center; transition: all 0.2s; background: white; }
+    .image-choice-item:hover { border-color: #4A5D4E; background: #f0f4f0; }
+    .image-choice-item.selected { border-color: #4A5D4E; background: #e8f5e9; }
+    .image-choice-item img { width: 100%; max-height: 90px; object-fit: contain; border-radius: 6px; margin-bottom: 6px; }
+    .image-choice-item span { font-size: 13px; color: #333; display: block; }
+    .question-image { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin: 8px 0 12px; border: 1px solid #eee; }
     .privacy-notice { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin: 16px 0 12px; font-size: 13px; color: #666; line-height: 1.7; }
     .privacy-notice a { color: #2980B9; text-decoration: underline; }
     .privacy-notice a:hover { opacity: 0.8; }
@@ -180,6 +188,7 @@ input[type="number"]::-webkit-inner-spin-button,
       html += esc(q.label);
       if (q.required) html += '<span class="required">※必須</span>';
       html += '</div>';
+      if (q.imageBase64) html += '<img src="' + q.imageBase64 + '" class="question-image" alt="質問画像">';
       if (q.type === 'text') {
         html += '<input type="text" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
@@ -197,6 +206,17 @@ input[type="number"]::-webkit-inner-spin-button,
       } else if (q.type === 'date') {
         html += '<input type="date" id="q_' + esc(q.id) + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
+      } else if (q.type === 'image_choice') {
+        html += '<div class="image-choice-grid" id="ic_' + esc(q.id) + '">';
+        (q.imageChoices || []).forEach(function(choice, ci) {
+          html += '<div class="image-choice-item" id="ic_item_' + esc(q.id) + '_' + ci + '" onclick="selectImageChoice('' + esc(q.id) + '', ' + ci + ', '' + esc(choice.label) + '')">';
+          if (choice.imageBase64) html += '<img src="' + choice.imageBase64 + '" alt="' + esc(choice.label) + '">';
+          html += '<span>' + esc(choice.label) + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+        html += '<input type="hidden" id="q_' + esc(q.id) + '" value="">';
+        if (q.required) html += '<div class="field-error-msg">選択してください</div>';
       } else if (q.type === 'rating') {
         var maxStars = q.maxStars || 5;
         var starLabels = q.starLabels || ['', '悪い', 'やや悪い', '普通', '良い', '大変良い', '', '', '', '', ''];
@@ -282,6 +302,8 @@ input[type="number"]::-webkit-inner-spin-button,
         } else if (q.type === 'select') {
           var el = document.getElementById('q_' + q.id);
           if (!el || !el.value) isEmpty = true;
+        } else if (q.type === 'image_choice') {
+          if (!document.getElementById('q_' + q.id).value) isEmpty = true;
         } else if (q.type === 'rating') {
           var checked = document.querySelector('input[name="q_' + q.id + '"]:checked');
           if (!checked) isEmpty = true;
@@ -307,6 +329,8 @@ input[type="number"]::-webkit-inner-spin-button,
         if (q.type === 'text' || q.type === 'textarea' || q.type === 'select' ||
             q.type === 'tel' || q.type === 'email' || q.type === 'number' || q.type === 'date') {
           answers[q.id] = document.getElementById('q_' + q.id).value;
+        } else if (q.type === 'image_choice') {
+          answers[q.id] = document.getElementById('q_' + q.id).value || '未選択';
         } else if (q.type === 'rating') {
           var checked = document.querySelector('input[name="q_' + q.id + '"]:checked');
           answers[q.id] = checked ? checked.value + '点' : '未評価';
@@ -372,6 +396,17 @@ input[type="number"]::-webkit-inner-spin-button,
     var badge = document.getElementById('periodBadge');
     if (endDate && badge) badge.textContent = '📅 受付期間：' + formatDate(endDate) + ' まで';
     buildForm(survey, settings);
+  }
+
+  function selectImageChoice(qId, idx, label) {
+    document.getElementById('q_' + qId).value = label;
+    var grid = document.getElementById('ic_' + qId);
+    grid.querySelectorAll('.image-choice-item').forEach(function(item) { item.classList.remove('selected'); });
+    var selected = document.getElementById('ic_item_' + qId + '_' + idx);
+    if (selected) selected.classList.add('selected');
+    // 必須エラーをクリア
+    var errEl = grid.nextElementSibling && grid.nextElementSibling.nextElementSibling;
+    if (errEl && errEl.className === 'field-error-msg') errEl.style.display = 'none';
   }
 
   function updateStarLabel(qId, val, label) {
