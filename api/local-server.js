@@ -273,7 +273,7 @@ app.get('/api/tenantsettings', async (req, res) => {
 
 app.post('/api/tenantsettings', async (req, res) => {
     if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyId, logoBase64, logoName, headerColor, bgColor, bgType } = req.body;
+    const { tenant, surveyId, logoBase64, logoName, headerColor, bgColor, bgType, privacyText, privacyLinkText, privacyLinkUrl, privacyTextColor, privacyBgColor } = req.body;
     if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
     try {
         const container = await getContainer();
@@ -288,6 +288,11 @@ app.post('/api/tenantsettings', async (req, res) => {
             headerColor: headerColor !== undefined ? headerColor : (existing.headerColor || ''),
             bgColor: bgColor !== undefined ? bgColor : (existing.bgColor || ''),
             bgType: bgType !== undefined ? bgType : (existing.bgType || 'solid'),
+            privacyText: privacyText !== undefined ? privacyText : (existing.privacyText || ''),
+            privacyLinkText: privacyLinkText !== undefined ? privacyLinkText : (existing.privacyLinkText || ''),
+            privacyLinkUrl: privacyLinkUrl !== undefined ? privacyLinkUrl : (existing.privacyLinkUrl || ''),
+            privacyTextColor: privacyTextColor !== undefined ? privacyTextColor : (existing.privacyTextColor || ''),
+            privacyBgColor: privacyBgColor !== undefined ? privacyBgColor : (existing.privacyBgColor || ''),
             updatedAt: new Date().toISOString()
         };
         await container.items.upsert(updated);

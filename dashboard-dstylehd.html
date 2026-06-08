@@ -314,6 +314,33 @@
               </div>
             </div>
 
+            <!-- プライバシーポリシー設定 -->
+            <div class="form-group" id="privacyGroup">
+              <label>📋 プライバシーポリシー文</label>
+              <p style="font-size:12px;color:#888;margin-bottom:8px">アンケート送信ボタン上に表示されます。空欄の場合はデフォルト文が表示されます。</p>
+              <textarea id="privacyText" rows="3" placeholder="例）ご入力いただいた個人情報は、サービス向上およびお客様へのご連絡の目的にのみ使用し、第三者への提供は行いません。" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;resize:vertical"></textarea>
+              <label style="margin-top:12px">リンクテキスト（任意）</label>
+              <input type="text" id="privacyLinkText" placeholder="例）プライバシーポリシーはこちら" style="width:100%;margin-top:4px">
+              <label style="margin-top:12px">リンクURL（任意）</label>
+              <input type="text" id="privacyLinkUrl" placeholder="例）https://example.com/privacy" style="width:100%;margin-top:4px">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">
+                <div>
+                  <label style="display:block;margin-bottom:4px">文字色</label>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <input type="color" id="privacyTextColor" value="#666666" style="width:40px;height:36px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                    <span id="privacyTextColorLabel" style="font-size:12px;color:#888">#666666</span>
+                  </div>
+                </div>
+                <div>
+                  <label style="display:block;margin-bottom:4px">背景色</label>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <input type="color" id="privacyBgColor" value="#f9f9f9" style="width:40px;height:36px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                    <span id="privacyBgColorLabel" style="font-size:12px;color:#888">#f9f9f9</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
               <button class="btn btn-primary" onclick="saveDesignSettings()">💾 デザインを保存</button>
               <button class="btn btn-secondary" onclick="resetDesignSettings()" id="resetDesignBtn" style="display:none">🗑️ このアンケートの設定をリセット</button>
@@ -1077,6 +1104,17 @@
     currentBgColor = bg;
     currentBgType = settings.bgType || 'solid';
     updateBgPresetSelection(bg);
+
+    // プライバシーポリシー設定
+    document.getElementById('privacyText').value = settings.privacyText || '';
+    document.getElementById('privacyLinkText').value = settings.privacyLinkText || '';
+    document.getElementById('privacyLinkUrl').value = settings.privacyLinkUrl || '';
+    var ptc = settings.privacyTextColor || '#666666';
+    var pbc = settings.privacyBgColor || '#f9f9f9';
+    document.getElementById('privacyTextColor').value = ptc;
+    document.getElementById('privacyBgColor').value = pbc;
+    document.getElementById('privacyTextColorLabel').textContent = ptc;
+    document.getElementById('privacyBgColorLabel').textContent = pbc;
   }
 
   function selectBg(el) {
@@ -1136,13 +1174,32 @@
     updateColorChips(e.target.value);
   });
 
+  document.getElementById('privacyTextColor').addEventListener('input', function(e) {
+    document.getElementById('privacyTextColorLabel').textContent = e.target.value;
+  });
+  document.getElementById('privacyBgColor').addEventListener('input', function(e) {
+    document.getElementById('privacyBgColorLabel').textContent = e.target.value;
+  });
+
   async function saveDesignSettings() {
     var surveyId = (designScope === 'survey' && currentSurvey) ? currentSurvey.id : null;
     try {
       var res = await apiFetch(BASE_URL + '/api/tenantsettings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant: TENANT, surveyId: surveyId, logoBase64: currentLogoBase64, headerColor: currentHeaderColor, bgColor: currentBgColor, bgType: currentBgType })
+        body: JSON.stringify({
+          tenant: TENANT,
+          surveyId: surveyId,
+          logoBase64: currentLogoBase64,
+          headerColor: currentHeaderColor,
+          bgColor: currentBgColor,
+          bgType: currentBgType,
+          privacyText: document.getElementById('privacyText').value,
+          privacyLinkText: document.getElementById('privacyLinkText').value,
+          privacyLinkUrl: document.getElementById('privacyLinkUrl').value,
+          privacyTextColor: document.getElementById('privacyTextColor').value,
+          privacyBgColor: document.getElementById('privacyBgColor').value
+        })
       });
       if (res.ok) { showStatus('designStatus', '✅ 保存しました', 'success'); }
       else { showStatus('designStatus', '❌ 保存失敗', 'error'); }

@@ -419,7 +419,7 @@ app.http('tenantsettings', {
                 const token = request.headers.get('x-admin-token');
                 if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
                 const body = await request.json().catch(() => ({}));
-                const { tenant, surveyId, logoBase64, logoName, headerColor, bgColor, bgType } = body;
+                const { tenant, surveyId, logoBase64, logoName, headerColor, bgColor, bgType, privacyText, privacyLinkText, privacyLinkUrl, privacyTextColor, privacyBgColor } = body;
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
 
                 const id = surveyId ? 'design_' + surveyId : 'settings_' + tenant;
@@ -434,6 +434,11 @@ app.http('tenantsettings', {
                     headerColor: headerColor !== undefined ? headerColor : (existing.headerColor || ''),
                     bgColor: bgColor !== undefined ? bgColor : (existing.bgColor || ''),
                     bgType: bgType !== undefined ? bgType : (existing.bgType || 'solid'),
+                    privacyText: privacyText !== undefined ? privacyText : (existing.privacyText || ''),
+                    privacyLinkText: privacyLinkText !== undefined ? privacyLinkText : (existing.privacyLinkText || ''),
+                    privacyLinkUrl: privacyLinkUrl !== undefined ? privacyLinkUrl : (existing.privacyLinkUrl || ''),
+                    privacyTextColor: privacyTextColor !== undefined ? privacyTextColor : (existing.privacyTextColor || ''),
+                    privacyBgColor: privacyBgColor !== undefined ? privacyBgColor : (existing.privacyBgColor || ''),
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
