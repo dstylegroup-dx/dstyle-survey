@@ -47,6 +47,8 @@ input[type="number"]::-webkit-inner-spin-button,
     .radio-label.selected { border-color: #4A5D4E; background: #eef3ee; font-weight: bold; }
 
     .privacy-notice { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin: 16px 0 12px; font-size: 13px; color: #666; line-height: 1.7; }
+    .privacy-notice a { color: #2980B9; text-decoration: underline; }
+    .privacy-notice a:hover { opacity: 0.8; }
     .privacy-notice p:first-child { color: #444; margin-bottom: 4px; }
     .submit-btn { width: 100%; padding: 18px; background: #4A5D4E; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; transition: background 0.2s; margin-top: 8px; box-shadow: 0 4px 12px rgba(74,93,78,0.3); -webkit-appearance: none; appearance: none; }
     .submit-btn:hover { background: #3b4d3f; }
@@ -230,17 +232,12 @@ input[type="number"]::-webkit-inner-spin-button,
       if (i === survey.questions.length - 2) html += '<hr class="divider">';
     });
     // プライバシーポリシー動的生成
-    var privacyText = (settings && settings.privacyText) ? settings.privacyText : 'ご入力いただいた個人情報は、サービス向上およびお客様へのご連絡の目的にのみ使用し、第三者への提供は行いません。';
+    var privacyContent = (settings && settings.privacyText) ? settings.privacyText : 'ご入力いただいた個人情報は、サービス向上およびお客様へのご連絡の目的にのみ使用し、第三者への提供は行いません。';
     var privacyTextColor = (settings && settings.privacyTextColor) ? settings.privacyTextColor : '#666666';
     var privacyBgColor = (settings && settings.privacyBgColor) ? settings.privacyBgColor : '#f9f9f9';
-    var privacyLinkText = (settings && settings.privacyLinkText) ? settings.privacyLinkText : '';
-    var privacyLinkUrl = (settings && settings.privacyLinkUrl) ? settings.privacyLinkUrl : '';
     var privacyHtml = '<div class="privacy-notice" style="background:' + privacyBgColor + ';color:' + privacyTextColor + ';border-color:' + privacyBgColor + '">';
     privacyHtml += '<p>📋 <strong style="color:' + privacyTextColor + '">個人情報の取り扱いについて</strong></p>';
-    privacyHtml += '<p>' + privacyText + '</p>';
-    if (privacyLinkText && privacyLinkUrl) {
-      privacyHtml += '<p style="margin-top:6px"><a href="' + privacyLinkUrl + '" target="_blank" rel="noopener noreferrer" style="color:' + privacyTextColor + ';text-decoration:underline">' + privacyLinkText + '</a></p>';
-    }
+    privacyHtml += '<div style="color:' + privacyTextColor + '">' + privacyContent + '</div>';
     privacyHtml += '</div>';
     html += privacyHtml;
     html += '<button type="submit" class="submit-btn" id="submitBtn" style="background:' + color + ';box-shadow:0 4px 12px rgba(0,0,0,0.2)">アンケートを送信する 📩</button>';

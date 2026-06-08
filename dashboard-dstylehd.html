@@ -125,6 +125,15 @@
     .status-msg.success { background: #e8f5e9; color: #2e7d32; display: block; }
     .status-msg.error { background: #fce8e6; color: #c62828; display: block; }
     .qr-box { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 16px; }
+
+    .rte-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 8px 10px; background: #f5f5f5; border: 1.5px solid #ddd; border-bottom: none; border-radius: 8px 8px 0 0; }
+    .rte-btn { padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 13px; color: #333; transition: all 0.15s; }
+    .rte-btn:hover { background: #1A6FA8; color: white; border-color: #1A6FA8; }
+    .rte-divider { width: 1px; height: 20px; background: #ddd; margin: 0 4px; }
+    .rte-editor { min-height: 80px; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 0 0 8px 8px; font-size: 14px; line-height: 1.7; background: white; outline: none; color: #333; }
+    .rte-editor:empty:before { content: attr(placeholder); color: #aaa; pointer-events: none; }
+    .rte-editor a { color: #2980B9; text-decoration: underline; }
+    .rte-editor:focus { border-color: #1A6FA8; }
     .logo-preview { max-width: 200px; max-height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: white; }
     .bg-preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 8px; }
     .bg-preset { border-radius: 10px; height: 64px; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; display: flex; align-items: flex-end; padding: 6px 8px; }
@@ -314,31 +323,42 @@
               </div>
             </div>
 
-            <!-- プライバシーポリシー設定 -->
+            <!-- プライバシーポリシー設定（リッチテキストエディタ） -->
             <div class="form-group" id="privacyGroup">
               <label>📋 プライバシーポリシー文</label>
               <p style="font-size:12px;color:#888;margin-bottom:8px">アンケート送信ボタン上に表示されます。空欄の場合はデフォルト文が表示されます。</p>
-              <textarea id="privacyText" rows="3" placeholder="例）ご入力いただいた個人情報は、サービス向上およびお客様へのご連絡の目的にのみ使用し、第三者への提供は行いません。" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;resize:vertical"></textarea>
-              <label style="margin-top:12px">リンクテキスト（任意）</label>
-              <input type="text" id="privacyLinkText" placeholder="例）プライバシーポリシーはこちら" style="width:100%;margin-top:4px">
-              <label style="margin-top:12px">リンクURL（任意）</label>
-              <input type="text" id="privacyLinkUrl" placeholder="例）https://example.com/privacy" style="width:100%;margin-top:4px">
-              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">
-                <div>
-                  <label style="display:block;margin-bottom:4px">文字色</label>
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <input type="color" id="privacyTextColor" value="#666666" style="width:40px;height:36px;border:none;border-radius:6px;cursor:pointer;padding:2px">
-                    <span id="privacyTextColorLabel" style="font-size:12px;color:#888">#666666</span>
-                  </div>
+
+              <!-- エディタツールバー -->
+              <div class="rte-toolbar">
+                <button type="button" class="rte-btn" onclick="rteCmd('bold')" title="太字"><b>B</b></button>
+                <button type="button" class="rte-btn" onclick="rteCmd('italic')" title="斜体"><i>I</i></button>
+                <button type="button" class="rte-btn" onclick="rteCmd('underline')" title="下線"><u>U</u></button>
+                <div class="rte-divider"></div>
+                <button type="button" class="rte-btn" onclick="rteInsertLink()" title="リンク">🔗 リンク</button>
+                <button type="button" class="rte-btn" onclick="rteClearLink()" title="リンク解除">🔗✕</button>
+                <div class="rte-divider"></div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:12px;color:#666;white-space:nowrap">文字色</label>
+                  <input type="color" id="privacyTextColor" value="#666666" style="width:32px;height:28px;border:none;border-radius:4px;cursor:pointer;padding:1px" onchange="document.getElementById('privacyTextColorLabel').textContent=this.value">
+                  <span id="privacyTextColorLabel" style="font-size:11px;color:#888">#666666</span>
                 </div>
-                <div>
-                  <label style="display:block;margin-bottom:4px">背景色</label>
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <input type="color" id="privacyBgColor" value="#f9f9f9" style="width:40px;height:36px;border:none;border-radius:6px;cursor:pointer;padding:2px">
-                    <span id="privacyBgColorLabel" style="font-size:12px;color:#888">#f9f9f9</span>
-                  </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-left:8px">
+                  <label style="font-size:12px;color:#666;white-space:nowrap">背景色</label>
+                  <input type="color" id="privacyBgColor" value="#f9f9f9" style="width:32px;height:28px;border:none;border-radius:4px;cursor:pointer;padding:1px" onchange="document.getElementById('privacyBgColorLabel').textContent=this.value">
+                  <span id="privacyBgColorLabel" style="font-size:11px;color:#888">#f9f9f9</span>
                 </div>
               </div>
+
+              <!-- エディタ本体 -->
+              <div id="privacyEditor" class="rte-editor" contenteditable="true"
+                   placeholder="例）ご入力いただいた個人情報は、サービス向上およびお客様へのご連絡の目的にのみ使用し、第三者への提供は行いません。"></div>
+
+              <!-- 非表示の保存用フィールド -->
+              <input type="hidden" id="privacyText">
+              <input type="hidden" id="privacyLinkText">
+              <input type="hidden" id="privacyLinkUrl">
+
+              <p style="font-size:11px;color:#aaa;margin-top:6px">テキストを選択してからボタンを押すと書式が適用されます。</p>
             </div>
 
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -1106,9 +1126,7 @@
     updateBgPresetSelection(bg);
 
     // プライバシーポリシー設定
-    document.getElementById('privacyText').value = settings.privacyText || '';
-    document.getElementById('privacyLinkText').value = settings.privacyLinkText || '';
-    document.getElementById('privacyLinkUrl').value = settings.privacyLinkUrl || '';
+    rteSetHtml(settings.privacyText || '');
     var ptc = settings.privacyTextColor || '#666666';
     var pbc = settings.privacyBgColor || '#f9f9f9';
     document.getElementById('privacyTextColor').value = ptc;
@@ -1194,9 +1212,9 @@
           headerColor: currentHeaderColor,
           bgColor: currentBgColor,
           bgType: currentBgType,
-          privacyText: document.getElementById('privacyText').value,
-          privacyLinkText: document.getElementById('privacyLinkText').value,
-          privacyLinkUrl: document.getElementById('privacyLinkUrl').value,
+          privacyText: rteGetHtml(),
+          privacyLinkText: '',
+          privacyLinkUrl: '',
           privacyTextColor: document.getElementById('privacyTextColor').value,
           privacyBgColor: document.getElementById('privacyBgColor').value
         })
