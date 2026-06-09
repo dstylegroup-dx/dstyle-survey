@@ -451,6 +451,94 @@ app.http('tenantsettings', {
 });
 
 // ----------------------------------------------------
+// 🔮 【診断】CRUD
+// ----------------------------------------------------
+app.http('diagnosis', {
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const url = new URL(request.url);
+            const container = await getContainer();
+
+            if (request.method === 'GET') {
+                const tenant = url.searchParams.get('tenant');
+                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                try {
+                    const { resource } = await container.item('diagnosis_' + tenant, tenant).read();
+                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource || { questions: [], results: {} } };
+                } catch (e) {
+                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { questions: [], results: {} } };
+                }
+            }
+
+            const token = request.headers.get('x-admin-token');
+            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+
+            if (request.method === 'POST' || request.method === 'PUT') {
+                const body = await request.json().catch(() => ({}));
+                const { tenant, questions, results, title, description } = body;
+                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                const updated = {
+                    id: 'diagnosis_' + tenant,
+                    docType: 'diagnosis',
+                    tenant,
+                    title: title || '',
+                    description: description || '',
+                    questions: questions || [],
+                    results: results || {},
+                    updatedAt: new Date().toISOString()
+                };
+                await container.items.upsert(updated);
+                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
+            }
+
+        } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 📊 【診断結果ログ】
+// ----------------------------------------------------
+app.http('diagnosislog', {
+    methods: ['POST', 'GET'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const container = await getContainer();
+            if (request.method === 'POST') {
+                const body = await request.json().catch(() => ({}));
+                const { tenant, resultKey, resultTitle } = body;
+                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'diagnosis_log',
+                    tenant, resultKey, resultTitle,
+                    createdAt: new Date().toISOString()
+                });
+                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok' } };
+            }
+            if (request.method === 'GET') {
+                const token = request.headers.get('x-admin-token');
+                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                const url = new URL(request.url);
+                const tenant = url.searchParams.get('tenant');
+                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                const { resources } = await container.items.query({
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis_log' ORDER BY c.createdAt DESC OFFSET 0 LIMIT 500",
+                    parameters: [{ name: "@tenant", value: tenant }]
+                }).fetchAll();
+                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+            }
+        } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
 // ⏰ 【タイマー】期限切れトークンの自動削除（毎日深夜2時）
 // ----------------------------------------------------
 app.timer('cleanupExpiredTokens', {

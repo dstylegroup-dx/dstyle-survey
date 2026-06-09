@@ -1335,6 +1335,288 @@
     return choices;
   }
 
+
+  // ============================================================
+  // 🔮 診断管理
+  // ============================================================
+  var diagData = { title: '', description: '', questions: [], results: {} };
+  var currentDiagRImgBase64 = '';
+
+  async function loadDiagnosis() {
+    try {
+      var res = await fetch(BASE_URL + '/api/diagnosis?tenant=' + TENANT);
+      if (!res.ok) return;
+      diagData = await res.json();
+      document.getElementById('diagTitle').value = diagData.title || '';
+      document.getElementById('diagDescription').value = diagData.description || '';
+      renderDiagQuestions();
+      renderDiagResults();
+      updateDiagUrl();
+    } catch(e) {}
+  }
+
+  async function saveDiagnosis() {
+    diagData.title = document.getElementById('diagTitle').value;
+    diagData.description = document.getElementById('diagDescription').value;
+    try {
+      var res = await apiFetch(BASE_URL + '/api/diagnosis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant: TENANT, ...diagData })
+      });
+      if (res.ok) { showStatus('diagStatus', '✅ 保存しました', 'success'); }
+      else { showStatus('diagStatus', '❌ 保存失敗', 'error'); }
+    } catch(e) { showStatus('diagStatus', '❌ エラー', 'error'); }
+  }
+
+  function updateDiagUrl() {
+    var base = location.hostname === 'localhost' ? 'http://localhost:7071' : 'https://form.dstylegroup.jp';
+    var url = base + '/diagnosis/herbelle.html';
+    document.getElementById('diagUrlBox').textContent = url;
+  }
+
+  function copyDiagUrl() {
+    var url = document.getElementById('diagUrlBox').textContent;
+    navigator.clipboard.writeText(url).then(function() { alert('URLをコピーしました'); });
+  }
+
+  // ---- 質問管理 ----
+  function renderDiagQuestions() {
+    var list = document.getElementById('diagQuestionList');
+    if (!diagData.questions || !diagData.questions.length) {
+      list.innerHTML = '<p style="color:#888;font-size:13px">質問がありません。「＋ 質問を追加」から追加してください。</p>';
+      return;
+    }
+    list.innerHTML = diagData.questions.map(function(q, i) {
+      var choicesText = (q.choices || []).map(function(c) { return esc(c.label); }).join(' / ');
+      return '<div class="survey-item" style="margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1">' +
+          '<span class="q-badge" style="background:#4A5D4E;color:white;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0">' + (i+1) + '</span>' +
+          '<div><div style="font-weight:bold;font-size:14px">' + esc(q.text) + '</div>' +
+          '<div style="font-size:12px;color:#888;margin-top:2px">' + choicesText + '</div></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0">' +
+          (i > 0 ? '<button class="btn btn-sm btn-secondary" onclick="moveDiagQuestion(' + i + ',-1)">↑</button>' : '') +
+          (i < diagData.questions.length-1 ? '<button class="btn btn-sm btn-secondary" onclick="moveDiagQuestion(' + i + ',1)">↓</button>' : '') +
+          '<button class="btn btn-sm btn-primary" onclick="openDiagQuestionModal(' + i + ')">編集</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteDiagQuestion(' + i + ')">削除</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function moveDiagQuestion(idx, dir) {
+    var arr = diagData.questions;
+    var tmp = arr[idx]; arr[idx] = arr[idx+dir]; arr[idx+dir] = tmp;
+    renderDiagQuestions();
+  }
+
+  function deleteDiagQuestion(idx) {
+    if (!confirm('この質問を削除しますか？')) return;
+    diagData.questions.splice(idx, 1);
+    renderDiagQuestions();
+  }
+
+  function openDiagQuestionModal(idx) {
+    document.getElementById('diagQuestionModal').style.display = 'flex';
+    document.getElementById('diagChoiceList').innerHTML = '';
+    if (idx !== undefined && idx >= 0) {
+      var q = diagData.questions[idx];
+      document.getElementById('diagQModalTitle').textContent = '質問を編集';
+      document.getElementById('diagQEditIndex').value = idx;
+      document.getElementById('diagQText').value = q.text || '';
+      (q.choices || []).forEach(function(c) { addDiagChoiceRow(c); });
+    } else {
+      document.getElementById('diagQModalTitle').textContent = '質問を追加';
+      document.getElementById('diagQEditIndex').value = -1;
+      document.getElementById('diagQText').value = '';
+      addDiagChoiceRow(); addDiagChoiceRow();
+    }
+  }
+
+  function closeDiagQuestionModal() {
+    document.getElementById('diagQuestionModal').style.display = 'none';
+  }
+
+  function addDiagChoiceRow(choice) {
+    var list = document.getElementById('diagChoiceList');
+    var resultKeys = Object.keys(diagData.results || {});
+    var div = document.createElement('div');
+    div.style.cssText = 'background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:8px';
+    var scoresHtml = resultKeys.length ?
+      resultKeys.map(function(k) {
+        var score = (choice && choice.scores && choice.scores[k]) ? choice.scores[k] : 0;
+        return '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
+          '<label style="font-size:12px;color:#666;min-width:80px">' + esc(k) + '：</label>' +
+          '<input type="number" value="' + score + '" min="0" max="10" data-key="' + esc(k) + '" style="width:60px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
+          '<span style="font-size:11px;color:#aaa">点</span>' +
+        '</div>';
+      }).join('') :
+      '<p style="font-size:12px;color:#aaa;margin-top:6px">先に結果パターンを追加してください</p>';
+    div.innerHTML =
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="text" placeholder="選択肢のテキスト" value="' + esc((choice && choice.label) || '') + '" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px" class="diag-choice-label">' +
+        '<button class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">✕</button>' +
+      '</div>' +
+      '<div class="diag-choice-scores">' + scoresHtml + '</div>';
+    list.appendChild(div);
+  }
+
+  function saveDiagQuestion() {
+    var text = document.getElementById('diagQText').value.trim();
+    if (!text) { alert('質問文を入力してください'); return; }
+    var rows = document.getElementById('diagChoiceList').querySelectorAll('div[style*="fafafa"]');
+    var choices = [];
+    rows.forEach(function(row) {
+      var label = row.querySelector('.diag-choice-label').value.trim();
+      if (!label) return;
+      var scores = {};
+      row.querySelectorAll('.diag-choice-scores input[data-key]').forEach(function(inp) {
+        scores[inp.dataset.key] = parseInt(inp.value) || 0;
+      });
+      choices.push({ label: label, scores: scores });
+    });
+    if (choices.length < 2) { alert('選択肢を2つ以上追加してください'); return; }
+    var q = { text: text, choices: choices };
+    var idx = parseInt(document.getElementById('diagQEditIndex').value);
+    if (idx >= 0) { diagData.questions[idx] = q; }
+    else { diagData.questions.push(q); }
+    renderDiagQuestions();
+    closeDiagQuestionModal();
+  }
+
+  // ---- 結果パターン管理 ----
+  function renderDiagResults() {
+    var list = document.getElementById('diagResultList');
+    var keys = Object.keys(diagData.results || {});
+    var btn = document.getElementById('addResultBtn');
+    btn.style.display = keys.length >= 5 ? 'none' : '';
+    if (!keys.length) {
+      list.innerHTML = '<p style="color:#888;font-size:13px">結果パターンがありません。「＋ 結果パターンを追加」から追加してください。</p>';
+      return;
+    }
+    list.innerHTML = keys.map(function(k) {
+      var r = diagData.results[k];
+      return '<div class="survey-item" style="margin-bottom:10px">' +
+        '<div style="flex:1">' +
+          '<div style="font-weight:bold;font-size:14px">[' + esc(k) + '] ' + esc(r.title) + '</div>' +
+          '<div style="font-size:12px;color:#888;margin-top:2px">コース：' + esc(r.course || '未設定') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0">' +
+          '<button class="btn btn-sm btn-primary" data-rkey="' + esc(k) + '" onclick="openDiagResultModalByKey(this.dataset.rkey)">編集</button>' +
+          '<button class="btn btn-sm btn-danger" data-rkey="' + esc(k) + '" onclick="deleteDiagResultByKey(this.dataset.rkey)">削除</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function deleteDiagResult(key) {
+    if (!confirm('結果パターン「' + key + '」を削除しますか？')) return;
+    delete diagData.results[key];
+    renderDiagResults();
+  }
+
+  function openDiagResultModalByKey(key) { openDiagResultModal(key); }
+  function deleteDiagResultByKey(key) { deleteDiagResult(key); }
+
+  function openDiagResultModal(key) {
+    document.getElementById('diagResultModal').style.display = 'flex';
+    currentDiagRImgBase64 = '';
+    document.getElementById('diagRImgPreviewWrap').style.display = 'none';
+    document.getElementById('diagRImgInput').value = '';
+    if (key) {
+      var r = diagData.results[key];
+      document.getElementById('diagRModalTitle').textContent = '結果パターンを編集';
+      document.getElementById('diagREditKey').value = key;
+      document.getElementById('diagRKey').value = key;
+      document.getElementById('diagRKey').disabled = true;
+      document.getElementById('diagRTitle').value = r.title || '';
+      document.getElementById('diagRCourse').value = r.course || '';
+      document.getElementById('diagRDescription').value = r.description || '';
+      document.getElementById('diagRBookingUrl').value = r.bookingUrl || '';
+      if (r.imageBase64) {
+        currentDiagRImgBase64 = r.imageBase64;
+        document.getElementById('diagRImgPreview').src = r.imageBase64;
+        document.getElementById('diagRImgPreviewWrap').style.display = 'block';
+      }
+    } else {
+      document.getElementById('diagRModalTitle').textContent = '結果パターンを追加';
+      document.getElementById('diagREditKey').value = '';
+      document.getElementById('diagRKey').value = '';
+      document.getElementById('diagRKey').disabled = false;
+      document.getElementById('diagRTitle').value = '';
+      document.getElementById('diagRCourse').value = '';
+      document.getElementById('diagRDescription').value = '';
+      document.getElementById('diagRBookingUrl').value = '';
+    }
+  }
+
+  function closeDiagResultModal() {
+    document.getElementById('diagResultModal').style.display = 'none';
+  }
+
+  function onDiagResultImageSelected(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) { alert('画像サイズは1MB以下にしてください'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      currentDiagRImgBase64 = e.target.result;
+      document.getElementById('diagRImgPreview').src = currentDiagRImgBase64;
+      document.getElementById('diagRImgPreviewWrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeDiagResultImage() {
+    currentDiagRImgBase64 = '';
+    document.getElementById('diagRImgPreview').src = '';
+    document.getElementById('diagRImgPreviewWrap').style.display = 'none';
+    document.getElementById('diagRImgInput').value = '';
+  }
+
+  function saveDiagResult() {
+    var key = document.getElementById('diagRKey').value.trim().replace(/[^a-zA-Z0-9_]/g, '');
+    if (!key) { alert('パターンIDを入力してください（英数字）'); return; }
+    var title = document.getElementById('diagRTitle').value.trim();
+    if (!title) { alert('結果タイトルを入力してください'); return; }
+    diagData.results[key] = {
+      title: title,
+      course: document.getElementById('diagRCourse').value.trim(),
+      description: document.getElementById('diagRDescription').value.trim(),
+      bookingUrl: document.getElementById('diagRBookingUrl').value.trim(),
+      imageBase64: currentDiagRImgBase64
+    };
+    renderDiagResults();
+    closeDiagResultModal();
+  }
+
+  // ---- 診断ログ ----
+  async function fetchDiagLog() {
+    var tbody = document.getElementById('diagLogBody');
+    tbody.innerHTML = '<tr><td colspan="2" class="loading">読み込み中...</td></tr>';
+    try {
+      var res = await apiFetch(BASE_URL + '/api/diagnosislog?tenant=' + TENANT);
+      if (!res.ok) throw new Error('取得失敗');
+      var logs = await res.json();
+      // サマリー
+      var summary = document.getElementById('diagLogSummary');
+      var counts = {};
+      logs.forEach(function(l) { counts[l.resultTitle] = (counts[l.resultTitle] || 0) + 1; });
+      summary.innerHTML = Object.entries(counts).map(function(e) {
+        return '<div class="card hl"><div class="num">' + e[1] + '</div><div class="label">' + esc(e[0]) + '</div></div>';
+      }).join('') || '<p style="color:#888;font-size:13px">診断結果がまだありません。</p>';
+      // テーブル
+      if (!logs.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">ログがありません</td></tr>'; return; }
+      tbody.innerHTML = logs.map(function(l) {
+        var date = new Date(l.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        return '<tr><td style="color:#888;white-space:nowrap">' + date + '</td><td>' + esc(l.resultTitle || '—') + '</td></tr>';
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="2" class="empty">❌ ' + e.message + '</td></tr>';
+    }
+  }
+
   // ============================================================
   // リッチテキストエディタ（プライバシーポリシー用）
   // ============================================================

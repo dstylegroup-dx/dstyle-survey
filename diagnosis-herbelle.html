@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>よもぎ蒸し体質診断</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔮</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .diag-wrap { width: 100%; max-width: 560px; }
+
+        /* ヘッダー */
+        .diag-header { background: #4A5D4E; color: white; border-radius: 16px 16px 0 0; padding: 28px 28px 24px; text-align: center; }
+        .diag-header h1 { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+        .diag-header p { font-size: 14px; opacity: 0.85; line-height: 1.6; }
+
+        /* 進捗バー */
+        .progress-wrap { background: #3a4d3e; padding: 12px 28px; }
+        .progress-bar-outer { background: rgba(255,255,255,0.2); border-radius: 20px; height: 8px; }
+        .progress-bar-inner { background: white; border-radius: 20px; height: 8px; transition: width 0.4s ease; }
+        .progress-text { color: rgba(255,255,255,0.8); font-size: 12px; text-align: right; margin-top: 4px; }
+
+        /* コンテンツ */
+        .diag-body { background: white; border-radius: 0 0 16px 16px; padding: 28px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+
+        /* 質問 */
+        .question-text { font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 20px; line-height: 1.5; }
+        .choices { display: flex; flex-direction: column; gap: 10px; }
+        .choice-btn { padding: 16px 20px; border: 2px solid #e0e0e0; border-radius: 10px; background: white; font-size: 15px; color: #333; cursor: pointer; text-align: left; transition: all 0.2s; }
+        .choice-btn:hover { border-color: #4A5D4E; background: #f0f4f0; color: #4A5D4E; transform: translateY(-1px); }
+        .choice-btn.selected { border-color: #4A5D4E; background: #4A5D4E; color: white; }
+
+        /* 結果画面 */
+        .result-screen { display: none; text-align: center; }
+        .result-badge { display: inline-block; background: #4A5D4E; color: white; padding: 6px 20px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-bottom: 16px; }
+        .result-title { font-size: 26px; font-weight: bold; color: #2c3e50; margin-bottom: 16px; }
+        .result-image { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin-bottom: 20px; }
+        .result-course { background: #f0f4f0; border-left: 4px solid #4A5D4E; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 16px; text-align: left; }
+        .result-course .label { font-size: 12px; color: #888; margin-bottom: 4px; }
+        .result-course .value { font-size: 16px; font-weight: bold; color: #4A5D4E; }
+        .result-description { font-size: 14px; color: #555; line-height: 1.8; margin-bottom: 24px; text-align: left; }
+        .result-actions { display: flex; flex-direction: column; gap: 10px; }
+        .btn-booking { display: block; padding: 16px; background: #4A5D4E; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; transition: background 0.2s; }
+        .btn-booking:hover { background: #3a4d3e; }
+        .btn-retry { display: block; padding: 14px; background: white; color: #4A5D4E; border: 2px solid #4A5D4E; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .btn-retry:hover { background: #f0f4f0; }
+
+        /* エラー */
+        .error-screen { display: none; text-align: center; padding: 40px 0; }
+        .error-screen .icon { font-size: 48px; margin-bottom: 16px; }
+        .error-screen p { color: #888; font-size: 14px; }
+
+        /* ローディング */
+        .loading-screen { text-align: center; padding: 40px 0; color: #888; }
+    </style>
+</head>
+<body>
+<div class="diag-wrap">
+    <div class="diag-header">
+        <h1 id="diagTitle">🔮 体質診断</h1>
+        <p id="diagDescription">少しの質問であなたに合ったコースをご提案します。</p>
+    </div>
+    <div class="progress-wrap" id="progressWrap" style="display:none">
+        <div class="progress-bar-outer">
+            <div class="progress-bar-inner" id="progressBar" style="width:0%"></div>
+        </div>
+        <div class="progress-text" id="progressText">1 / 5</div>
+    </div>
+    <div class="diag-body">
+        <!-- ローディング -->
+        <div class="loading-screen" id="loadingScreen">読み込み中...</div>
+
+        <!-- 質問画面 -->
+        <div id="questionScreen" style="display:none">
+            <div class="question-text" id="questionText"></div>
+            <div class="choices" id="choiceList"></div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div class="result-screen" id="resultScreen">
+            <div class="result-badge">診断結果</div>
+            <div class="result-title" id="resultTitle"></div>
+            <img class="result-image" id="resultImage" src="" alt="" style="display:none">
+            <div class="result-course" id="resultCourseWrap" style="display:none">
+                <div class="label">おすすめコース</div>
+                <div class="value" id="resultCourse"></div>
+            </div>
+            <div class="result-description" id="resultDescription"></div>
+            <div class="result-actions">
+                <a class="btn-booking" id="bookingBtn" href="#" target="_blank" style="display:none">📅 予約はこちら</a>
+                <button class="btn-retry" onclick="startDiagnosis()">🔄 もう一度診断する</button>
+            </div>
+        </div>
+
+        <!-- エラー画面 -->
+        <div class="error-screen" id="errorScreen">
+            <div class="icon">⚠️</div>
+            <p id="errorMsg">診断データを読み込めませんでした。</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    var BASE_URL = location.hostname === 'localhost'
+        ? 'http://localhost:7071'
+        : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
+
+    var TENANT = 'herbelle';
+    var diagData = null;
+    var currentQIndex = 0;
+    var scores = {};
+
+    // ============================================================
+    // 初期化
+    // ============================================================
+    async function init() {
+        try {
+            var res = await fetch(BASE_URL + '/api/diagnosis?tenant=' + TENANT);
+            if (!res.ok) throw new Error('データ取得失敗');
+            diagData = await res.json();
+            if (!diagData.questions || !diagData.questions.length) throw new Error('診断データが設定されていません');
+
+            // ヘッダー更新
+            if (diagData.title) document.getElementById('diagTitle').textContent = '🔮 ' + diagData.title;
+            if (diagData.description) document.getElementById('diagDescription').textContent = diagData.description;
+            document.title = diagData.title || '体質診断';
+
+            startDiagnosis();
+        } catch(e) {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('errorScreen').style.display = 'block';
+            document.getElementById('errorMsg').textContent = e.message;
+        }
+    }
+
+    // ============================================================
+    // 診断開始
+    // ============================================================
+    function startDiagnosis() {
+        currentQIndex = 0;
+        scores = {};
+        Object.keys(diagData.results || {}).forEach(function(k) { scores[k] = 0; });
+        document.getElementById('resultScreen').style.display = 'none';
+        document.getElementById('errorScreen').style.display = 'none';
+        document.getElementById('progressWrap').style.display = 'block';
+        showQuestion();
+    }
+
+    // ============================================================
+    // 質問表示
+    // ============================================================
+    function showQuestion() {
+        var q = diagData.questions[currentQIndex];
+        var total = diagData.questions.length;
+
+        // 進捗バー
+        var pct = Math.round((currentQIndex / total) * 100);
+        document.getElementById('progressBar').style.width = pct + '%';
+        document.getElementById('progressText').textContent = (currentQIndex + 1) + ' / ' + total;
+
+        // 質問文
+        document.getElementById('questionText').textContent = q.text;
+
+        // 選択肢
+        var choiceList = document.getElementById('choiceList');
+        choiceList.innerHTML = (q.choices || []).map(function(c, i) {
+            return '<button class="choice-btn" onclick="selectChoice(' + i + ')">' + escHtml(c.label) + '</button>';
+        }).join('');
+
+        document.getElementById('loadingScreen').style.display = 'none';
+        document.getElementById('questionScreen').style.display = 'block';
+    }
+
+    // ============================================================
+    // 選択肢を選ぶ
+    // ============================================================
+    function selectChoice(choiceIdx) {
+        // ハイライト
+        document.querySelectorAll('.choice-btn').forEach(function(b, i) {
+            b.classList.toggle('selected', i === choiceIdx);
+        });
+
+        // スコア加算
+        var choice = diagData.questions[currentQIndex].choices[choiceIdx];
+        Object.keys(choice.scores || {}).forEach(function(k) {
+            scores[k] = (scores[k] || 0) + (choice.scores[k] || 0);
+        });
+
+        // 次へ（少し遅延してから）
+        setTimeout(function() {
+            currentQIndex++;
+            if (currentQIndex < diagData.questions.length) {
+                showQuestion();
+            } else {
+                showResult();
+            }
+        }, 350);
+    }
+
+    // ============================================================
+    // 結果表示
+    // ============================================================
+    function showResult() {
+        // 最高スコアのパターンを取得
+        var maxKey = Object.keys(scores).reduce(function(a, b) {
+            return (scores[a] || 0) >= (scores[b] || 0) ? a : b;
+        });
+        var result = diagData.results[maxKey];
+        if (!result) { showError('結果データが見つかりません'); return; }
+
+        // 進捗バー100%
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressText').textContent = '診断完了！';
+
+        // 結果画面
+        document.getElementById('questionScreen').style.display = 'none';
+        document.getElementById('resultScreen').style.display = 'block';
+        document.getElementById('resultTitle').textContent = result.title || '';
+
+        // 画像
+        if (result.imageBase64) {
+            document.getElementById('resultImage').src = result.imageBase64;
+            document.getElementById('resultImage').style.display = 'block';
+        } else {
+            document.getElementById('resultImage').style.display = 'none';
+        }
+
+        // コース
+        if (result.course) {
+            document.getElementById('resultCourse').textContent = result.course;
+            document.getElementById('resultCourseWrap').style.display = 'block';
+        } else {
+            document.getElementById('resultCourseWrap').style.display = 'none';
+        }
+
+        // 説明文
+        document.getElementById('resultDescription').textContent = result.description || '';
+
+        // 予約ボタン
+        if (result.bookingUrl) {
+            var btn = document.getElementById('bookingBtn');
+            btn.href = result.bookingUrl;
+            btn.style.display = 'block';
+        } else {
+            document.getElementById('bookingBtn').style.display = 'none';
+        }
+
+        // ログ送信
+        fetch(BASE_URL + '/api/diagnosislog', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenant: TENANT, resultKey: maxKey, resultTitle: result.title })
+        }).catch(function() {});
+    }
+
+    function showError(msg) {
+        document.getElementById('questionScreen').style.display = 'none';
+        document.getElementById('errorScreen').style.display = 'block';
+        document.getElementById('errorMsg').textContent = msg;
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    init();
+</script>
+</body>
+</html>
