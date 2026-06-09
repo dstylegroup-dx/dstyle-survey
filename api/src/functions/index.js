@@ -555,12 +555,14 @@ app.http('diagnosislog', {
             const container = await getContainer();
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, resultKey, resultTitle } = body;
+                const { tenant, resultKey, resultTitle, diagTitle, diagId: logDiagId } = body;
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
                 await container.items.create({
                     id: crypto.randomUUID(),
                     docType: 'diagnosis_log',
                     tenant, resultKey, resultTitle,
+                    diagTitle: diagTitle || '',
+                    diagId: logDiagId || '',
                     createdAt: new Date().toISOString()
                 });
                 return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok' } };

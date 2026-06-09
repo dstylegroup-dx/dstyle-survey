@@ -93,6 +93,13 @@
             </div>
         </div>
 
+        <!-- 受付停止画面 -->
+        <div id="closedScreen" style="display:none;text-align:center;padding:40px 0">
+            <div style="font-size:48px;margin-bottom:16px">🔒</div>
+            <div style="font-size:18px;font-weight:bold;color:#2c3e50;margin-bottom:8px">現在受付しておりません</div>
+            <div style="font-size:14px;color:#888">この診断は現在公開されていません。<br>しばらく経ってから再度アクセスしてください。</div>
+        </div>
+
         <!-- エラー画面 -->
         <div class="error-screen" id="errorScreen">
             <div class="icon">⚠️</div>
@@ -129,6 +136,12 @@
             if (diagData.description) document.getElementById('diagDescription').textContent = diagData.description;
             document.title = diagData.title || '体質診断';
 
+            // 公開チェック
+            if (diagData.active === false) {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('closedScreen').style.display = 'block';
+                return;
+            }
             startDiagnosis();
         } catch(e) {
             document.getElementById('loadingScreen').style.display = 'none';
@@ -253,7 +266,7 @@
         fetch(BASE_URL + '/api/diagnosislog', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tenant: TENANT, resultKey: maxKey, resultTitle: result.title })
+            body: JSON.stringify({ tenant: TENANT, resultKey: maxKey, resultTitle: result.title, diagTitle: diagData.title || '', diagId: diagData.diagId || diagData.id || '' })
         }).catch(function() {});
     }
 
