@@ -1556,6 +1556,79 @@ Herbelleスタッフ一同"></textarea>
   }
 
 
+
+  // ============================================================
+  // 📧 メール設定
+  // ============================================================
+  function initEmailTab() {
+    var sel = document.getElementById('emailSurveySelect');
+    sel.innerHTML = '<option value="">アンケートを選択してください</option>';
+    allSurveys.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.title;
+      sel.appendChild(opt);
+    });
+    if (currentSurvey) {
+      sel.value = currentSurvey.id;
+      loadEmailSettings();
+    } else {
+      document.getElementById('emailSettingsForm').style.display = 'none';
+      document.getElementById('emailNoSurvey').style.display = 'block';
+    }
+  }
+
+  async function loadEmailSettings() {
+    var surveyId = document.getElementById('emailSurveySelect').value;
+    if (!surveyId) {
+      document.getElementById('emailSettingsForm').style.display = 'none';
+      document.getElementById('emailNoSurvey').style.display = 'block';
+      return;
+    }
+    document.getElementById('emailSettingsForm').style.display = 'block';
+    document.getElementById('emailNoSurvey').style.display = 'none';
+    try {
+      var res = await apiFetch(BASE_URL + '/api/emailsettings?tenant=' + TENANT + '&surveyId=' + surveyId);
+      var settings = res.ok ? await res.json() : { emailEnabled: false };
+      document.getElementById('emailEnabled').checked = settings.emailEnabled || false;
+      document.getElementById('emailSenderName').value = settings.senderName || '';
+      document.getElementById('emailSubject').value = settings.subject || '';
+      document.getElementById('emailBodyText').value = settings.bodyText || '';
+      updateEmailPreview();
+    } catch(e) { document.getElementById('emailEnabled').checked = false; }
+  }
+
+  function updateEmailPreview() {
+    document.getElementById('previewSender').textContent = document.getElementById('emailSenderName').value || '（未設定）';
+    document.getElementById('previewSubject').textContent = document.getElementById('emailSubject').value || '（未設定）';
+    document.getElementById('previewBody').textContent = document.getElementById('emailBodyText').value || '（未設定）';
+  }
+
+  async function saveEmailSettings() {
+    var surveyId = document.getElementById('emailSurveySelect').value;
+    if (!surveyId) { alert('アンケートを選択してください'); return; }
+    try {
+      var res = await apiFetch(BASE_URL + '/api/emailsettings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant: TENANT,
+          surveyId: surveyId,
+          emailEnabled: document.getElementById('emailEnabled').checked,
+          senderName: document.getElementById('emailSenderName').value.trim(),
+          subject: document.getElementById('emailSubject').value.trim(),
+          bodyText: document.getElementById('emailBodyText').value.trim()
+        })
+      });
+      if (res.ok) { showStatus('emailStatus', '✅ 保存しました', 'success'); updateEmailPreview(); }
+      else { showStatus('emailStatus', '❌ 保存失敗', 'error'); }
+    } catch(e) { showStatus('emailStatus', '❌ エラー: ' + e.message, 'error'); }
+  }
+
+  ['emailSenderName', 'emailSubject', 'emailBodyText'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', updateEmailPreview);
+  });
+
   // ============================================================
   // 📨 メール送信ログ
   // ============================================================
