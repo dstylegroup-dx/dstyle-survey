@@ -467,71 +467,6 @@
         </div>
       </div>
     </div>
-        <!-- タブ: メール設定 -->
-    <div id="tab-email" class="tab-content">
-      <div class="panel">
-        <h2>📧 お礼メール設定</h2>
-        <p style="font-size:13px;color:#666;margin-bottom:20px">アンケートにメールアドレス項目がある場合、回答送信時に自動でお礼メールを送信します。アンケートごとに文面を設定できます。</p>
-
-        <!-- アンケート選択 -->
-        <div class="form-group" style="margin-bottom:20px">
-          <label>設定対象のアンケート</label>
-          <div class="select-wrap">
-            <select id="emailSurveySelect" onchange="loadEmailSettings()">
-              <option value="">アンケートを選択してください</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 設定フォーム -->
-        <div id="emailSettingsForm" style="display:none">
-          <div style="background:#f0f4f0;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#4A5D4E">
-            <strong>📌 動作について</strong><br>
-            回答の中にメールアドレス形式の入力がある場合、そのアドレス宛に自動送信されます。メール送信が失敗しても回答の保存には影響しません。
-          </div>
-
-          <div class="form-group">
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:normal">
-              <input type="checkbox" id="emailEnabled" style="width:20px;height:20px;accent-color:#4A5D4E;cursor:pointer">
-              <span>このアンケートでお礼メールを送信する</span>
-            </label>
-          </div>
-
-          <div id="emailFields">
-            <div class="form-group">
-              <label>送信者名</label>
-              <input type="text" id="emailSenderName" placeholder="例）Herbelle サロン">
-            </div>
-            <div class="form-group">
-              <label>件名</label>
-              <input type="text" id="emailSubject" placeholder="例）本日はアンケートにご回答いただきありがとうございました">
-            </div>
-            <div class="form-group">
-              <label>本文</label>
-              <textarea id="emailBodyText" style="height:200px;resize:vertical" placeholder="例）
-〇〇様
-
-本日はアンケートにご回答いただきありがとうございました。
-お客様のご意見をサービス向上に活かしてまいります。
-
-特別クーポン：WELCOME10
-次回ご来店時に10%割引でご利用いただけます。
-
-またのご来店を心よりお待ちしております。
-
-Herbelleスタッフ一同"></textarea>
-              <p style="font-size:12px;color:#888;margin-top:4px">プレーンテキスト形式で送信されます。</p>
-            </div>
-
-            <!-- プレビュー -->
-            <div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-top:8px">
-              <div style="font-size:12px;font-weight:bold;color:#888;margin-bottom:8px">📬 送信イメージ</div>
-              <div style="font-size:13px;color:#333">
-                <div style="margin-bottom:4px"><span style="color:#888">差出人：</span><span id="previewSender">—</span></div>
-                <div style="margin-bottom:8px"><span style="color:#888">件名：</span><span id="previewSubject">—</span></div>
-                <div style="white-space:pre-wrap;font-size:12px;background:white;padding:10px;border-radius:6px;border:1px solid #eee;max-height:120px;overflow-y:auto" id="previewBody">—</div>
-              </div>
-            </div>
           </div>
 
           <div style="display:flex;gap:10px;margin-top:20px;align-items:center">
@@ -545,7 +480,59 @@ Herbelleスタッフ一同"></textarea>
         </div>
       </div>
     </div>
+    </div>
 
+    <!-- タブ: メール設定 -->
+    <div id="tab-email" class="tab-content">
+      <div class="panel">
+        <h2>📧 お礼メール設定</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:20px">アンケートにメールアドレス項目がある場合、回答送信時に自動でお礼メールを送信します。アンケートごとに文面を設定できます。</p>
+        <div class="form-group" style="margin-bottom:20px">
+          <label>設定対象のアンケート</label>
+          <div class="select-wrap">
+            <select id="emailSurveySelect" onchange="loadEmailSettings()">
+              <option value="">アンケートを選択してください</option>
+            </select>
+          </div>
+        </div>
+        <div id="emailSettingsForm" style="display:none">
+          <div style="background:#f0f4f0;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#555">
+            <strong>📌 動作について</strong><br>
+            回答の中にメールアドレス形式の入力がある場合、そのアドレス宛に自動送信されます。メール送信が失敗しても回答の保存には影響しません。
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:bold">
+              <input type="checkbox" id="emailEnabled" style="width:20px;height:20px;accent-color:#4A5D4E;cursor:pointer;flex-shrink:0;-webkit-appearance:checkbox;appearance:checkbox">
+              <span>このアンケートでお礼メールを送信する</span>
+            </label>
+          </div>
+          <div id="emailFields">
+            <div class="form-group"><label>送信者名</label><input type="text" id="emailSenderName" placeholder="例）〇〇サロン"></div>
+            <div class="form-group"><label>件名</label><input type="text" id="emailSubject" placeholder="例）本日はアンケートにご回答いただきありがとうございました"></div>
+            <div class="form-group">
+              <label>本文</label>
+              <textarea id="emailBodyText" style="height:200px;resize:vertical" placeholder="例）〇〇様&#10;&#10;本日はアンケートにご回答いただきありがとうございました。&#10;またのご来店を心よりお待ちしております。"></textarea>
+              <p style="font-size:12px;color:#888;margin-top:4px">プレーンテキスト形式で送信されます。</p>
+            </div>
+            <div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-top:8px">
+              <div style="font-size:12px;font-weight:bold;color:#888;margin-bottom:8px">📬 送信イメージ</div>
+              <div style="font-size:13px;color:#333">
+                <div style="margin-bottom:4px"><span style="color:#888">差出人：</span><span id="previewSender">—</span></div>
+                <div style="margin-bottom:8px"><span style="color:#888">件名：</span><span id="previewSubject">—</span></div>
+                <div style="white-space:pre-wrap;font-size:12px;background:white;padding:10px;border-radius:6px;border:1px solid #eee;max-height:120px;overflow-y:auto" id="previewBody">—</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;align-items:center">
+            <button class="btn btn-primary" onclick="saveEmailSettings()">💾 メール設定を保存</button>
+            <div class="status-msg" id="emailStatus"></div>
+          </div>
+        </div>
+        <div id="emailNoSurvey" style="text-align:center;color:#888;padding:30px">
+          上のドロップダウンからアンケートを選択してください
+        </div>
+      </div>
+    </div>
 
     <!-- タブ: メール送信ログ -->
     <div id="tab-emaillog" class="tab-content">
@@ -746,10 +733,10 @@ Herbelleスタッフ一同"></textarea>
     document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
     document.querySelector('[onclick="switchTab(\'' + name + '\')"]').classList.add('active');
     document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'diagnosis') loadDiagnosisList();
     if (name === 'email') initEmailTab();
     if (name === 'emaillog') initEmailLogTab();
     if (name === 'surveys') renderSurveyList();
-    if (name === 'email') initEmailTab();
   }
 
   async function loadSurveys() {
@@ -1553,6 +1540,77 @@ Herbelleスタッフ一同"></textarea>
     } catch(e) { showStatus('designStatus', '❌ エラー', 'error'); }
   }
 
+  // ============================================================
+  // 📧 メール設定
+  // ============================================================
+  function initEmailTab() {
+    var sel = document.getElementById('emailSurveySelect');
+    sel.innerHTML = '<option value="">アンケートを選択してください</option>';
+    allSurveys.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.title;
+      sel.appendChild(opt);
+    });
+    if (currentSurvey) {
+      sel.value = currentSurvey.id;
+      loadEmailSettings();
+    } else {
+      document.getElementById('emailSettingsForm').style.display = 'none';
+      document.getElementById('emailNoSurvey').style.display = 'block';
+    }
+  }
+
+  async function loadEmailSettings() {
+    var surveyId = document.getElementById('emailSurveySelect').value;
+    if (!surveyId) {
+      document.getElementById('emailSettingsForm').style.display = 'none';
+      document.getElementById('emailNoSurvey').style.display = 'block';
+      return;
+    }
+    document.getElementById('emailSettingsForm').style.display = 'block';
+    document.getElementById('emailNoSurvey').style.display = 'none';
+    try {
+      var res = await apiFetch(BASE_URL + '/api/emailsettings?tenant=' + TENANT + '&surveyId=' + surveyId);
+      var settings = res.ok ? await res.json() : { emailEnabled: false };
+      document.getElementById('emailEnabled').checked = settings.emailEnabled || false;
+      document.getElementById('emailSenderName').value = settings.senderName || '';
+      document.getElementById('emailSubject').value = settings.subject || '';
+      document.getElementById('emailBodyText').value = settings.bodyText || '';
+      updateEmailPreview();
+    } catch(e) { document.getElementById('emailEnabled').checked = false; }
+  }
+
+  function updateEmailPreview() {
+    document.getElementById('previewSender').textContent = document.getElementById('emailSenderName').value || '（未設定）';
+    document.getElementById('previewSubject').textContent = document.getElementById('emailSubject').value || '（未設定）';
+    document.getElementById('previewBody').textContent = document.getElementById('emailBodyText').value || '（未設定）';
+  }
+
+  async function saveEmailSettings() {
+    var surveyId = document.getElementById('emailSurveySelect').value;
+    if (!surveyId) { alert('アンケートを選択してください'); return; }
+    try {
+      var res = await apiFetch(BASE_URL + '/api/emailsettings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant: TENANT,
+          surveyId: surveyId,
+          emailEnabled: document.getElementById('emailEnabled').checked,
+          senderName: document.getElementById('emailSenderName').value.trim(),
+          subject: document.getElementById('emailSubject').value.trim(),
+          bodyText: document.getElementById('emailBodyText').value.trim()
+        })
+      });
+      if (res.ok) { showStatus('emailStatus', '✅ 保存しました', 'success'); updateEmailPreview(); }
+      else { showStatus('emailStatus', '❌ 保存失敗', 'error'); }
+    } catch(e) { showStatus('emailStatus', '❌ エラー: ' + e.message, 'error'); }
+  }
+
+  ['emailSenderName', 'emailSubject', 'emailBodyText'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', updateEmailPreview);
+  });
 
   // ============================================================
   // 📨 メール送信ログ
@@ -1579,29 +1637,19 @@ Herbelleスタッフ一同"></textarea>
       var res = await apiFetch(url);
       if (!res.ok) throw new Error('取得失敗');
       var logs = await res.json();
-
-      // サマリー
       var success = logs.filter(function(l) { return l.success; }).length;
       var failed  = logs.filter(function(l) { return !l.success; }).length;
       document.getElementById('emailLogSummary').innerHTML =
         '<div class="card hl"><div class="num">' + logs.length + '</div><div class="label">総送信数</div></div>' +
         '<div class="card hl"><div class="num" style="color:#27ae60">' + success + '</div><div class="label">成功</div></div>' +
         (failed > 0 ? '<div class="card hl"><div class="num" style="color:#e74c3c">' + failed + '</div><div class="label">失敗</div></div>' : '');
-
       if (!logs.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">送信ログがありません</td></tr>'; return; }
-
       tbody.innerHTML = logs.map(function(l) {
         var date = new Date(l.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
         var badge = l.success
           ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:bold">✅ 成功</span>'
           : '<span style="background:#fce8e6;color:#c62828;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:bold" title="' + esc(l.error || '') + '">❌ 失敗</span>';
-        return '<tr>' +
-          '<td style="white-space:nowrap;color:#888;font-size:12px">' + date + '</td>' +
-          '<td style="font-size:13px">' + esc(l.toAddress || '—') + '</td>' +
-          '<td style="font-size:13px;max-width:200px">' + esc(l.subject || '—') + '</td>' +
-          '<td style="font-size:13px">' + esc(l.senderName || '—') + '</td>' +
-          '<td>' + badge + '</td>' +
-          '</tr>';
+        return '<tr><td style="white-space:nowrap;color:#888;font-size:12px">' + date + '</td><td style="font-size:13px">' + esc(l.toAddress || '—') + '</td><td style="font-size:13px;max-width:200px">' + esc(l.subject || '—') + '</td><td style="font-size:13px">' + esc(l.senderName || '—') + '</td><td>' + badge + '</td></tr>';
       }).join('');
     } catch(e) {
       tbody.innerHTML = '<tr><td colspan="5" class="empty">❌ ' + e.message + '</td></tr>';
