@@ -431,7 +431,40 @@
         </div>
       </div>
     </div>
-
+        <div class="form-group">
+          <label>結果タイトル</label>
+          <input type="text" id="diagRTitle" placeholder="例）冷え性タイプ">
+        </div>
+        <div class="form-group">
+          <label>おすすめコース</label>
+          <input type="text" id="diagRCourse" placeholder="例）よもぎ蒸し 温活コース">
+        </div>
+        <div class="form-group">
+          <label>説明文</label>
+          <textarea id="diagRDescription" rows="3" placeholder="例）体の芯から温めることが大切なタイプです..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>結果画像（任意）</label>
+          <div id="diagRImgPreviewWrap" style="display:none;margin-bottom:8px">
+            <img id="diagRImgPreview" style="max-width:200px;max-height:120px;border-radius:8px;border:1px solid #ddd;object-fit:contain" src="" alt="">
+            <button class="btn btn-secondary btn-sm" style="margin-left:8px" onclick="removeDiagResultImage()">🗑️ 削除</button>
+          </div>
+          <div class="img-upload-area" onclick="document.getElementById('diagRImgInput').click()">
+            <div style="font-size:20px;margin-bottom:4px">🖼️</div>
+            <div style="font-size:12px;color:#888">クリックして画像を選択（1MB以内）</div>
+          </div>
+          <input type="file" id="diagRImgInput" accept="image/*" style="display:none" onchange="onDiagResultImageSelected(event)">
+        </div>
+        <div class="form-group">
+          <label>予約URL（任意）</label>
+          <input type="text" id="diagRBookingUrl" placeholder="例）https://example.com/booking">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <button class="btn btn-primary" onclick="saveDiagResult()">💾 保存</button>
+          <button class="btn btn-secondary" onclick="closeDiagResultModal()">キャンセル</button>
+        </div>
+      </div>
+    </div>
     <!-- タブ3: アンケート管理 -->
     <div id="tab-surveys" class="tab-content">
       <div class="panel">
@@ -1334,6 +1367,7 @@
     });
     return choices;
   }
+
 
 
   // ============================================================

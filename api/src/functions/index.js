@@ -451,10 +451,32 @@ app.http('tenantsettings', {
 });
 
 // ----------------------------------------------------
-// 🔮 【診断】CRUD
+// 🔮 【診断】CRUD（複数診断対応）
 // ----------------------------------------------------
+app.http('diagnosislist', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const token = request.headers.get('x-admin-token');
+            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            const url = new URL(request.url);
+            const tenant = url.searchParams.get('tenant');
+            if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+            const container = await getContainer();
+            const { resources } = await container.items.query({
+                query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC",
+                parameters: [{ name: "@tenant", value: tenant }]
+            }).fetchAll();
+            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+        } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
 app.http('diagnosis', {
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'DELETE'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
@@ -463,10 +485,23 @@ app.http('diagnosis', {
 
             if (request.method === 'GET') {
                 const tenant = url.searchParams.get('tenant');
+                const diagId = url.searchParams.get('diagId') || url.searchParams.get('id');
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (diagId) {
+                    try {
+                        const { resource } = await container.item(diagId, tenant).read();
+                        return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource || {} };
+                    } catch (e) {
+                        return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: {} };
+                    }
+                }
+                // 後方互換：diagId未指定時は最初の診断を返す
                 try {
-                    const { resource } = await container.item('diagnosis_' + tenant, tenant).read();
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource || { questions: [], results: {} } };
+                    const { resources } = await container.items.query({
+                        query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC OFFSET 0 LIMIT 1",
+                        parameters: [{ name: "@tenant", value: tenant }]
+                    }).fetchAll();
+                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources[0] || { questions: [], results: {} } };
                 } catch (e) {
                     return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { questions: [], results: {} } };
                 }
@@ -475,12 +510,14 @@ app.http('diagnosis', {
             const token = request.headers.get('x-admin-token');
             if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
 
-            if (request.method === 'POST' || request.method === 'PUT') {
+            if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, questions, results, title, description } = body;
+                const { tenant, diagId, questions, results, title, description } = body;
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                const id = diagId || ('diag_' + crypto.randomUUID());
                 const updated = {
-                    id: 'diagnosis_' + tenant,
+                    ...body,
+                    id, diagId: id,
                     docType: 'diagnosis',
                     tenant,
                     title: title || '',
@@ -491,6 +528,14 @@ app.http('diagnosis', {
                 };
                 await container.items.upsert(updated);
                 return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
+            }
+
+            if (request.method === 'DELETE') {
+                const id = url.searchParams.get('id') || url.searchParams.get('diagId');
+                const tenant = url.searchParams.get('tenant');
+                if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
+                await container.item(id, tenant).delete();
+                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
             }
 
         } catch (e) {

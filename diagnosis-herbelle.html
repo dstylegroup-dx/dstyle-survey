@@ -116,7 +116,10 @@
     // ============================================================
     async function init() {
         try {
-            var res = await fetch(BASE_URL + '/api/diagnosis?tenant=' + TENANT);
+            var params = new URLSearchParams(location.search);
+            var diagId = params.get('id') || params.get('diagId') || '';
+            var url = BASE_URL + '/api/diagnosis?tenant=' + TENANT + (diagId ? '&diagId=' + diagId : '');
+            var res = await fetch(url);
             if (!res.ok) throw new Error('データ取得失敗');
             diagData = await res.json();
             if (!diagData.questions || !diagData.questions.length) throw new Error('診断データが設定されていません');

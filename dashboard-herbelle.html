@@ -432,94 +432,6 @@
         </div>
       </div>
     </div>
-
-
-    <!-- タブ4: 診断管理 -->
-    <div id="tab-diagnosis" class="tab-content">
-          <div class="panel">
-            <h2>🔮 診断設定</h2>
-            <div class="builder-form">
-              <div class="form-group">
-                <label>診断タイトル</label>
-                <input type="text" id="diagTitle" placeholder="例）よもぎ蒸し体質診断">
-              </div>
-              <div class="form-group">
-                <label>説明文（任意）</label>
-                <textarea id="diagDescription" rows="2" placeholder="例）あなたに合ったよもぎ蒸しコースを診断します。"></textarea>
-              </div>
-              <div style="display:flex;gap:10px;align-items:center">
-                <button class="btn btn-primary" onclick="saveDiagnosis()">💾 診断設定を保存</button>
-                <div class="status-msg" id="diagStatus"></div>
-              </div>
-            </div>
-          </div>
-          <div class="panel">
-            <h2>❓ 質問管理</h2>
-            <div id="diagQuestionList" style="margin-bottom:16px"></div>
-            <button class="btn btn-primary" onclick="openDiagQuestionModal()">＋ 質問を追加</button>
-          </div>
-          <div class="panel">
-            <h2>🏆 結果パターン管理</h2>
-            <p style="font-size:13px;color:#888;margin-bottom:16px">最大5パターンまで設定できます。スコアが最も高いパターンが結果として表示されます。</p>
-            <div id="diagResultList" style="margin-bottom:16px"></div>
-            <button class="btn btn-primary" id="addResultBtn" onclick="openDiagResultModal()">＋ 結果パターンを追加</button>
-          </div>
-          <div class="panel">
-            <h2>📊 診断結果ログ</h2>
-            <div class="summary" id="diagLogSummary"></div>
-            <div style="margin-top:16px">
-              <button class="btn btn-primary" onclick="fetchDiagLog()">🔄 更新</button>
-            </div>
-            <div class="table-wrap" style="margin-top:12px">
-              <div class="table-scroll">
-                <table>
-                  <thead><tr><th>日時</th><th>結果</th></tr></thead>
-                  <tbody id="diagLogBody"><tr><td colspan="2" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="panel">
-            <h2>🔗 診断ページURL</h2>
-            <div id="diagUrlBox" style="background:#f0f4f0;padding:12px;border-radius:8px;font-size:13px;color:#4A5D4E;word-break:break-all;margin-bottom:12px"></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-secondary" onclick="copyDiagUrl()">📋 URLをコピー</button>
-              <button class="btn btn-primary" onclick="window.open(document.getElementById('diagUrlBox').textContent, '_blank')">🔗 診断ページを開く</button>
-            </div>
-          </div>
-    </div>
-
-    <!-- 診断質問モーダル -->
-    <div id="diagQuestionModal" class="modal-overlay" style="display:none">
-      <div class="modal-box" style="max-width:600px">
-        <h3 id="diagQModalTitle">質問を追加</h3>
-        <input type="hidden" id="diagQEditIndex" value="-1">
-        <div class="form-group">
-          <label>質問文</label>
-          <input type="text" id="diagQText" placeholder="例）最近、体が冷えやすいですか？">
-        </div>
-        <div class="form-group">
-          <label>選択肢とスコア</label>
-          <p style="font-size:12px;color:#888;margin-bottom:8px">各選択肢に結果パターンのスコアを設定します。</p>
-          <div id="diagChoiceList"></div>
-          <button class="add-option-btn" onclick="addDiagChoiceRow()">＋ 選択肢を追加</button>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:20px">
-          <button class="btn btn-primary" onclick="saveDiagQuestion()">💾 保存</button>
-          <button class="btn btn-secondary" onclick="closeDiagQuestionModal()">キャンセル</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 診断結果モーダル -->
-    <div id="diagResultModal" class="modal-overlay" style="display:none">
-      <div class="modal-box" style="max-width:600px">
-        <h3 id="diagRModalTitle">結果パターンを追加</h3>
-        <input type="hidden" id="diagREditKey" value="">
-        <div class="form-group">
-          <label>パターンID（英数字）</label>
-          <input type="text" id="diagRKey" placeholder="例）A / B / type1" maxlength="20">
-        </div>
         <div class="form-group">
           <label>結果タイトル</label>
           <input type="text" id="diagRTitle" placeholder="例）冷え性タイプ">
@@ -549,6 +461,190 @@
           <input type="text" id="diagRBookingUrl" placeholder="例）https://example.com/booking">
         </div>
         <div style="display:flex;gap:10px;margin-top:20px">
+          <button class="btn btn-primary" onclick="saveDiagResult()">💾 保存</button>
+          <button class="btn btn-secondary" onclick="closeDiagResultModal()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- タブ4: 診断管理 -->
+    <div id="tab-diagnosis" class="tab-content">
+
+      <!-- 診断一覧 -->
+      <div class="panel" id="diagListPanel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <h2 style="margin-bottom:0">🔮 診断一覧</h2>
+          <button class="btn btn-primary" onclick="openNewDiagModal()">＋ 新しい診断を作成</button>
+        </div>
+        <div id="diagListArea">
+          <p style="color:#888;font-size:13px;text-align:center;padding:30px">診断がありません。「＋ 新しい診断を作成」から追加してください。</p>
+        </div>
+      </div>
+
+      <!-- 診断編集エリア（診断選択後に表示） -->
+      <div id="diagEditArea" style="display:none">
+
+        <!-- ヘッダー -->
+        <div class="panel" style="background:#f0f4f0;border-left:4px solid #4A5D4E">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="backToDiagList()" style="font-size:13px">← 一覧に戻る</button>
+            <div style="flex:1">
+              <div style="font-size:12px;color:#888">編集中の診断</div>
+              <div style="font-weight:bold;font-size:16px;color:#4A5D4E" id="diagEditTitle">診断タイトル</div>
+            </div>
+            <button class="btn btn-primary" onclick="window.open(getDiagUrl(), '_blank')" style="font-size:13px">🔗 診断ページを開く</button>
+          </div>
+        </div>
+
+        <!-- 基本情報 -->
+        <div class="panel">
+          <h2>📝 基本情報</h2>
+          <div class="builder-form">
+            <div class="form-group">
+              <label>診断タイトル <span style="color:#c0392b">※必須</span></label>
+              <input type="text" id="diagTitle" placeholder="例）よもぎ蒸し体質診断">
+            </div>
+            <div class="form-group">
+              <label>説明文（任意）</label>
+              <textarea id="diagDescription" rows="2" placeholder="例）あなたに合ったよもぎ蒸しコースを診断します。（約1分）"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <button class="btn btn-primary" onclick="saveDiagBasic()">💾 基本情報を保存</button>
+              <div class="status-msg" id="diagBasicStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 結果パターン管理 -->
+        <div class="panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:10px">
+            <h2 style="margin-bottom:0">🏆 結果パターン</h2>
+            <button class="btn btn-primary btn-sm" id="addResultBtn" onclick="openDiagResultModal()">＋ 結果を追加</button>
+          </div>
+          <p style="font-size:12px;color:#888;margin-bottom:16px">最大8パターンまで設定できます。各選択肢のスコアが最も高いパターンが診断結果として表示されます。</p>
+          <div id="diagResultList">
+            <p style="color:#888;font-size:13px;text-align:center;padding:20px">結果パターンがありません。先に結果パターンを追加してください。</p>
+          </div>
+        </div>
+
+        <!-- 質問管理 -->
+        <div class="panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <h2 style="margin-bottom:0">❓ 質問管理</h2>
+            <button class="btn btn-primary btn-sm" onclick="openDiagQuestionModal()">＋ 質問を追加</button>
+          </div>
+          <p style="font-size:12px;color:#888;margin-bottom:16px">質問と選択肢を追加してください。各選択肢に結果パターンのスコアを設定します。</p>
+          <div id="diagQuestionList">
+            <p style="color:#888;font-size:13px;text-align:center;padding:20px">質問がありません。「＋ 質問を追加」から追加してください。</p>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px">
+            <button class="btn btn-primary" onclick="saveDiagnosis()">💾 診断を保存</button>
+            <div class="status-msg" id="diagStatus"></div>
+          </div>
+        </div>
+
+        <!-- 診断結果ログ -->
+        <div class="panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <h2 style="margin-bottom:0">📊 診断結果ログ</h2>
+            <button class="btn btn-primary btn-sm" onclick="fetchDiagLog()">🔄 更新</button>
+          </div>
+          <div class="summary" id="diagLogSummary" style="margin-bottom:16px"></div>
+          <div class="table-wrap">
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>日時</th><th>結果タイプ</th></tr></thead>
+                <tbody id="diagLogBody"><tr><td colspan="2" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /diagEditArea -->
+
+    </div><!-- /tab-diagnosis -->
+
+    <!-- 診断新規作成モーダル -->
+    <div id="diagNewModal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:500px">
+        <h3>🔮 新しい診断を作成</h3>
+        <div class="form-group" style="margin-top:16px">
+          <label>診断タイトル <span style="color:#c0392b">※必須</span></label>
+          <input type="text" id="diagNewTitle" placeholder="例）よもぎ蒸し体質診断">
+        </div>
+        <div class="form-group">
+          <label>説明文（任意）</label>
+          <textarea id="diagNewDescription" rows="2" placeholder="例）あなたに合ったよもぎ蒸しコースを診断します。"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <button class="btn btn-primary" onclick="createNewDiag()">作成する</button>
+          <button class="btn btn-secondary" onclick="closeNewDiagModal()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 質問追加・編集モーダル -->
+    <div id="diagQuestionModal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:620px;max-height:85vh;overflow-y:auto">
+        <h3 id="diagQModalTitle">❓ 質問を追加</h3>
+        <input type="hidden" id="diagQEditIndex" value="-1">
+        <div class="form-group" style="margin-top:16px">
+          <label>質問文 <span style="color:#c0392b">※必須</span></label>
+          <input type="text" id="diagQText" placeholder="例）最近、体が冷えやすいですか？">
+        </div>
+        <div class="form-group">
+          <label>選択肢とスコア設定</label>
+          <p style="font-size:12px;color:#888;margin-bottom:10px">各選択肢を選んだときに加算されるスコアを設定します（0〜10点）。</p>
+          <div id="diagChoiceList"></div>
+          <button class="add-option-btn" onclick="addDiagChoiceRow()" style="margin-top:8px">＋ 選択肢を追加</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #eee">
+          <button class="btn btn-primary" onclick="saveDiagQuestion()">💾 保存</button>
+          <button class="btn btn-secondary" onclick="closeDiagQuestionModal()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 結果パターン追加・編集モーダル -->
+    <div id="diagResultModal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:560px;max-height:85vh;overflow-y:auto">
+        <h3 id="diagRModalTitle">🏆 結果パターンを追加</h3>
+        <input type="hidden" id="diagREditKey" value="">
+        <div class="form-group" style="margin-top:16px">
+          <label>パターンキー <span style="color:#c0392b">※必須</span></label>
+          <input type="text" id="diagRKey" placeholder="例）A, B, type1, cold（英数字）" maxlength="20">
+          <p style="font-size:11px;color:#aaa;margin-top:4px">スコア集計に使います。一度保存後は変更できません。</p>
+        </div>
+        <div class="form-group">
+          <label>結果タイトル <span style="color:#c0392b">※必須</span></label>
+          <input type="text" id="diagRTitle" placeholder="例）冷え性タイプ">
+        </div>
+        <div class="form-group">
+          <label>おすすめコース</label>
+          <input type="text" id="diagRCourse" placeholder="例）よもぎ蒸し 温活コース">
+        </div>
+        <div class="form-group">
+          <label>説明文</label>
+          <textarea id="diagRDescription" rows="3" placeholder="例）体の芯から温めることが大切なタイプです。..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>結果画像（任意・1MB以内）</label>
+          <div id="diagRImgPreviewWrap" style="display:none;margin-bottom:8px">
+            <img id="diagRImgPreview" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid #ddd;object-fit:contain" src="" alt="">
+            <button class="btn btn-secondary btn-sm" style="margin-top:6px;display:block" onclick="removeDiagResultImage()">🗑️ 画像を削除</button>
+          </div>
+          <div class="img-upload-area" onclick="document.getElementById('diagRImgInput').click()">
+            <div style="font-size:20px;margin-bottom:4px">🖼️</div>
+            <div style="font-size:12px;color:#888">クリックして画像を選択</div>
+          </div>
+          <input type="file" id="diagRImgInput" accept="image/*" style="display:none" onchange="onDiagResultImageSelected(event)">
+        </div>
+        <div class="form-group">
+          <label>予約・詳細ページURL（任意）</label>
+          <input type="text" id="diagRBookingUrl" placeholder="例）https://example.com/booking">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #eee">
           <button class="btn btn-primary" onclick="saveDiagResult()">💾 保存</button>
           <button class="btn btn-secondary" onclick="closeDiagResultModal()">キャンセル</button>
         </div>
@@ -1459,171 +1555,176 @@
   }
 
 
+
   // ============================================================
-  // 🔮 診断管理
+  // 🔮 診断管理（複数診断対応・最大8結果パターン）
   // ============================================================
-  var diagData = { title: '', description: '', questions: [], results: {} };
+  var diagList = [];           // 診断一覧
+  var currentDiag = null;     // 現在編集中の診断
   var currentDiagRImgBase64 = '';
 
-  async function loadDiagnosis() {
+  // ---- 診断一覧 ----
+  async function loadDiagnosisList() {
     try {
-      var res = await fetch(BASE_URL + '/api/diagnosis?tenant=' + TENANT);
-      if (!res.ok) return;
-      diagData = await res.json();
-      document.getElementById('diagTitle').value = diagData.title || '';
-      document.getElementById('diagDescription').value = diagData.description || '';
-      renderDiagQuestions();
-      renderDiagResults();
-      updateDiagUrl();
-    } catch(e) {}
+      var res = await apiFetch(BASE_URL + '/api/diagnosislist?tenant=' + TENANT);
+      if (!res.ok) {
+        // 旧形式（単一診断）からの移行対応
+        var res2 = await fetch(BASE_URL + '/api/diagnosis?tenant=' + TENANT);
+        var old = await res2.json();
+        diagList = (old && old.questions && old.questions.length) ? [old] : [];
+      } else {
+        diagList = await res.json();
+      }
+    } catch(e) { diagList = []; }
+    renderDiagList();
   }
 
-  async function saveDiagnosis() {
-    diagData.title = document.getElementById('diagTitle').value;
-    diagData.description = document.getElementById('diagDescription').value;
-    try {
-      var res = await apiFetch(BASE_URL + '/api/diagnosis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant: TENANT, ...diagData })
-      });
-      if (res.ok) { showStatus('diagStatus', '✅ 保存しました', 'success'); }
-      else { showStatus('diagStatus', '❌ 保存失敗', 'error'); }
-    } catch(e) { showStatus('diagStatus', '❌ エラー', 'error'); }
-  }
-
-  function updateDiagUrl() {
-    var base = location.hostname === 'localhost' ? 'http://localhost:7071' : 'https://form.dstylegroup.jp';
-    var url = base + '/diagnosis/herbelle.html';
-    document.getElementById('diagUrlBox').textContent = url;
-  }
-
-  function copyDiagUrl() {
-    var url = document.getElementById('diagUrlBox').textContent;
-    navigator.clipboard.writeText(url).then(function() { alert('URLをコピーしました'); });
-  }
-
-  // ---- 質問管理 ----
-  function renderDiagQuestions() {
-    var list = document.getElementById('diagQuestionList');
-    if (!diagData.questions || !diagData.questions.length) {
-      list.innerHTML = '<p style="color:#888;font-size:13px">質問がありません。「＋ 質問を追加」から追加してください。</p>';
+  function renderDiagList() {
+    var area = document.getElementById('diagListArea');
+    if (!diagList.length) {
+      area.innerHTML = '<p style="color:#888;font-size:13px;text-align:center;padding:30px">診断がありません。「＋ 新しい診断を作成」から追加してください。</p>';
       return;
     }
-    list.innerHTML = diagData.questions.map(function(q, i) {
-      var choicesText = (q.choices || []).map(function(c) { return esc(c.label); }).join(' / ');
+    area.innerHTML = diagList.map(function(d, i) {
+      var qCount = (d.questions || []).length;
+      var rCount = Object.keys(d.results || {}).length;
       return '<div class="survey-item" style="margin-bottom:10px">' +
-        '<div style="display:flex;align-items:center;gap:8px;flex:1">' +
-          '<span class="q-badge" style="background:#4A5D4E;color:white;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0">' + (i+1) + '</span>' +
-          '<div><div style="font-weight:bold;font-size:14px">' + esc(q.text) + '</div>' +
-          '<div style="font-size:12px;color:#888;margin-top:2px">' + choicesText + '</div></div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:bold;font-size:15px;margin-bottom:4px">' + esc(d.title || '無題の診断') + '</div>' +
+          '<div style="font-size:12px;color:#888">質問数：' + qCount + '件　結果パターン：' + rCount + '件</div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-shrink:0">' +
-          (i > 0 ? '<button class="btn btn-sm btn-secondary" onclick="moveDiagQuestion(' + i + ',-1)">↑</button>' : '') +
-          (i < diagData.questions.length-1 ? '<button class="btn btn-sm btn-secondary" onclick="moveDiagQuestion(' + i + ',1)">↓</button>' : '') +
-          '<button class="btn btn-sm btn-primary" onclick="openDiagQuestionModal(' + i + ')">編集</button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteDiagQuestion(' + i + ')">削除</button>' +
+          '<button class="btn btn-sm btn-primary" data-idx="' + i + '" onclick="editDiag(this.dataset.idx)">編集・確認</button>' +
+          '<button class="btn btn-sm btn-danger" data-idx="' + i + '" onclick="deleteDiag(this.dataset.idx)">削除</button>' +
         '</div>' +
       '</div>';
     }).join('');
   }
 
-  function moveDiagQuestion(idx, dir) {
-    var arr = diagData.questions;
-    var tmp = arr[idx]; arr[idx] = arr[idx+dir]; arr[idx+dir] = tmp;
+  function editDiag(idx) {
+    currentDiag = JSON.parse(JSON.stringify(diagList[parseInt(idx)]));
+    document.getElementById('diagListPanel').style.display = 'none';
+    document.getElementById('diagEditArea').style.display = 'block';
+    document.getElementById('diagEditTitle').textContent = currentDiag.title || '無題の診断';
+    document.getElementById('diagTitle').value = currentDiag.title || '';
+    document.getElementById('diagDescription').value = currentDiag.description || '';
+    renderDiagResults();
     renderDiagQuestions();
   }
 
-  function deleteDiagQuestion(idx) {
-    if (!confirm('この質問を削除しますか？')) return;
-    diagData.questions.splice(idx, 1);
-    renderDiagQuestions();
+  function backToDiagList() {
+    currentDiag = null;
+    document.getElementById('diagEditArea').style.display = 'none';
+    document.getElementById('diagListPanel').style.display = 'block';
+    loadDiagnosisList();
   }
 
-  function openDiagQuestionModal(idx) {
-    document.getElementById('diagQuestionModal').style.display = 'flex';
-    document.getElementById('diagChoiceList').innerHTML = '';
-    if (idx !== undefined && idx >= 0) {
-      var q = diagData.questions[idx];
-      document.getElementById('diagQModalTitle').textContent = '質問を編集';
-      document.getElementById('diagQEditIndex').value = idx;
-      document.getElementById('diagQText').value = q.text || '';
-      (q.choices || []).forEach(function(c) { addDiagChoiceRow(c); });
-    } else {
-      document.getElementById('diagQModalTitle').textContent = '質問を追加';
-      document.getElementById('diagQEditIndex').value = -1;
-      document.getElementById('diagQText').value = '';
-      addDiagChoiceRow(); addDiagChoiceRow();
-    }
+  function getDiagUrl() {
+    var base = location.hostname === 'localhost' ? 'http://localhost:7071' : 'https://form.dstylegroup.jp';
+    var id = currentDiag ? (currentDiag.diagId || '') : '';
+    return base + '/diagnosis-herbelle.html' + (id ? '?id=' + id : '');
   }
 
-  function closeDiagQuestionModal() {
-    document.getElementById('diagQuestionModal').style.display = 'none';
+  async function deleteDiag(idx) {
+    var d = diagList[parseInt(idx)];
+    if (!confirm('「' + (d.title || '無題の診断') + '」を削除しますか？')) return;
+    try {
+      await apiFetch(BASE_URL + '/api/diagnosis?id=' + (d.id || d.diagId) + '&tenant=' + TENANT, { method: 'DELETE' });
+    } catch(e) {}
+    diagList.splice(parseInt(idx), 1);
+    renderDiagList();
   }
 
-  function addDiagChoiceRow(choice) {
-    var list = document.getElementById('diagChoiceList');
-    var resultKeys = Object.keys(diagData.results || {});
-    var div = document.createElement('div');
-    div.style.cssText = 'background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:8px';
-    var scoresHtml = resultKeys.length ?
-      resultKeys.map(function(k) {
-        var score = (choice && choice.scores && choice.scores[k]) ? choice.scores[k] : 0;
-        return '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
-          '<label style="font-size:12px;color:#666;min-width:80px">' + esc(k) + '：</label>' +
-          '<input type="number" value="' + score + '" min="0" max="10" data-key="' + esc(k) + '" style="width:60px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
-          '<span style="font-size:11px;color:#aaa">点</span>' +
-        '</div>';
-      }).join('') :
-      '<p style="font-size:12px;color:#aaa;margin-top:6px">先に結果パターンを追加してください</p>';
-    div.innerHTML =
-      '<div style="display:flex;gap:8px;align-items:center">' +
-        '<input type="text" placeholder="選択肢のテキスト" value="' + esc((choice && choice.label) || '') + '" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px" class="diag-choice-label">' +
-        '<button class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">✕</button>' +
-      '</div>' +
-      '<div class="diag-choice-scores">' + scoresHtml + '</div>';
-    list.appendChild(div);
+  // ---- 新規作成 ----
+  function openNewDiagModal() {
+    document.getElementById('diagNewTitle').value = '';
+    document.getElementById('diagNewDescription').value = '';
+    document.getElementById('diagNewModal').style.display = 'flex';
+    setTimeout(function() { document.getElementById('diagNewTitle').focus(); }, 100);
   }
 
-  function saveDiagQuestion() {
-    var text = document.getElementById('diagQText').value.trim();
-    if (!text) { alert('質問文を入力してください'); return; }
-    var rows = document.getElementById('diagChoiceList').querySelectorAll('div[style*="fafafa"]');
-    var choices = [];
-    rows.forEach(function(row) {
-      var label = row.querySelector('.diag-choice-label').value.trim();
-      if (!label) return;
-      var scores = {};
-      row.querySelectorAll('.diag-choice-scores input[data-key]').forEach(function(inp) {
-        scores[inp.dataset.key] = parseInt(inp.value) || 0;
+  function closeNewDiagModal() {
+    document.getElementById('diagNewModal').style.display = 'none';
+  }
+
+  async function createNewDiag() {
+    var title = document.getElementById('diagNewTitle').value.trim();
+    if (!title) { alert('診断タイトルを入力してください'); return; }
+    var newDiag = {
+      diagId: 'diag_' + Date.now(),
+      tenant: TENANT,
+      title: title,
+      description: document.getElementById('diagNewDescription').value.trim(),
+      questions: [],
+      results: {}
+    };
+    try {
+      var res = await apiFetch(BASE_URL + '/api/diagnosis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newDiag)
       });
-      choices.push({ label: label, scores: scores });
-    });
-    if (choices.length < 2) { alert('選択肢を2つ以上追加してください'); return; }
-    var q = { text: text, choices: choices };
-    var idx = parseInt(document.getElementById('diagQEditIndex').value);
-    if (idx >= 0) { diagData.questions[idx] = q; }
-    else { diagData.questions.push(q); }
-    renderDiagQuestions();
-    closeDiagQuestionModal();
+      if (res.ok) { var saved = await res.json(); newDiag = saved; }
+    } catch(e) {}
+    diagList.push(newDiag);
+    closeNewDiagModal();
+    editDiag(diagList.length - 1);
   }
 
-  // ---- 結果パターン管理 ----
+  // ---- 基本情報保存 ----
+  async function saveDiagBasic() {
+    var title = document.getElementById('diagTitle').value.trim();
+    if (!title) { alert('診断タイトルを入力してください'); return; }
+    currentDiag.title = title;
+    currentDiag.description = document.getElementById('diagDescription').value.trim();
+    document.getElementById('diagEditTitle').textContent = title;
+    await saveDiagToDB('diagBasicStatus');
+  }
+
+  // ---- 診断保存（DB） ----
+  async function saveDiagnosis() {
+    currentDiag.title = document.getElementById('diagTitle').value.trim() || currentDiag.title;
+    await saveDiagToDB('diagStatus');
+  }
+
+  async function saveDiagToDB(statusId) {
+    try {
+      var res = await apiFetch(BASE_URL + '/api/diagnosis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...currentDiag, tenant: TENANT })
+      });
+      if (res.ok) {
+        var saved = await res.json();
+        currentDiag = saved;
+        // diagListも更新
+        var idx = diagList.findIndex(function(d) { return d.diagId === currentDiag.diagId || d.id === currentDiag.id; });
+        if (idx >= 0) diagList[idx] = currentDiag; else diagList.push(currentDiag);
+        showStatus(statusId, '✅ 保存しました', 'success');
+      } else { showStatus(statusId, '❌ 保存失敗', 'error'); }
+    } catch(e) { showStatus(statusId, '❌ エラー: ' + e.message, 'error'); }
+  }
+
+  // ---- 結果パターン ----
   function renderDiagResults() {
     var list = document.getElementById('diagResultList');
-    var keys = Object.keys(diagData.results || {});
+    var keys = Object.keys(currentDiag.results || {});
     var btn = document.getElementById('addResultBtn');
-    btn.style.display = keys.length >= 5 ? 'none' : '';
+    if (btn) btn.style.display = keys.length >= 8 ? 'none' : '';
     if (!keys.length) {
-      list.innerHTML = '<p style="color:#888;font-size:13px">結果パターンがありません。「＋ 結果パターンを追加」から追加してください。</p>';
+      list.innerHTML = '<p style="color:#888;font-size:13px;text-align:center;padding:20px">結果パターンがありません。「＋ 結果を追加」から追加してください。</p>';
       return;
     }
     list.innerHTML = keys.map(function(k) {
-      var r = diagData.results[k];
-      return '<div class="survey-item" style="margin-bottom:10px">' +
-        '<div style="flex:1">' +
-          '<div style="font-weight:bold;font-size:14px">[' + esc(k) + '] ' + esc(r.title) + '</div>' +
-          '<div style="font-size:12px;color:#888;margin-top:2px">コース：' + esc(r.course || '未設定') + '</div>' +
+      var r = currentDiag.results[k];
+      return '<div style="background:#fafafa;border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        (r.imageBase64 ? '<img src="' + r.imageBase64 + '" style="width:56px;height:56px;border-radius:8px;object-fit:cover;border:1px solid #ddd;flex-shrink:0">' : '<div style="width:56px;height:56px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🏆</div>') +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">' +
+            '<span style="background:#4A5D4E;color:white;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:bold">' + esc(k) + '</span>' +
+            '<span style="font-weight:bold;font-size:14px">' + esc(r.title || '') + '</span>' +
+          '</div>' +
+          '<div style="font-size:12px;color:#888">' + (r.course ? 'コース：' + esc(r.course) : '—') + '</div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-shrink:0">' +
           '<button class="btn btn-sm btn-primary" data-rkey="' + esc(k) + '" onclick="openDiagResultModalByKey(this.dataset.rkey)">編集</button>' +
@@ -1633,14 +1734,15 @@
     }).join('');
   }
 
-  function deleteDiagResult(key) {
-    if (!confirm('結果パターン「' + key + '」を削除しますか？')) return;
-    delete diagData.results[key];
-    renderDiagResults();
-  }
-
   function openDiagResultModalByKey(key) { openDiagResultModal(key); }
   function deleteDiagResultByKey(key) { deleteDiagResult(key); }
+
+  function deleteDiagResult(key) {
+    if (!confirm('結果パターン「' + key + '」を削除しますか？')) return;
+    delete currentDiag.results[key];
+    renderDiagResults();
+    renderDiagQuestions(); // スコア表示更新
+  }
 
   function openDiagResultModal(key) {
     document.getElementById('diagResultModal').style.display = 'flex';
@@ -1648,8 +1750,8 @@
     document.getElementById('diagRImgPreviewWrap').style.display = 'none';
     document.getElementById('diagRImgInput').value = '';
     if (key) {
-      var r = diagData.results[key];
-      document.getElementById('diagRModalTitle').textContent = '結果パターンを編集';
+      var r = currentDiag.results[key];
+      document.getElementById('diagRModalTitle').textContent = '🏆 結果パターンを編集';
       document.getElementById('diagREditKey').value = key;
       document.getElementById('diagRKey').value = key;
       document.getElementById('diagRKey').disabled = true;
@@ -1663,7 +1765,7 @@
         document.getElementById('diagRImgPreviewWrap').style.display = 'block';
       }
     } else {
-      document.getElementById('diagRModalTitle').textContent = '結果パターンを追加';
+      document.getElementById('diagRModalTitle').textContent = '🏆 結果パターンを追加';
       document.getElementById('diagREditKey').value = '';
       document.getElementById('diagRKey').value = '';
       document.getElementById('diagRKey').disabled = false;
@@ -1700,10 +1802,11 @@
 
   function saveDiagResult() {
     var key = document.getElementById('diagRKey').value.trim().replace(/[^a-zA-Z0-9_]/g, '');
-    if (!key) { alert('パターンIDを入力してください（英数字）'); return; }
+    if (!key) { alert('パターンキーを入力してください（英数字）'); return; }
     var title = document.getElementById('diagRTitle').value.trim();
     if (!title) { alert('結果タイトルを入力してください'); return; }
-    diagData.results[key] = {
+    if (!currentDiag.results) currentDiag.results = {};
+    currentDiag.results[key] = {
       title: title,
       course: document.getElementById('diagRCourse').value.trim(),
       description: document.getElementById('diagRDescription').value.trim(),
@@ -1711,7 +1814,120 @@
       imageBase64: currentDiagRImgBase64
     };
     renderDiagResults();
+    renderDiagQuestions();
     closeDiagResultModal();
+  }
+
+  // ---- 質問管理 ----
+  function renderDiagQuestions() {
+    var list = document.getElementById('diagQuestionList');
+    if (!currentDiag.questions || !currentDiag.questions.length) {
+      list.innerHTML = '<p style="color:#888;font-size:13px;text-align:center;padding:20px">質問がありません。「＋ 質問を追加」から追加してください。</p>';
+      return;
+    }
+    list.innerHTML = currentDiag.questions.map(function(q, i) {
+      var choiceCount = (q.choices || []).length;
+      return '<div style="background:#fafafa;border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:flex-start;gap:10px">' +
+          '<span style="background:#4A5D4E;color:white;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0;margin-top:2px">' + (i+1) + '</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:bold;font-size:14px;margin-bottom:4px">' + esc(q.text) + '</div>' +
+            '<div style="font-size:12px;color:#888">選択肢 ' + choiceCount + '個</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;flex-shrink:0">' +
+            (i > 0 ? '<button class="btn btn-sm btn-secondary" data-idx="' + i + '" onclick="moveDiagQ(this.dataset.idx,-1)">↑</button>' : '') +
+            (i < currentDiag.questions.length-1 ? '<button class="btn btn-sm btn-secondary" data-idx="' + i + '" onclick="moveDiagQ(this.dataset.idx,1)">↓</button>' : '') +
+            '<button class="btn btn-sm btn-primary" data-idx="' + i + '" onclick="openDiagQuestionModal(this.dataset.idx)">編集</button>' +
+            '<button class="btn btn-sm btn-danger" data-idx="' + i + '" onclick="deleteDiagQ(this.dataset.idx)">削除</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function moveDiagQ(idx, dir) {
+    idx = parseInt(idx);
+    var arr = currentDiag.questions;
+    var tmp = arr[idx]; arr[idx] = arr[idx+parseInt(dir)]; arr[idx+parseInt(dir)] = tmp;
+    renderDiagQuestions();
+  }
+
+  function deleteDiagQ(idx) {
+    if (!confirm('この質問を削除しますか？')) return;
+    currentDiag.questions.splice(parseInt(idx), 1);
+    renderDiagQuestions();
+  }
+
+  function openDiagQuestionModal(idx) {
+    document.getElementById('diagQuestionModal').style.display = 'flex';
+    document.getElementById('diagChoiceList').innerHTML = '';
+    if (idx !== undefined && idx !== null && parseInt(idx) >= 0) {
+      idx = parseInt(idx);
+      var q = currentDiag.questions[idx];
+      document.getElementById('diagQModalTitle').textContent = '❓ 質問を編集';
+      document.getElementById('diagQEditIndex').value = idx;
+      document.getElementById('diagQText').value = q.text || '';
+      (q.choices || []).forEach(function(c) { addDiagChoiceRow(c); });
+    } else {
+      document.getElementById('diagQModalTitle').textContent = '❓ 質問を追加';
+      document.getElementById('diagQEditIndex').value = -1;
+      document.getElementById('diagQText').value = '';
+      addDiagChoiceRow(); addDiagChoiceRow();
+    }
+    setTimeout(function() { document.getElementById('diagQText').focus(); }, 100);
+  }
+
+  function closeDiagQuestionModal() {
+    document.getElementById('diagQuestionModal').style.display = 'none';
+  }
+
+  function addDiagChoiceRow(choice) {
+    var list = document.getElementById('diagChoiceList');
+    var resultKeys = Object.keys(currentDiag.results || {});
+    var div = document.createElement('div');
+    div.style.cssText = 'background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;padding:10px 12px;margin-bottom:8px';
+    var scoresHtml = resultKeys.length ?
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">' +
+      resultKeys.map(function(k) {
+        var score = (choice && choice.scores && choice.scores[k] !== undefined) ? choice.scores[k] : 0;
+        return '<div style="display:flex;align-items:center;gap:4px">' +
+          '<span style="font-size:11px;font-weight:bold;background:#4A5D4E;color:white;padding:1px 7px;border-radius:8px">' + esc(k) + '</span>' +
+          '<input type="number" value="' + score + '" min="0" max="10" data-key="' + esc(k) + '" style="width:50px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center">' +
+          '<span style="font-size:11px;color:#888">点</span>' +
+        '</div>';
+      }).join('') + '</div>' :
+      '<p style="font-size:11px;color:#aaa;margin-top:6px">⚠️ 先に結果パターンを追加してください</p>';
+    div.innerHTML =
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="text" placeholder="選択肢テキスト（例：よく冷える）" value="' + esc((choice && choice.label) || '') + '" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px" class="diag-choice-label">' +
+        '<button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">✕</button>' +
+      '</div>' +
+      '<div class="diag-choice-scores">' + scoresHtml + '</div>';
+    list.appendChild(div);
+  }
+
+  function saveDiagQuestion() {
+    var text = document.getElementById('diagQText').value.trim();
+    if (!text) { alert('質問文を入力してください'); return; }
+    var rows = document.getElementById('diagChoiceList').querySelectorAll('div[style*="f9f9f9"]');
+    var choices = [];
+    rows.forEach(function(row) {
+      var label = row.querySelector('.diag-choice-label').value.trim();
+      if (!label) return;
+      var scores = {};
+      row.querySelectorAll('.diag-choice-scores input[data-key]').forEach(function(inp) {
+        scores[inp.dataset.key] = parseInt(inp.value) || 0;
+      });
+      choices.push({ label: label, scores: scores });
+    });
+    if (choices.length < 2) { alert('選択肢を2つ以上追加してください'); return; }
+    var q = { text: text, choices: choices };
+    var idx = parseInt(document.getElementById('diagQEditIndex').value);
+    if (!currentDiag.questions) currentDiag.questions = [];
+    if (idx >= 0) { currentDiag.questions[idx] = q; }
+    else { currentDiag.questions.push(q); }
+    renderDiagQuestions();
+    closeDiagQuestionModal();
   }
 
   // ---- 診断ログ ----
@@ -1719,21 +1935,21 @@
     var tbody = document.getElementById('diagLogBody');
     tbody.innerHTML = '<tr><td colspan="2" class="loading">読み込み中...</td></tr>';
     try {
-      var res = await apiFetch(BASE_URL + '/api/diagnosislog?tenant=' + TENANT);
+      var diagId = currentDiag ? (currentDiag.diagId || '') : '';
+      var res = await apiFetch(BASE_URL + '/api/diagnosislog?tenant=' + TENANT + (diagId ? '&diagId=' + diagId : ''));
       if (!res.ok) throw new Error('取得失敗');
       var logs = await res.json();
-      // サマリー
       var summary = document.getElementById('diagLogSummary');
       var counts = {};
       logs.forEach(function(l) { counts[l.resultTitle] = (counts[l.resultTitle] || 0) + 1; });
-      summary.innerHTML = Object.entries(counts).map(function(e) {
-        return '<div class="card hl"><div class="num">' + e[1] + '</div><div class="label">' + esc(e[0]) + '</div></div>';
-      }).join('') || '<p style="color:#888;font-size:13px">診断結果がまだありません。</p>';
-      // テーブル
+      var keys = Object.keys(counts);
+      summary.innerHTML = keys.length ? keys.map(function(k) {
+        return '<div class="card hl"><div class="num">' + counts[k] + '</div><div class="label">' + esc(k) + '</div></div>';
+      }).join('') : '<p style="color:#888;font-size:13px">まだ診断結果がありません。</p>';
       if (!logs.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">ログがありません</td></tr>'; return; }
       tbody.innerHTML = logs.map(function(l) {
         var date = new Date(l.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-        return '<tr><td style="color:#888;white-space:nowrap">' + date + '</td><td>' + esc(l.resultTitle || '—') + '</td></tr>';
+        return '<tr><td style="color:#888;white-space:nowrap;font-size:12px">' + date + '</td><td>' + esc(l.resultTitle || '—') + '</td></tr>';
       }).join('');
     } catch(e) {
       tbody.innerHTML = '<tr><td colspan="2" class="empty">❌ ' + e.message + '</td></tr>';
