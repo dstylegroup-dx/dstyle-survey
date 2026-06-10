@@ -184,11 +184,12 @@ app.post('/api/response', async (req, res) => {
     try {
         const container = await getContainer();
 
-        // ── メールアドレス 1日1回 重複チェック ──────────────────
-        const emailAnswerForCheck = Object.values(answers).find(v =>
+        // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
+        const emailAnswer = Object.values(answers).find(v =>
             typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
         );
-        if (emailAnswerForCheck) {
+        let emailAlreadySentToday = false;
+        if (emailAnswer) {
             const todayJst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
             const tomorrowJst = new Date(new Date(todayJst).getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
             const { resources: dupCheck } = await container.items.query({
@@ -196,22 +197,38 @@ app.post('/api/response', async (req, res) => {
                 parameters: [
                     { name: "@tenant",   value: tenant },
                     { name: "@surveyId", value: surveyId },
-                    { name: "@email",    value: emailAnswerForCheck.trim().toLowerCase() },
+                    { name: "@email",    value: emailAnswer.trim().toLowerCase() },
                     { name: "@today",    value: todayJst + 'T00:00:00.000Z' },
                     { name: "@tomorrow", value: tomorrowJst + 'T00:00:00.000Z' }
                 ]
             }).fetchAll();
             if (dupCheck.length > 0) {
-                return res.status(429).json({ error: '本日すでに回答済みです。同じメールアドレスでの回答は1日1回までとなっております。' });
+                emailAlreadySentToday = true; // 回答は保存するがメールはスキップ
+                console.log(`[重複メールスキップ] tenant=${tenant} surveyId=${surveyId} email=${emailAnswer.trim()}`);
+                // スキップもメールログに記録
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'email_log',
+                    tenant,
+                    surveyId,
+                    toAddress: emailAnswer.trim(),
+                    subject: '（重複のためスキップ）',
+                    senderName: '',
+                    success: false,
+                    skipped: true,
+                    error: '同一メールアドレスへの本日2回目以降の送信のためスキップしました',
+                    createdAt: new Date().toISOString()
+                }).catch(() => {});
             }
         }
         // ────────────────────────────────────────────────────────
 
+        // 回答を保存（2回目以降も保存する）
         await container.items.create({
             id: crypto.randomUUID(),
             docType: 'survey_response',
             surveyId, tenant, answers,
-            emailAddress: emailAnswerForCheck ? emailAnswerForCheck.trim().toLowerCase() : null,
+            emailAddress: emailAnswer ? emailAnswer.trim().toLowerCase() : null,
             createdAt: new Date().toISOString()
         });
         return res.status(201).json({ status: 'ok' });

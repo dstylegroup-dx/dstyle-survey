@@ -318,43 +318,56 @@ app.http('response', {
                 const { surveyId, tenant, answers } = body;
                 if (!surveyId || !tenant || !answers) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
 
-                // ── メールアドレス 1日1回 重複チェック ──────────────────
-                const emailAnswerForCheck = Object.values(answers).find(v =>
+                // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
+                const emailAnswer = Object.values(answers).find(v =>
                     typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
                 );
-                if (emailAnswerForCheck) {
-                    const todayJst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10); // YYYY-MM-DD (JST)
+                let emailAlreadySentToday = false;
+                if (emailAnswer) {
+                    const todayJst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
                     const tomorrowJst = new Date(new Date(todayJst).getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
                     const { resources: dupCheck } = await container.items.query({
                         query: "SELECT TOP 1 c.id FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' AND c.emailAddress = @email AND c.createdAt >= @today AND c.createdAt < @tomorrow",
                         parameters: [
                             { name: "@tenant",   value: tenant },
                             { name: "@surveyId", value: surveyId },
-                            { name: "@email",    value: emailAnswerForCheck.trim().toLowerCase() },
+                            { name: "@email",    value: emailAnswer.trim().toLowerCase() },
                             { name: "@today",    value: todayJst + 'T00:00:00.000Z' },
                             { name: "@tomorrow", value: tomorrowJst + 'T00:00:00.000Z' }
                         ]
                     }).fetchAll();
                     if (dupCheck.length > 0) {
-                        return { status: 429, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '本日すでに回答済みです。同じメールアドレスでの回答は1日1回までとなっております。' } };
+                        emailAlreadySentToday = true; // 回答は保存するがメールはスキップ
+                        context.log(`[重複メールスキップ] tenant=${tenant} surveyId=${surveyId} email=${emailAnswer.trim()}`);
+                        // スキップもメールログに記録
+                        await container.items.create({
+                            id: crypto.randomUUID(),
+                            docType: 'email_log',
+                            tenant,
+                            surveyId,
+                            toAddress: emailAnswer.trim(),
+                            subject: '（重複のためスキップ）',
+                            senderName: '',
+                            success: false,
+                            skipped: true,
+                            error: '同一メールアドレスへの本日2回目以降の送信のためスキップしました',
+                            createdAt: new Date().toISOString()
+                        }).catch(() => {});
                     }
                 }
                 // ────────────────────────────────────────────────────────
 
-                // 回答を保存
+                // 回答を保存（2回目以降も保存する）
                 await container.items.create({
                     id: crypto.randomUUID(),
                     docType: 'survey_response',
                     surveyId, tenant, answers,
-                    emailAddress: emailAnswerForCheck ? emailAnswerForCheck.trim().toLowerCase() : null,
+                    emailAddress: emailAnswer ? emailAnswer.trim().toLowerCase() : null,
                     createdAt: new Date().toISOString()
                 });
 
-                // メールアドレスが回答に含まれていればお礼メール送信
-                const emailAnswer = Object.values(answers).find(v =>
-                    typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-                );
-                if (emailAnswer) {
+                // メール送信（本日初回のみ）
+                if (emailAnswer && !emailAlreadySentToday) {
                     try {
                         // アンケート個別設定 → テナント共通設定の順で取得
                         let emailSettings = null;
@@ -377,7 +390,6 @@ app.http('response', {
                                 bodyText: emailSettings.bodyText || '',
                                 senderName: emailSettings.senderName || '',
                             });
-                            // Cosmos DBにメール送信ログを保存
                             await container.items.create({
                                 id: crypto.randomUUID(),
                                 docType: 'email_log',
