@@ -1007,11 +1007,23 @@ app.timer('sendScheduledReports', {
                         if (responses.length === 0) continue;
                         totalCount += responses.length;
 
-                        // CSV変換
+                        // CSV変換（質問ラベルをヘッダーに使用）
                         const allKeys = new Set();
                         responses.forEach(r => Object.keys(r.answers || {}).forEach(k => allKeys.add(k)));
                         const keys = Array.from(allKeys);
-                        const header = ['回答日時', ...keys].join(',');
+
+                        // アンケート定義から質問IDとラベルのマップを作成
+                        let labelMap = {};
+                        try {
+                            const { resource: surveyDef } = await container.item(surveyId, tenant).read();
+                            if (surveyDef && surveyDef.questions) {
+                                surveyDef.questions.forEach(q => { labelMap[q.id] = q.label || q.id; });
+                            }
+                        } catch (e) {}
+
+                        // ヘッダーは質問ラベル（定義になければIDをそのまま使用）
+                        const headerLabels = keys.map(k => '"' + (labelMap[k] || k).replace(/"/g, '""') + '"');
+                        const header = ['回答日時', ...headerLabels].join(',');
                         const rows = responses.map(r => {
                             const date = new Date(r.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
                             const vals = keys.map(k => {
