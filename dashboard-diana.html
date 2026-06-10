@@ -598,8 +598,15 @@
             </label>
             <div id="reportRangeDaysArea" style="display:none;margin-top:10px;align-items:center;gap:8px">
               <span style="font-size:13px;color:#555">直近</span>
-              <input type="number" id="reportRangeDays" value="7" min="1" max="365" style="width:70px;padding:6px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:center">
-              <span style="font-size:13px;color:#555">日分</span>
+              <select id="reportRangeDays" style="padding:6px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;-webkit-appearance:auto;appearance:auto">
+                <option value="7">7日</option>
+                <option value="14">14日</option>
+                <option value="30">30日</option>
+                <option value="60">60日</option>
+                <option value="90">90日</option>
+                <option value="180">180日</option>
+                <option value="365">365日（1年）</option>
+              </select>
             </div>
           </div>
         </div>
