@@ -1047,8 +1047,13 @@ app.timer('sendScheduledReports', {
                             }
                         } catch (e) {}
 
-                        // ヘッダーは質問ラベル（定義になければIDをそのまま使用）
-                        const headerLabels = keys.map(k => '"' + (labelMap[k] || k).replace(/"/g, '""') + '"');
+                        // ヘッダーは質問ラベル（定義にないIDは「削除済み質問N」として表示）
+                        let unknownCount = 0;
+                        const headerLabels = keys.map(k => {
+                            if (labelMap[k]) return '"' + labelMap[k].replace(/"/g, '""') + '"';
+                            unknownCount++;
+                            return '"削除済み質問' + unknownCount + '"';
+                        });
                         const header = ['回答日時', ...headerLabels].join(',');
                         const rows = responses.map(r => {
                             const date = new Date(r.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
