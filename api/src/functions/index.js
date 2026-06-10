@@ -923,6 +923,60 @@ app.timer('sendScheduledReports', {
                 context.log(`[定期レポート] 送信開始 tenant=${tenant}`);
 
                 try {
+                    // ── 診断ログレポート（herbelle_diagテナント専用）──────────
+                    if (tenant === 'herbelle_diag') {
+                        const { resources: diagLogs } = await container.items.query({
+                            query: "SELECT * FROM c WHERE c.tenant = 'herbelle' AND c.docType = 'diagnosis_log' ORDER BY c.createdAt DESC",
+                        }).fetchAll();
+
+                        if (diagLogs.length === 0) {
+                            context.log(`[定期レポート] 診断ログなし スキップ`);
+                            continue;
+                        }
+
+                        const header = ['受診日時', '診断名', '結果タイプ'].join(',');
+                        const rows = diagLogs.map(l => {
+                            const date = new Date(l.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+                            return ['"' + date + '"',
+                                '"' + (l.diagTitle || '—').replace(/"/g, '""') + '"',
+                                '"' + (l.resultTitle || '—').replace(/"/g, '""') + '"'].join(',');
+                        });
+                        const csvContent = '\uFEFF' + header + '\n' + rows.join('\n');
+                        const csvBase64 = Buffer.from(csvContent, 'utf-8').toString('base64');
+                        const dateStr = nowJst.toISOString().slice(0, 10);
+                        const subject = `[Herbelle] 診断ログレポート ${dateStr}（${diagLogs.length}件）`;
+
+                        const connectionString = process.env.COMMUNICATION_CONNECTION_STRING;
+                        const senderAddress = process.env.EMAIL_SENDER_ADDRESS;
+                        if (!connectionString || !senderAddress) continue;
+                        const { EmailClient: EC } = require('@azure/communication-email');
+                        const emailClient2 = new EC(connectionString);
+
+                        for (const recipient of setting.recipients) {
+                            if (!recipient || !recipient.trim()) continue;
+                            try {
+                                const poller = await emailClient2.beginSend({
+                                    senderAddress,
+                                    content: { subject, plainText: `Herbelle の診断ログレポートをお送りします。\n\n総件数：${diagLogs.length}件\n\n添付のCSVファイルをご確認ください。` },
+                                    recipients: { to: [{ address: recipient.trim() }] },
+                                    attachments: [{ name: `herbelle_diagnosis_log_${dateStr}.csv`, contentType: 'text/csv', contentInBase64: csvBase64 }]
+                                });
+                                await poller.pollUntilDone();
+                                context.log(`[診断レポート] 送信成功 to=${recipient.trim()}`);
+                                await container.items.create({
+                                    id: crypto.randomUUID(), docType: 'email_log', tenant: 'herbelle',
+                                    surveyId: 'diag_report', toAddress: recipient.trim(), subject,
+                                    senderName: 'システム定期レポート', success: true, skipped: false, error: null,
+                                    createdAt: new Date().toISOString()
+                                }).catch(() => {});
+                            } catch (e) {
+                                context.log(`[診断レポート] 送信失敗 to=${recipient} error=${e.message}`);
+                            }
+                        }
+                        continue; // 通常のアンケートCSV処理はスキップ
+                    }
+                    // ────────────────────────────────────────────────────────
+
                     // 対象アンケートの回答を取得してCSV生成
                     let surveyIds = setting.surveyIds || [];
 

@@ -200,6 +200,7 @@
       <button class="tab-btn" onclick="switchTab('report')">📅 定期レポート</button>
       <button class="tab-btn" onclick="switchTab('diagnosis')">🔮 診断管理</button>
       <button class="tab-btn" onclick="switchTab('diaglog')">📊 診断ログ</button>
+      <button class="tab-btn" onclick="switchTab('diagreport')">📅 診断レポート</button>
     </div>
 
     <!-- タブ1: 回答データ -->
@@ -461,6 +462,8 @@
               <option value="">すべての診断</option>
             </select>
             <button class="btn btn-primary btn-sm" onclick="loadAllDiagLogs()">🔄 更新</button>
+            <button class="btn btn-sm" onclick="downloadDiagLogCSV()" style="background:#27ae60;color:white">📥 CSVダウンロード</button>
+            <button class="btn btn-sm" onclick="switchTab('diagreport')" style="background:#4A5D4E;color:white">📅 定期レポート設定</button>
           </div>
         </div>
         <div class="summary" id="diagLogAllSummary" style="margin-bottom:16px"></div>
@@ -471,6 +474,58 @@
               <tbody id="diagLogAllBody"><tr><td colspan="3" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- タブ: 診断定期レポート設定 -->
+    <div id="tab-diagreport" class="tab-content">
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="margin:0">📅 診断ログ 定期CSVレポート設定</h2>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:bold">
+            <input type="checkbox" id="diagReportEnabled" style="width:18px;height:18px;accent-color:#4A5D4E;-webkit-appearance:checkbox;appearance:checkbox">
+            送信を有効にする
+          </label>
+        </div>
+        <div style="background:#e8f4fd;border:1px solid #bee3f8;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#2c5282">
+          💡 設定した曜日・時刻に診断ログのCSVが添付されたメールが自動送信されます。
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="font-size:13px;font-weight:bold;color:#555;display:block;margin-bottom:6px">送信先メールアドレス <span style="color:#c0392b;font-size:11px">※必須</span></label>
+          <textarea id="diagReportRecipients" placeholder="例）staff@example.com&#10;複数の場合は改行またはカンマ区切り" style="width:100%;height:90px;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:13px;font-weight:bold;color:#555;display:block;margin-bottom:6px">送信曜日</label>
+            <select id="diagReportDayOfWeek" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;-webkit-appearance:auto;appearance:auto">
+              <option value="1">月曜日</option>
+              <option value="2">火曜日</option>
+              <option value="3">水曜日</option>
+              <option value="4">木曜日</option>
+              <option value="5">金曜日</option>
+              <option value="6">土曜日</option>
+              <option value="0">日曜日</option>
+              <option value="7">毎日</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:13px;font-weight:bold;color:#555;display:block;margin-bottom:6px">送信時刻（JST）</label>
+            <select id="diagReportHour" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;-webkit-appearance:auto;appearance:auto">
+              <option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option>
+              <option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option>
+              <option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option>
+              <option value="9" selected>09:00</option><option value="10">10:00</option><option value="11">11:00</option>
+              <option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option>
+              <option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option>
+              <option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option>
+              <option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="saveDiagReportSettings()" style="background:#4A5D4E">💾 設定を保存</button>
+          <span id="diagReportStatus" style="font-size:13px;display:none;padding:6px 12px;border-radius:6px"></span>
         </div>
       </div>
     </div>
@@ -897,6 +952,7 @@
     if (name === 'emaillog') initEmailLogTab();
     if (name === 'surveys') renderSurveyList();
     if (name === 'report') initReportTab();
+    if (name === 'diagreport') initDiagReportTab();
   }
 
   async function loadSurveys() {
@@ -2463,6 +2519,77 @@
       loadSurveys();
     }
   })();
+
+  function downloadDiagLogCSV() {
+    if (!allDiagLogs || allDiagLogs.length === 0) { alert('ダウンロードするデータがありません。先に「更新」を押してください。'); return; }
+    var filterVal = document.getElementById('diagLogFilter').value;
+    var data = filterVal ? allDiagLogs.filter(function(l) { return (l.diagTitle || '—') === filterVal; }) : allDiagLogs;
+    var header = ['日時', '診断名', '結果タイプ'];
+    var rows = data.map(function(l) {
+      var date = new Date(l.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+      return ['"' + date + '"', '"' + (l.diagTitle || '—').replace(/"/g, '""') + '"', '"' + (l.resultTitle || '—').replace(/"/g, '""') + '"'].join(',');
+    });
+    var csv = '\uFEFF' + header.join(',') + '\n' + rows.join('\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'herbelle_diagnosis_log_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ============================================================
+  // 📅 診断ログ 定期レポート設定
+  // ============================================================
+  async function initDiagReportTab() {
+    try {
+      var res = await apiFetch(BASE_URL + '/api/reportsettings?tenant=herbelle_diag');
+      if (!res.ok) return;
+      var cfg = await res.json();
+      document.getElementById('diagReportEnabled').checked = cfg.enabled || false;
+      document.getElementById('diagReportRecipients').value = (cfg.recipients || []).join('\n');
+      document.getElementById('diagReportDayOfWeek').value = cfg.dayOfWeek || '1';
+      document.getElementById('diagReportHour').value = cfg.hour || '9';
+    } catch (e) { /* 初回は設定なし */ }
+  }
+
+  async function saveDiagReportSettings() {
+    var statusEl = document.getElementById('diagReportStatus');
+    statusEl.style.display = 'none';
+    var enabled = document.getElementById('diagReportEnabled').checked;
+    var recipientRaw = document.getElementById('diagReportRecipients').value.trim();
+    var recipients = recipientRaw
+      .split(/[,\n]/)
+      .map(function(r) { return r.trim(); })
+      .filter(function(r) { return r && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r); });
+    if (enabled && recipients.length === 0) {
+      statusEl.textContent = '❌ 有効な送信先メールアドレスを入力してください';
+      statusEl.style.cssText = 'display:inline-block;background:#fce8e6;color:#c62828;padding:6px 12px;border-radius:6px;font-size:13px';
+      return;
+    }
+    var dayOfWeek = document.getElementById('diagReportDayOfWeek').value;
+    var hour = document.getElementById('diagReportHour').value;
+    try {
+      var res = await apiFetch(BASE_URL + '/api/reportsettings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant: 'herbelle_diag', enabled, recipients, surveyIds: ['diag'], dayOfWeek, hour })
+      });
+      if (res.ok) {
+        statusEl.textContent = '✅ 保存しました';
+        statusEl.style.cssText = 'display:inline-block;background:#e8f5e9;color:#2e7d32;padding:6px 12px;border-radius:6px;font-size:13px';
+      } else {
+        statusEl.textContent = '❌ 保存失敗';
+        statusEl.style.cssText = 'display:inline-block;background:#fce8e6;color:#c62828;padding:6px 12px;border-radius:6px;font-size:13px';
+      }
+    } catch (e) {
+      statusEl.textContent = '❌ エラー: ' + e.message;
+      statusEl.style.cssText = 'display:inline-block;background:#fce8e6;color:#c62828;padding:6px 12px;border-radius:6px;font-size:13px';
+    }
+    statusEl.style.display = 'inline-block';
+    setTimeout(function() { statusEl.style.display = 'none'; }, 4000);
+  }
 
   // ============================================================
   // 📅 定期レポート設定
