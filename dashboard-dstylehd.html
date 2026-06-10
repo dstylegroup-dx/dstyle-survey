@@ -560,7 +560,7 @@
           </label>
         </div>
         <div style="background:#e8f4fd;border:1px solid #bee3f8;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#2c5282">
-          💡 設定した曜日・時刻にCSVファイルが添付されたメールが自動送信されます。回答データは送信時点の全件が対象です。
+          💡 設定した曜日・時刻にCSVファイルが添付されたメールが自動送信されます。送信範囲は下記で設定できます。
         </div>
         <div class="form-group" style="margin-bottom:16px">
           <label style="font-size:13px;font-weight:bold;color:#555;display:block;margin-bottom:6px">送信先メールアドレス <span style="color:#c0392b;font-size:11px">※必須</span></label>
@@ -585,6 +585,22 @@
             <select id="reportHour" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;-webkit-appearance:auto;appearance:auto">
               <option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option>
             </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="font-size:13px;font-weight:bold;color:#555;display:block;margin-bottom:6px">送信範囲</label>
+          <div style="background:#f8f8f8;border:1.5px solid #ddd;border-radius:8px;padding:12px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:8px">
+              <input type="radio" name="reportRangeMode" value="all" checked style="accent-color:#1A6FA8;-webkit-appearance:radio;appearance:radio;width:16px;height:16px;cursor:pointer;flex-shrink:0" onchange="toggleReportRangeMode()"> 全件（全回答データ）
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="radio" name="reportRangeMode" value="days" style="accent-color:#1A6FA8;-webkit-appearance:radio;appearance:radio;width:16px;height:16px;cursor:pointer;flex-shrink:0" onchange="toggleReportRangeMode()"> 直近N日分
+            </label>
+            <div id="reportRangeDaysArea" style="display:none;margin-top:10px;display:none;align-items:center;gap:8px">
+              <span style="font-size:13px;color:#555">直近</span>
+              <input type="number" id="reportRangeDays" value="7" min="1" max="365" style="width:70px;padding:6px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:center">
+              <span style="font-size:13px;color:#555">日分</span>
+            </div>
           </div>
         </div>
         <div class="form-group" style="margin-bottom:20px">
@@ -1859,6 +1875,14 @@
       // 曜日・時刻
       document.getElementById('reportDayOfWeek').value = cfg.dayOfWeek || '1';
       document.getElementById('reportHour').value = cfg.hour || '9';
+      // 送信範囲復元
+      var rangeMode = cfg.rangeMode || 'all';
+      document.querySelectorAll('input[name="reportRangeMode"]').forEach(function(r) {
+        r.checked = r.value === rangeMode;
+      });
+      var daysArea = document.getElementById('reportRangeDaysArea');
+      if (daysArea) daysArea.style.display = rangeMode === 'days' ? 'flex' : 'none';
+      document.getElementById('reportRangeDays').value = cfg.rangeDays || 7;
       // 対象アンケート
       var surveyIds = cfg.surveyIds || [];
       var isAll = surveyIds.length === 0 || surveyIds[0] === 'all';
@@ -1899,6 +1923,9 @@
 
     var dayOfWeek = document.getElementById('reportDayOfWeek').value;
     var hour = document.getElementById('reportHour').value;
+    var rangeRadio = document.querySelector('input[name="reportRangeMode"]:checked');
+    var rangeMode = rangeRadio ? rangeRadio.value : 'all';
+    var rangeDays = parseInt(document.getElementById('reportRangeDays').value) || 7;
     var mode = document.querySelector('input[name="reportSurveyMode"]:checked');
     var surveyIds = ['all'];
     if (mode && mode.value === 'select') {
@@ -1914,7 +1941,7 @@
       var res = await apiFetch(BASE_URL + '/api/reportsettings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant: TENANT, enabled, recipients, surveyIds, dayOfWeek, hour })
+        body: JSON.stringify({ tenant: TENANT, enabled, recipients, surveyIds, dayOfWeek, hour, rangeMode, rangeDays })
       });
       if (res.ok) {
         statusEl.textContent = '✅ 保存しました';

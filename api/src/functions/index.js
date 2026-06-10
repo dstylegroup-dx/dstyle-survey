@@ -834,6 +834,8 @@ app.http('reportsettings', {
                     surveyIds: surveyIds !== undefined ? surveyIds : (existing.surveyIds || []),
                     dayOfWeek: dayOfWeek !== undefined ? dayOfWeek : (existing.dayOfWeek || '1'),
                     hour: hour !== undefined ? hour : (existing.hour || '9'),
+                    rangeMode: body.rangeMode !== undefined ? body.rangeMode : (existing.rangeMode || 'all'),
+                    rangeDays: body.rangeDays !== undefined ? parseInt(body.rangeDays) : (existing.rangeDays || 7),
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
@@ -999,9 +1001,20 @@ app.timer('sendScheduledReports', {
                             if (surveyDef) surveyTitle = surveyDef.title || surveyId;
                         } catch (e) {}
 
+                        // 送信範囲に応じてクエリを切り替え
+                        const rangeMode = setting.rangeMode || 'all';
+                        const rangeDays = parseInt(setting.rangeDays) || 7;
+                        let responseQuery, responseParams;
+                        if (rangeMode === 'days') {
+                            const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
+                            responseQuery = "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @sid AND c.docType = 'survey_response' AND c.createdAt >= @since ORDER BY c.createdAt DESC";
+                            responseParams = [{ name: "@tenant", value: tenant }, { name: "@sid", value: surveyId }, { name: "@since", value: since }];
+                        } else {
+                            responseQuery = "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @sid AND c.docType = 'survey_response' ORDER BY c.createdAt DESC";
+                            responseParams = [{ name: "@tenant", value: tenant }, { name: "@sid", value: surveyId }];
+                        }
                         const { resources: responses } = await container.items.query({
-                            query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @sid AND c.docType = 'survey_response' ORDER BY c.createdAt DESC",
-                            parameters: [{ name: "@tenant", value: tenant }, { name: "@sid", value: surveyId }]
+                            query: responseQuery, parameters: responseParams
                         }).fetchAll();
 
                         if (responses.length === 0) continue;
@@ -1045,7 +1058,8 @@ app.timer('sendScheduledReports', {
 
                     const dateStr = nowJst.toISOString().slice(0, 10);
                     const tenantLabel = { herbelle: 'Herbelle', diana: 'Diana', dstylehd: 'DstyleHD' }[tenant] || tenant;
-                    const subject = `[${tenantLabel}] アンケート回答レポート ${dateStr}（${totalCount}件）`;
+                    const rangeLabel = (setting.rangeMode === 'days') ? `直近${setting.rangeDays || 7}日分` : '全件';
+                    const subject = `[${tenantLabel}] アンケート回答レポート ${dateStr}（${rangeLabel}・${totalCount}件）`;
 
                     // 送信先ごとにメール送信
                     const connectionString = process.env.COMMUNICATION_CONNECTION_STRING;
