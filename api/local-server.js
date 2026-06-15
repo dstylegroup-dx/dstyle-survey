@@ -599,6 +599,67 @@ app.get('/api/groupstats', async (req, res) => {
 });
 
 // ----------------------------------------------------
+// 📧 一斉メール送信・予約
+// ----------------------------------------------------
+app.get('/api/bulkmail', async (req, res) => {
+    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
+    const { tenant } = req.query;
+    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
+    try {
+        const container = await getContainer();
+        const { resources } = await container.items.query({
+            query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.tenant = @tenant ORDER BY c.scheduledAt ASC",
+            parameters: [{ name: "@tenant", value: tenant }]
+        }).fetchAll();
+        return res.json(resources);
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/bulkmail', async (req, res) => {
+    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
+    const { tenant, surveyId, toAddresses, subject, bodyText, scheduleMode, scheduledAt } = req.body;
+    if (!tenant || !toAddresses?.length || !subject || !bodyText) {
+        return res.status(400).json({ error: 'tenant, toAddresses, subject, bodyText は必須です' });
+    }
+    try {
+        const container = await getContainer();
+        if (scheduleMode === 'scheduled' && scheduledAt) {
+            await container.items.create({
+                id: crypto.randomUUID(), docType: 'scheduled_mail',
+                tenant, surveyId: surveyId || '', toAddresses, subject, bodyText,
+                scheduledAt, status: 'pending', createdAt: new Date().toISOString()
+            });
+            return res.json({ status: 'scheduled', count: toAddresses.length });
+        }
+        // ローカルではメール送信をシミュレート
+        console.log(`[一斉送信ローカルシミュレート] to=${toAddresses.join(',')} subject=${subject}`);
+        for (const toAddress of toAddresses) {
+            await container.items.create({
+                id: crypto.randomUUID(), docType: 'email_log', tenant,
+                surveyId: surveyId || 'bulk', toAddress: toAddress.trim(),
+                subject, senderName: '一斉メール送信（ローカル）', success: true,
+                skipped: false, error: null, createdAt: new Date().toISOString()
+            }).catch(() => {});
+        }
+        return res.json({ status: 'ok', successCount: toAddresses.length, failCount: 0 });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/bulkmail/:id', async (req, res) => {
+    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
+    try {
+        const container = await getContainer();
+        const { resources } = await container.items.query({
+            query: "SELECT * FROM c WHERE c.id = @id AND c.docType = 'scheduled_mail'",
+            parameters: [{ name: "@id", value: req.params.id }]
+        }).fetchAll();
+        if (resources.length === 0) return res.status(404).json({ error: '見つかりません' });
+        await container.item(req.params.id, resources[0].tenant).delete();
+        return res.json({ status: 'deleted' });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+// ----------------------------------------------------
 // 起動
 // ----------------------------------------------------
 app.listen(7071, () => {

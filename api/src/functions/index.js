@@ -1150,6 +1150,181 @@ app.timer('sendScheduledReports', {
 });
 
 // ----------------------------------------------------
+// 📧 【一斉メール送信】POST /api/bulkmail
+// ----------------------------------------------------
+app.http('bulkmail', {
+    methods: ['GET', 'POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const token = request.headers.get('x-admin-token');
+            if (!await verifyToken(token)) return secureJson({ error: '認証が必要です' }, 401);
+
+            const url = new URL(request.url);
+            const container = await getContainer();
+
+            // GET: 予約メール一覧取得
+            if (request.method === 'GET') {
+                const tenant = url.searchParams.get('tenant');
+                if (!tenant) return secureJson({ error: 'tenant は必須です' }, 400);
+                const { resources } = await container.items.query({
+                    query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.tenant = @tenant ORDER BY c.scheduledAt ASC",
+                    parameters: [{ name: "@tenant", value: tenant }]
+                }).fetchAll();
+                return secureJson(resources);
+            }
+
+            // POST: 送信 or 予約保存
+            const body = await request.json().catch(() => ({}));
+            const { tenant, surveyId, toAddresses, subject, bodyText, scheduleMode, scheduledAt } = body;
+            if (!tenant || !toAddresses?.length || !subject || !bodyText) {
+                return secureJson({ error: 'tenant, toAddresses, subject, bodyText は必須です' }, 400);
+            }
+
+            // 予約送信の場合はCosmosDBに保存
+            if (scheduleMode === 'scheduled' && scheduledAt) {
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'scheduled_mail',
+                    tenant, surveyId: surveyId || '',
+                    toAddresses, subject, bodyText,
+                    scheduledAt,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                });
+                return secureJson({ status: 'scheduled', count: toAddresses.length });
+            }
+
+            // 即時送信
+            const connectionString = process.env.COMMUNICATION_CONNECTION_STRING;
+            const senderAddress = process.env.EMAIL_SENDER_ADDRESS;
+            if (!connectionString || !senderAddress) {
+                return secureJson({ error: 'メール設定が未構成です' }, 500);
+            }
+            const { EmailClient } = require('@azure/communication-email');
+            const emailClient = new EmailClient(connectionString);
+            let successCount = 0, failCount = 0;
+            for (const toAddress of toAddresses) {
+                if (!toAddress?.trim()) continue;
+                try {
+                    const poller = await emailClient.beginSend({
+                        senderAddress,
+                        content: { subject, plainText: bodyText },
+                        recipients: { to: [{ address: toAddress.trim() }] }
+                    });
+                    await poller.pollUntilDone();
+                    successCount++;
+                    // ログ記録
+                    await container.items.create({
+                        id: crypto.randomUUID(), docType: 'email_log', tenant,
+                        surveyId: surveyId || 'bulk', toAddress: toAddress.trim(),
+                        subject, senderName: '一斉メール送信', success: true,
+                        skipped: false, error: null, createdAt: new Date().toISOString()
+                    }).catch(() => {});
+                } catch (e) {
+                    failCount++;
+                    await container.items.create({
+                        id: crypto.randomUUID(), docType: 'email_log', tenant,
+                        surveyId: surveyId || 'bulk', toAddress: toAddress.trim(),
+                        subject, senderName: '一斉メール送信', success: false,
+                        skipped: false, error: e.message, createdAt: new Date().toISOString()
+                    }).catch(() => {});
+                    context.log(`[一斉送信失敗] to=${toAddress} error=${e.message}`);
+                }
+            }
+            return secureJson({ status: 'ok', successCount, failCount });
+        } catch (e) {
+            return secureJson({ error: e.message }, 500);
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 📧 【予約メール削除】DELETE /api/bulkmail
+// ----------------------------------------------------
+app.http('bulkmailDelete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'bulkmail/{id}',
+    handler: async (request, context) => {
+        try {
+            const token = request.headers.get('x-admin-token');
+            if (!await verifyToken(token)) return secureJson({ error: '認証が必要です' }, 401);
+            const id = request.params.id;
+            const container = await getContainer();
+            // パーティションキーを特定するためにまず取得
+            const { resources } = await container.items.query({
+                query: "SELECT * FROM c WHERE c.id = @id AND c.docType = 'scheduled_mail'",
+                parameters: [{ name: "@id", value: id }]
+            }).fetchAll();
+            if (resources.length === 0) return secureJson({ error: '見つかりません' }, 404);
+            await container.item(id, resources[0].tenant).delete();
+            return secureJson({ status: 'deleted' });
+        } catch (e) {
+            return secureJson({ error: e.message }, 500);
+        }
+    }
+});
+
+// ----------------------------------------------------
+// ⏰ 【タイマー】予約メール送信（毎分チェック）
+// ----------------------------------------------------
+app.timer('sendScheduledMails', {
+    schedule: '0 * * * * *',  // 毎分起動
+    handler: async (myTimer, context) => {
+        try {
+            const container = await getContainer();
+            const nowIso = new Date().toISOString();
+            // 送信時刻を過ぎた pending の予約を取得
+            const { resources: pendingMails } = await container.items.query({
+                query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.status = 'pending' AND c.scheduledAt <= @now",
+                parameters: [{ name: "@now", value: nowIso }]
+            }).fetchAll();
+
+            if (pendingMails.length === 0) return;
+
+            const connectionString = process.env.COMMUNICATION_CONNECTION_STRING;
+            const senderAddress = process.env.EMAIL_SENDER_ADDRESS;
+            if (!connectionString || !senderAddress) return;
+            const { EmailClient } = require('@azure/communication-email');
+            const emailClient = new EmailClient(connectionString);
+
+            for (const mail of pendingMails) {
+                // statusをprocessingに更新（二重送信防止）
+                await container.items.upsert({ ...mail, status: 'processing' });
+                let successCount = 0, failCount = 0;
+                for (const toAddress of (mail.toAddresses || [])) {
+                    if (!toAddress?.trim()) continue;
+                    try {
+                        const poller = await emailClient.beginSend({
+                            senderAddress,
+                            content: { subject: mail.subject, plainText: mail.bodyText },
+                            recipients: { to: [{ address: toAddress.trim() }] }
+                        });
+                        await poller.pollUntilDone();
+                        successCount++;
+                        await container.items.create({
+                            id: crypto.randomUUID(), docType: 'email_log', tenant: mail.tenant,
+                            surveyId: mail.surveyId || 'bulk', toAddress: toAddress.trim(),
+                            subject: mail.subject, senderName: '予約メール送信', success: true,
+                            skipped: false, error: null, createdAt: new Date().toISOString()
+                        }).catch(() => {});
+                    } catch (e) {
+                        failCount++;
+                        context.log(`[予約送信失敗] to=${toAddress} error=${e.message}`);
+                    }
+                }
+                // statusをdoneに更新
+                await container.items.upsert({ ...mail, status: 'done', sentAt: new Date().toISOString(), successCount, failCount });
+                context.log(`[予約送信完了] id=${mail.id} success=${successCount} fail=${failCount}`);
+            }
+        } catch (e) {
+            context.log('[予約送信タイマーエラー] ' + e.message);
+        }
+    }
+});
+
+// ----------------------------------------------------
 // ⏰ 【タイマー】期限切れトークンの自動削除（毎日深夜2時）
 // ----------------------------------------------------
 app.timer('cleanupExpiredTokens', {
