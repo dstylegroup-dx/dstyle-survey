@@ -229,9 +229,8 @@
         <div class="toolbar">
           <button class="btn btn-primary" onclick="fetchResponses()">🔄 更新</button>
           <button class="btn btn-success" onclick="downloadCSV()">📥 CSVダウンロード</button>
-          <button class="btn" onclick="toggleSelectMode()" id="selectModeBtn" style="background:#f0f0f0;color:#333;border:1.5px solid #ddd">☑️ 選択モード</button>
           <span id="selectedCountBadge" style="display:none;font-size:13px;color:#4A5D4E;font-weight:bold"></span>
-          <button id="bulkMailBtn" class="btn" onclick="openBulkMailModal()" style="display:none;background:#4A5D4E;color:white">📧 メール送信</button>
+          <button id="bulkMailBtn" class="btn" onclick="openBulkMailModal()" style="background:#4A5D4E;color:white">📧 メール送信</button>
           <button class="btn" onclick="openScheduledMails()" style="background:#f0f0f0;color:#555;border:1.5px solid #ddd;font-size:12px">📅 予約確認</button>
         </div>
         <div class="table-wrap">
@@ -2786,28 +2785,9 @@
   // ============================================================
   // 📧 一斉メール送信・予約機能
   // ============================================================
-  var selectMode = false;
+  var selectMode = true; // 常時ON
 
-  function toggleSelectMode() {
-    selectMode = !selectMode;
-    var btn = document.getElementById('selectModeBtn');
-    var bulkBtn = document.getElementById('bulkMailBtn');
-    var badge = document.getElementById('selectedCountBadge');
-    if (selectMode) {
-      btn.style.background = '#4A5D4E';
-      btn.style.color = 'white';
-      btn.style.border = '1.5px solid #4A5D4E';
-      btn.textContent = '✖️ 選択解除';
-    } else {
-      btn.style.background = '#f0f0f0';
-      btn.style.color = '#333';
-      btn.style.border = '1.5px solid #ddd';
-      btn.textContent = '☑️ 選択モード';
-      bulkBtn.style.display = 'none';
-      badge.style.display = 'none';
-    }
-    renderResponseTable();
-  }
+  function toggleSelectMode() { /* 常時ON */ }
 
   function toggleCheckAll(el) {
     document.querySelectorAll('.row-check:not(:disabled)').forEach(function(chk) { chk.checked = el.checked; });
@@ -2817,14 +2797,11 @@
   function updateSelectedCount() {
     var checked = document.querySelectorAll('.row-check:checked');
     var badge = document.getElementById('selectedCountBadge');
-    var bulkBtn = document.getElementById('bulkMailBtn');
     if (checked.length > 0) {
       badge.textContent = checked.length + '件選択中';
       badge.style.display = 'inline';
-      bulkBtn.style.display = 'inline-block';
     } else {
       badge.style.display = 'none';
-      bulkBtn.style.display = 'none';
     }
   }
 
@@ -2842,10 +2819,14 @@
     document.getElementById('bulkMailBody').value = '';
     document.querySelector('input[name="bulkMailMode"][value="now"]').checked = true;
     document.getElementById('bulkMailScheduleArea').style.display = 'none';
-    // デフォルト日時を今日に設定
+    // デフォルト日時を現在の1時間後に設定・過去日時を選択不可に
     var now = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    document.getElementById('bulkMailDate').value = now.toISOString().slice(0, 10);
-    document.getElementById('bulkMailTime').value = '10:00';
+    var oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+    var todayStr = now.toISOString().slice(0, 10);
+    var nextHour = oneHourLater.getUTCHours().toString().padStart(2, '0') + ':00';
+    document.getElementById('bulkMailDate').value = oneHourLater.toISOString().slice(0, 10);
+    document.getElementById('bulkMailDate').min = todayStr;
+    document.getElementById('bulkMailTime').value = nextHour;
     document.getElementById('bulkMailStatus').style.display = 'none';
     document.getElementById('bulkMailSendBtn').disabled = false;
     document.getElementById('bulkMailSendBtn').textContent = '📧 送信';
@@ -3105,7 +3086,7 @@
         <div style="padding:20px 24px">
           <div id="scheduledMailList"><div class="loading">読み込み中...</div></div>
           <div style="display:flex;justify-content:flex-end;margin-top:16px">
-            <button class="btn btn-secondary" onclick="closeModal('scheduledMailModal')">閉じる</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('scheduledMailModal').style.display='none';document.getElementById('scheduledMailModal').style.setProperty('display','none','important')">閉じる</button>
           </div>
         </div>
       </div>
