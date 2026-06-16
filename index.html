@@ -277,9 +277,27 @@
     // ============================================================
     // 認証
     // ============================================================
-    function showDashboard() {
+    async function showDashboard() {
         document.getElementById('loginArea').style.display = 'none';
         document.getElementById('portalContent').style.display = 'block';
+        // MSALのIDトークンをAPIトークンに交換
+        try {
+            var instance = await initMsal();
+            var account = instance.getAllAccounts()[0];
+            if (account) {
+                var result = await instance.acquireTokenSilent({ scopes: ["User.Read"], account: account });
+                var res = await fetch(BASE_URL + '/api/msalauth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken: result.idToken, tenant: 'portal' })
+                });
+                if (res.ok) {
+                    var data = await res.json();
+                    portalToken = data.token;
+                    sessionStorage.setItem('portalToken', data.token);
+                }
+            }
+        } catch(e) { console.warn('token取得失敗:', e); }
         init();
     }
 

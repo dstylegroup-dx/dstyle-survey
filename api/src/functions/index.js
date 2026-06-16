@@ -1348,3 +1348,47 @@ app.timer('cleanupExpiredTokens', {
         }
     }
 });
+// ----------------------------------------------------
+// 🔐 【Entra ID認証】MSALトークンでAPIトークン発行
+// ----------------------------------------------------
+app.http('msalauth', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const { idToken, tenant } = await request.json();
+            if (!idToken || !tenant) {
+                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'idToken と tenant は必須です' } };
+            }
+            const parts = idToken.split('.');
+            if (parts.length !== 3) {
+                return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '無効なトークン形式' } };
+            }
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+            const TENANT_ID = '2648ac1f-8786-40fb-80f8-14bd84511449';
+            const CLIENT_ID = '1f4f2ade-4eeb-4f65-8fbd-394378a63518';
+            const validIssuer = payload.iss && (
+                payload.iss === `https://login.microsoftonline.com/${TENANT_ID}/v2.0` ||
+                payload.iss === `https://sts.windows.net/${TENANT_ID}/`
+            );
+            const validAudience = payload.aud === CLIENT_ID;
+            const notExpired = payload.exp && payload.exp * 1000 > Date.now();
+            if (!validIssuer || !validAudience || !notExpired) {
+                return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'トークンの検証に失敗しました' } };
+            }
+            const token = await issueToken('auth_token');
+            const container = await getContainer();
+            await container.items.create({
+                id: crypto.randomUUID(),
+                docType: 'access_log',
+                tenant,
+                result: 'success',
+                ip: request.headers.get('x-forwarded-for') || 'unknown',
+                createdAt: new Date().toISOString()
+            }).catch(() => {});
+            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
+        } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});

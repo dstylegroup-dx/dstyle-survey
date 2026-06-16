@@ -839,16 +839,41 @@
   var qrInstance = null;
   var chartInstances = [];
 
+  async function acquireApiToken() {
+    try {
+      var instance = await initMsal();
+      var account = instance.getAllAccounts()[0];
+      if (!account) return;
+      // IDトークンを取得して /api/msalauth でAPIトークンに交換
+      var result = await instance.acquireTokenSilent({ scopes: ["User.Read"], account: account });
+      var idToken = result.idToken;
+      var res = await fetch(BASE_URL + '/api/msalauth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idToken, tenant: TENANT })
+      });
+      if (res.ok) {
+        var data = await res.json();
+        sessionStorage.setItem('adminToken', data.token);
+      }
+    } catch(e) {
+      console.warn('token取得失敗:', e);
+    }
+  }
+
   async function apiFetch(url, options) {
     var opts = options || {};
+    var t = sessionStorage.getItem('adminToken');
+    if (t) { opts.headers = opts.headers || {}; opts.headers['x-admin-token'] = t; }
     var res = await fetch(url, opts);
     if (res.status === 401) { doLogout(); return res; }
     return res;
   }
 
-  function showDashboard() {
+  async function showDashboard() {
     document.getElementById('loginArea').style.display = 'none';
     document.getElementById('dashContent').style.display = 'block';
+    await acquireApiToken();
     loadSurveys();
   }
   function doLogout() { msalLogout(); }
