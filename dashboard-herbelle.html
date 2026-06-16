@@ -178,12 +178,21 @@
       },
       cache: { cacheLocation: "sessionStorage" }
     };
-    var msalInstance = new msal.PublicClientApplication(msalConfig);
+
+    var msalInstance = null;
+
+    async function initMsal() {
+      if (msalInstance) return msalInstance;
+      msalInstance = new msal.PublicClientApplication(msalConfig);
+      await msalInstance.initialize();
+      return msalInstance;
+    }
 
     async function msalLogin() {
       try {
-        await msalInstance.loginPopup({ scopes: ["User.Read"] });
-        var account = msalInstance.getAllAccounts()[0];
+        var instance = await initMsal();
+        await instance.loginPopup({ scopes: ["User.Read"] });
+        var account = instance.getAllAccounts()[0];
         sessionStorage.setItem('msalUser', account.name || account.username);
         showDashboard();
       } catch(e) {
@@ -193,17 +202,20 @@
     }
 
     function msalLogout() {
-      msalInstance.logoutPopup().catch(function(){});
+      if (msalInstance) { msalInstance.logoutPopup().catch(function(){}); }
       sessionStorage.removeItem('msalUser');
       location.reload();
     }
 
-    function checkMsalLogin() {
-      var accounts = msalInstance.getAllAccounts();
-      if (accounts.length > 0) {
-        sessionStorage.setItem('msalUser', accounts[0].name || accounts[0].username);
-        if (typeof showDashboard === 'function') showDashboard();
-      }
+    async function checkMsalLogin() {
+      try {
+        var instance = await initMsal();
+        var accounts = instance.getAllAccounts();
+        if (accounts.length > 0) {
+          sessionStorage.setItem('msalUser', accounts[0].name || accounts[0].username);
+          if (typeof showDashboard === 'function') showDashboard();
+        }
+      } catch(e) { console.error('MSAL init error:', e); }
     }
   </script>
 </head>
