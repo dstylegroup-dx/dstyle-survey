@@ -168,19 +168,59 @@
     .color-chip:hover, .color-chip.selected { border-color: #333; transform: scale(1.15); }
     #qrcode { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block; }
   </style>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <script>
+    var msalConfig = {
+      auth: {
+        clientId: "1f4f2ade-4eeb-4f65-8fbd-394378a63518",
+        authority: "https://login.microsoftonline.com/2648ac1f-8786-40fb-80f8-14bd84511449",
+        redirectUri: "https://form.dstylegroup.jp"
+      },
+      cache: { cacheLocation: "sessionStorage" }
+    };
+    var msalInstance = new msal.PublicClientApplication(msalConfig);
+
+    async function msalLogin() {
+      try {
+        await msalInstance.loginPopup({ scopes: ["User.Read"] });
+        var account = msalInstance.getAllAccounts()[0];
+        sessionStorage.setItem('msalUser', account.name || account.username);
+        showDashboard();
+      } catch(e) {
+        var errEl = document.getElementById('loginError');
+        if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'ログインに失敗しました: ' + e.message; }
+      }
+    }
+
+    function msalLogout() {
+      msalInstance.logoutPopup().catch(function(){});
+      sessionStorage.removeItem('msalUser');
+      location.reload();
+    }
+
+    function checkMsalLogin() {
+      var accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) {
+        sessionStorage.setItem('msalUser', accounts[0].name || accounts[0].username);
+        if (typeof showDashboard === 'function') showDashboard();
+      }
+    }
+  </script>
 </head>
 <body>
 
 <div class="login-wrap" id="loginArea">
-  <div class="login-box">
-    <h2>📋 DstyleHD ダッシュボード</h2>
-    <input type="password" id="passwordInput" placeholder="パスワードを入力">
-    <button onclick="doLogin()">ログイン</button>
-    <div class="login-error" id="loginError">⚠️ パスワードが違います</div>
-  </div>
-</div>
-
-<div id="dashContent">
+      <div class="login-box">
+        <h2>DstyleHD ダッシュボード</h2>
+        <p style="color:#888;font-size:13px;margin-bottom:24px">Microsoftアカウントでログインしてください</p>
+        <button onclick="msalLogin()" style="width:100%;padding:14px;background:#0078D4;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
+          <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+          Microsoftでサインイン
+        </button>
+        <p class="login-error" id="loginError" style="display:none"></p>
+      </div>
+    </div>
+    <div id="dashContent">
   <div class="topbar">
     <h1>📋 DstyleHD ダッシュボード</h1>
     <div class="topbar-right">
@@ -787,46 +827,19 @@
   var qrInstance = null;
   var chartInstances = [];
 
-  async function apiFetch(url, options, retried) {
+  async function apiFetch(url, options) {
     var opts = options || {};
-    var t = sessionStorage.getItem('adminToken');
-    if (t) { opts.headers = opts.headers || {}; opts.headers['x-admin-token'] = t; }
     var res = await fetch(url, opts);
-    if (res.status === 401 && !retried) {
-      var pw = sessionStorage.getItem('savedPW');
-      if (pw) { var ok = await reLogin(pw); if (ok) return apiFetch(url, options, true); }
-      doLogout(); return res;
-    }
+    if (res.status === 401) { doLogout(); return res; }
     return res;
   }
 
-  async function reLogin(pw) {
-    try {
-      var res = await fetch(BASE_URL + '/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw, tenant: TENANT }) });
-      if (res.ok) { var data = await res.json(); sessionStorage.setItem('adminToken', data.token); return true; }
-    } catch (e) {}
-    return false;
+  function showDashboard() {
+    document.getElementById('loginArea').style.display = 'none';
+    document.getElementById('dashContent').style.display = 'block';
+    loadSurveys();
   }
-
-  async function doLogin() {
-    var pw = document.getElementById('passwordInput').value;
-    var loginError = document.getElementById('loginError');
-    loginError.style.display = 'none';
-    try {
-      var res = await fetch(BASE_URL + '/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw, tenant: TENANT }) });
-      if (res.ok) {
-        var data = await res.json();
-        sessionStorage.setItem('adminToken', data.token);
-        sessionStorage.setItem('savedPW', pw);
-        document.getElementById('loginArea').style.display = 'none';
-        document.getElementById('dashContent').style.display = 'block';
-        loadSurveys();
-      } else { loginError.style.display = 'block'; }
-    } catch (e) { loginError.style.display = 'block'; }
-  }
-
-  document.getElementById('passwordInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') doLogin(); });
-  function doLogout() { sessionStorage.removeItem('adminToken'); sessionStorage.removeItem('savedPW'); location.reload(); }
+  function doLogout() { msalLogout(); }
 
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -1853,15 +1866,7 @@
     if (e.key === 'F5') { e.preventDefault(); if (currentSurvey) fetchResponses(); }
   });
 
-  (function() {
-    var t = sessionStorage.getItem('adminToken');
-    var pw = sessionStorage.getItem('savedPW');
-    if (t && pw) {
-      document.getElementById('loginArea').style.display = 'none';
-      document.getElementById('dashContent').style.display = 'block';
-      loadSurveys();
-    }
-  })();
+  (function() { checkMsalLogin(); })();
 
   // ============================================================
   // 📅 定期レポート設定

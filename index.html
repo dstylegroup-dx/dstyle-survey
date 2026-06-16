@@ -67,18 +67,59 @@
         .loading { text-align: center; padding: 30px; color: #888; }
         .system-status { font-size: 13px; color: #95a5a6; border-top: 1px dashed #ccc; padding-top: 15px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
     </style>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <script>
+    var msalConfig = {
+      auth: {
+        clientId: "1f4f2ade-4eeb-4f65-8fbd-394378a63518",
+        authority: "https://login.microsoftonline.com/2648ac1f-8786-40fb-80f8-14bd84511449",
+        redirectUri: "https://form.dstylegroup.jp"
+      },
+      cache: { cacheLocation: "sessionStorage" }
+    };
+    var msalInstance = new msal.PublicClientApplication(msalConfig);
+
+    async function msalLogin() {
+      try {
+        await msalInstance.loginPopup({ scopes: ["User.Read"] });
+        var account = msalInstance.getAllAccounts()[0];
+        sessionStorage.setItem('msalUser', account.name || account.username);
+        showDashboard();
+      } catch(e) {
+        var errEl = document.getElementById('loginError');
+        if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'ログインに失敗しました: ' + e.message; }
+      }
+    }
+
+    function msalLogout() {
+      msalInstance.logoutPopup().catch(function(){});
+      sessionStorage.removeItem('msalUser');
+      location.reload();
+    }
+
+    function checkMsalLogin() {
+      var accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) {
+        sessionStorage.setItem('msalUser', accounts[0].name || accounts[0].username);
+        if (typeof showDashboard === 'function') showDashboard();
+      }
+    }
+  </script>
 </head>
 <body>
 
 <!-- ログイン画面 -->
 <div class="login-wrap" id="loginArea">
     <div class="login-box">
-        <h2>📋 DStyle DX</h2>
-        <p>フォーム管理ポータル<br>パスワードを入力してください</p>
-        <input type="password" id="passwordInput" placeholder="パスワードを入力">
-        <button onclick="doLogin()">ログイン</button>
-        <div class="login-error" id="loginError">⚠️ パスワードが違います</div>
+        <h2>🔐 DStyle DX</h2>
+        <p style="color:#888;font-size:13px;margin-bottom:24px">Microsoftアカウントでログインしてください</p>
+        <button onclick="msalLogin()" style="width:100%;padding:14px;background:#0078D4;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
+          <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+          Microsoftでサインイン
+        </button>
+        <p class="login-error" id="loginError" style="display:none"></p>
     </div>
+</div>
 </div>
 
 <!-- ポータル本体 -->
@@ -224,40 +265,13 @@
     // ============================================================
     // 認証
     // ============================================================
-    async function doLogin() {
-        var pw = document.getElementById('passwordInput').value;
-        var loginError = document.getElementById('loginError');
-        loginError.style.display = 'none';
-        try {
-            var res = await fetch(BASE_URL + '/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: pw, tenant: 'portal' })
-            });
-            if (res.ok) {
-                var data = await res.json();
-                portalToken = data.token;
-                sessionStorage.setItem('portalToken', data.token);
-                sessionStorage.setItem('portalPW', pw);
-                document.getElementById('loginArea').style.display = 'none';
-                document.getElementById('portalContent').style.display = 'block';
-            } else {
-                loginError.style.display = 'block';
-            }
-        } catch (e) {
-            loginError.style.display = 'block';
-        }
+    function showDashboard() {
+        document.getElementById('loginArea').style.display = 'none';
+        document.getElementById('portalContent').style.display = 'block';
+        init();
     }
 
-    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') doLogin();
-    });
-
-    function doLogout() {
-        sessionStorage.removeItem('portalToken');
-        sessionStorage.removeItem('portalPW');
-        location.reload();
-    }
+    function doLogout() { msalLogout(); }
 
     // ============================================================
     // タブ切り替え
@@ -396,15 +410,7 @@
     // ============================================================
     // ページ読み込み時にログイン状態を復元
     // ============================================================
-    (function() {
-        var t = sessionStorage.getItem('portalToken');
-        var pw = sessionStorage.getItem('portalPW');
-        if (t && pw) {
-            portalToken = t;
-            document.getElementById('loginArea').style.display = 'none';
-            document.getElementById('portalContent').style.display = 'block';
-        }
-    })();
+    (function() { checkMsalLogin(); })();
 </script>
 </body>
 </html>
