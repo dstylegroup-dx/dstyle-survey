@@ -185,16 +185,20 @@
       if (msalInstance) return msalInstance;
       msalInstance = new msal.PublicClientApplication(msalConfig);
       await msalInstance.initialize();
+      // リダイレクト後の処理
+      await msalInstance.handleRedirectPromise().then(function(result) {
+        if (result && result.account) {
+          sessionStorage.setItem('msalUser', result.account.name || result.account.username);
+        }
+      }).catch(function(e) { console.error('redirect error:', e); });
       return msalInstance;
     }
 
     async function msalLogin() {
       try {
         var instance = await initMsal();
-        await instance.loginPopup({ scopes: ["User.Read"] });
-        var account = instance.getAllAccounts()[0];
-        sessionStorage.setItem('msalUser', account.name || account.username);
-        showDashboard();
+        // リダイレクト方式（ポップアップ非対応環境でも動作）
+        await instance.loginRedirect({ scopes: ["User.Read"] });
       } catch(e) {
         var errEl = document.getElementById('loginError');
         if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'ログインに失敗しました: ' + e.message; }
@@ -202,9 +206,8 @@
     }
 
     function msalLogout() {
-      if (msalInstance) { msalInstance.logoutPopup().catch(function(){}); }
+      if (msalInstance) { msalInstance.logoutRedirect().catch(function(){}); }
       sessionStorage.removeItem('msalUser');
-      location.reload();
     }
 
     async function checkMsalLogin() {
@@ -1004,8 +1007,14 @@
       var instance = await initMsal();
       var account = instance.getAllAccounts()[0];
       if (!account) return;
-      // IDトークンを取得して /api/msalauth でAPIトークンに交換
-      var result = await instance.acquireTokenSilent({ scopes: ["User.Read"], account: account });
+      var result;
+      try {
+        result = await instance.acquireTokenSilent({ scopes: ["User.Read"], account: account });
+      } catch(e) {
+        // サイレント取得失敗時はリダイレクトで再取得
+        await instance.acquireTokenRedirect({ scopes: ["User.Read"], account: account });
+        return;
+      }
       var idToken = result.idToken;
       var res = await fetch(BASE_URL + '/api/msalauth', {
         method: 'POST',

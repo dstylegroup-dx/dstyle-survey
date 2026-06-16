@@ -84,16 +84,20 @@
       if (msalInstance) return msalInstance;
       msalInstance = new msal.PublicClientApplication(msalConfig);
       await msalInstance.initialize();
+      // リダイレクト後の処理
+      await msalInstance.handleRedirectPromise().then(function(result) {
+        if (result && result.account) {
+          sessionStorage.setItem('msalUser', result.account.name || result.account.username);
+        }
+      }).catch(function(e) { console.error('redirect error:', e); });
       return msalInstance;
     }
 
     async function msalLogin() {
       try {
         var instance = await initMsal();
-        await instance.loginPopup({ scopes: ["User.Read"] });
-        var account = instance.getAllAccounts()[0];
-        sessionStorage.setItem('msalUser', account.name || account.username);
-        showDashboard();
+        // リダイレクト方式（ポップアップ非対応環境でも動作）
+        await instance.loginRedirect({ scopes: ["User.Read"] });
       } catch(e) {
         var errEl = document.getElementById('loginError');
         if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'ログインに失敗しました: ' + e.message; }
@@ -101,9 +105,8 @@
     }
 
     function msalLogout() {
-      if (msalInstance) { msalInstance.logoutPopup().catch(function(){}); }
+      if (msalInstance) { msalInstance.logoutRedirect().catch(function(){}); }
       sessionStorage.removeItem('msalUser');
-      location.reload();
     }
 
     async function checkMsalLogin() {
