@@ -258,7 +258,7 @@
                     <div class="table-wrap">
                         <div class="table-scroll">
                             <table>
-                                <thead><tr><th>日時</th><th>テナント</th><th>ユーザー</th><th>IPアドレス</th><th>結果</th></tr></thead>
+                                <thead><tr><th>日時</th><th>テナント</th><th>IPアドレス</th><th>結果</th></tr></thead>
                                 <tbody id="logTableBody"><tr><td colspan="4" class="loading">タブを開くと読み込みます</td></tr></tbody>
                             </table>
                         </div>
@@ -302,7 +302,6 @@
                 }
             }
         } catch(e) { console.warn('token取得失敗:', e); }
-        init();
     }
 
     function doLogout() { msalLogout(); }
@@ -399,7 +398,7 @@
     // ============================================================
     async function fetchAccessLog() {
         var tbody = document.getElementById('logTableBody');
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">読み込み中...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">読み込み中...</td></tr>';
         var token = portalToken || sessionStorage.getItem('portalToken');
         if (!token) return;
         try {
@@ -418,7 +417,7 @@
 
             applyLogFilter();
         } catch(e) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty">❌ ' + e.message + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="empty">❌ ' + e.message + '</td></tr>';
         }
     }
 
@@ -437,8 +436,7 @@
             var badge = l.result === 'success'
                 ? '<span class="badge-success">成功</span>'
                 : '<span class="badge-fail">失敗</span>';
-            var user = l.userName || l.userEmail || '—';
-            return '<tr><td style="white-space:nowrap;color:#888">' + date + '</td><td>' + (l.tenant||'—') + '</td><td style="font-size:12px">' + user + '</td><td style="color:#888;font-size:12px">' + (l.ip||'—') + '</td><td>' + badge + '</td></tr>';
+            return '<tr><td style="white-space:nowrap;color:#888">' + date + '</td><td>' + (l.tenant||'—') + '</td><td style="color:#888;font-size:12px">' + (l.ip||'—') + '</td><td>' + badge + '</td></tr>';
         }).join('');
     }
 
