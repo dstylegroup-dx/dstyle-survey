@@ -1374,21 +1374,30 @@ app.http('msalauth', {
             const validAudience = payload.aud === CLIENT_ID;
             const notExpired = payload.exp && payload.exp * 1000 > Date.now();
             if (!validIssuer || !validAudience || !notExpired) {
+                // 不正アクセスをログに記録
+                try {
+                    const container = await getContainer();
+                    await container.items.create({
+                        id: crypto.randomUUID(),
+                        docType: 'access_log',
+                        tenant,
+                        result: 'failure',
+                        ip: request.headers.get('x-forwarded-for') || 'unknown',
+                        userName: 'unknown（トークン検証失敗）',
+                        userEmail: 'unknown',
+                        createdAt: new Date().toISOString()
+                    }).catch(() => {});
+                } catch(e) {}
                 return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'トークンの検証に失敗しました' } };
             }
             const token = await issueToken('auth_token');
             const container = await getContainer();
-            // Entra IDトークンからユーザー情報を取得
-            const userName = payload.name || payload.preferred_username || payload.upn || 'unknown';
-            const userEmail = payload.preferred_username || payload.upn || payload.email || 'unknown';
             await container.items.create({
                 id: crypto.randomUUID(),
                 docType: 'access_log',
                 tenant,
                 result: 'success',
                 ip: request.headers.get('x-forwarded-for') || 'unknown',
-                userName,
-                userEmail,
                 createdAt: new Date().toISOString()
             }).catch(() => {});
             return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
