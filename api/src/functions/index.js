@@ -1378,12 +1378,17 @@ app.http('msalauth', {
             }
             const token = await issueToken('auth_token');
             const container = await getContainer();
+            // Entra IDトークンからユーザー情報を取得
+            const userName = payload.name || payload.preferred_username || payload.upn || 'unknown';
+            const userEmail = payload.preferred_username || payload.upn || payload.email || 'unknown';
             await container.items.create({
                 id: crypto.randomUUID(),
                 docType: 'access_log',
                 tenant,
                 result: 'success',
                 ip: request.headers.get('x-forwarded-for') || 'unknown',
+                userName,
+                userEmail,
                 createdAt: new Date().toISOString()
             }).catch(() => {});
             return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
