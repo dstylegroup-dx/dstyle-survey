@@ -1356,7 +1356,8 @@ app.http('msalauth', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
-            const { idToken, tenant } = await request.json();
+            const reqBody = await request.json();
+            const { idToken, tenant, accessToken } = reqBody;
             if (!idToken || !tenant) {
                 return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'idToken と tenant は必須です' } };
             }
@@ -1390,13 +1391,12 @@ app.http('msalauth', {
                 } catch(e) {}
                 return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'トークンの検証に失敗しました' } };
             }
-            // ===== グループベースのアクセス制御 =====
+            // ===== Graph APIでグループ取得してアクセス制御 =====
             const GROUP_DELIGHT    = '6e4af16e-cfe1-49a6-968e-05b8cef847d8'; // ディライトテクノロジーズ事業部
             const GROUP_DIANA      = '560396ae-5774-4b3e-b451-9602d140f921'; // 株式会社ダイアナ
             const GROUP_ZENSYA     = '84b52c84-a162-43e0-a4be-30bc13ff36b0'; // 全社連絡用
             const GROUP_DSTYLE_LAB = '22b1fe31-87e4-4dc2-9387-d98688477ac1'; // Dstyle総合研究所
 
-            // テナントごとに許可グループを定義
             const ALLOWED_GROUPS = {
                 portal:    [GROUP_DELIGHT],
                 herbelle:  [GROUP_DELIGHT, GROUP_DSTYLE_LAB],
@@ -1404,7 +1404,20 @@ app.http('msalauth', {
                 dstylehd:  [GROUP_DELIGHT, GROUP_ZENSYA],
             };
 
-            const userGroups = payload.groups || [];
+            // フロントから送られたaccessTokenでGraph APIを呼びグループ取得
+            let userGroups = [];
+            if (accessToken) {
+                try {
+                    const graphRes = await fetch('https://graph.microsoft.com/v1.0/me/memberOf?$select=id', {
+                        headers: { 'Authorization': 'Bearer ' + accessToken }
+                    });
+                    if (graphRes.ok) {
+                        const graphData = await graphRes.json();
+                        userGroups = (graphData.value || []).map(g => g.id);
+                    }
+                } catch(e) { context.log('Graph API error:', e.message); }
+            }
+
             const allowedForTenant = ALLOWED_GROUPS[tenant] || [GROUP_DELIGHT];
             const hasAccess = allowedForTenant.some(g => userGroups.includes(g));
 

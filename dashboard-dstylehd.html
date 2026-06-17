@@ -849,16 +849,17 @@
       if (!account) return;
       var result;
       try {
-        result = await instance.acquireTokenSilent({ scopes: ["User.Read"], account: account });
+        result = await instance.acquireTokenSilent({ scopes: ["User.Read", "GroupMember.Read.All"], account: account });
       } catch(e) {
         await instance.acquireTokenRedirect({ scopes: ["User.Read"], account: account });
         return;
       }
       var idToken = result.idToken;
+      var accessToken = result.accessToken;
       var res = await fetch(BASE_URL + '/api/msalauth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: idToken, tenant: TENANT })
+        body: JSON.stringify({ idToken: idToken, accessToken: accessToken, tenant: TENANT })
       });
       if (res.status === 403) {
         // アクセス権限なし
