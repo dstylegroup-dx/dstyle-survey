@@ -1410,7 +1410,7 @@
       var cells = questions.map(function(q) { var val = r.answers ? (r.answers[q.id] || '—') : '—'; return '<td style="max-width:180px">' + esc(val) + '</td>'; }).join('');
       var emailVal = r.emailAddress || (r.answers ? Object.values(r.answers).find(function(v) { return typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()); }) : null) || '';
       var chkCol = selectMode ? '<td><input type="checkbox" class="row-check" data-email="' + esc(emailVal) + '" data-id="' + r.id + '" ' + (emailVal ? '' : 'disabled title="メールアドレスなし"') + ' style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:' + (emailVal ? 'pointer' : 'not-allowed') + '" onchange="updateSelectedCount()"></td>' : '';
-      var rowStyle = (selectMode && !emailVal) ? ' style="opacity:0.5"' : '';
+      var rowStyle = '';
       return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
     }).join('');
   }
