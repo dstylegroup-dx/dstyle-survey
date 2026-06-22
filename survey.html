@@ -37,7 +37,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-inner-spin-button,
 
-    input[type="text"], input[type="tel"], input[type="email"], input[type="number"], input[type="date"], select, textarea { width: 100%; padding: 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 16px; background: #fafafa; -webkit-appearance: none; appearance: none; transition: border-color 0.2s; }
+    input[type="text"], input[type="tel"], input[type="email"], input[type="date"], select, textarea { width: 100%; padding: 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 16px; background: #fafafa; -webkit-appearance: none; appearance: none; transition: border-color 0.2s; }
+    input[type="number"] { width: 100%; padding: 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 16px; background: #fafafa; -webkit-appearance: textfield; appearance: textfield; transition: border-color 0.2s; }
     input[type="text"]:focus, input[type="tel"]:focus, input[type="email"]:focus, input[type="number"]:focus, input[type="date"]:focus, select:focus, textarea:focus { border-color: #4A5D4E; background: #fff; outline: none; }
     textarea { height: 110px; resize: vertical; }
     .radio-group { display: flex; flex-direction: column; gap: 10px; }
@@ -223,9 +224,9 @@ input[type="number"]::-webkit-inner-spin-button,
         html += '<input type="email" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '例）example@email.com') + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'number') {
-        var minAttr = q.min !== undefined ? ' min="' + q.min + '"' : '';
-        var maxAttr = q.max !== undefined ? ' max="' + q.max + '"' : '';
-        html += '<input type="number" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '"' + minAttr + maxAttr + '>';
+        var minAttr = (q.min !== undefined && q.min !== null && q.min !== '') ? ' min="' + q.min + '"' : '';
+        var maxAttr = (q.max !== undefined && q.max !== null && q.max !== '') ? ' max="' + q.max + '"' : '';
+        html += '<input type="number" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '"' + minAttr + maxAttr + ' style="-webkit-appearance:textfield;appearance:textfield">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'date') {
         html += '<input type="date" id="q_' + esc(q.id) + '">';
