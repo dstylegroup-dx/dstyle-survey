@@ -3296,11 +3296,18 @@
         var res = await apiFetch(BASE_URL + '/api/filedownload?blobName=' + encodeURIComponent(blobName));
         if (!res.ok) throw new Error('URL取得失敗');
         var data = await res.json();
+        // ブラウザで表示せず強制ダウンロード
+        var fetchRes = await fetch(data.downloadUrl);
+        if (!fetchRes.ok) throw new Error('ファイル取得失敗');
+        var blob = await fetchRes.blob();
+        var objectUrl = URL.createObjectURL(blob);
         var a = document.createElement('a');
-        a.href = data.downloadUrl;
+        a.href = objectUrl;
         a.download = fileName;
-        a.target = '_blank';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(objectUrl); }, 1000);
       } catch(e) { alert('ダウンロードエラー: ' + e.message); }
     }
 
