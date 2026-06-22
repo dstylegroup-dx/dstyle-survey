@@ -1,0 +1,15 @@
+[33m127b89b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m ci: trigger redeploy with new token
+[33mbfb6034[m fix: restore correct survey.html
+[33mf7b852a[m fix: skip app build and fix close job
+[33m8024c90[m feat: add file upload question type to dashboard builder
+[33m238edc2[m fix: add build script to root package.json
+[33m3476e27[m fix: add build script and Blob Storage CSP
+[33me697892[m feat: ファイルアップロード機能追加（Blob Storage連携）
+[33m99700d5[m feat:entraグループ設定１
+[33m6b7349e[m feat:entraグループ設定
+[33m2ca2a2c[m feat:accessログ取得３
+[33mabf405f[m feat:accessログ取得２
+[33m66830e0[m feat:accessログ取得１
+[33m91cd358[m feat:accessログ取得
+[33m707dce2[m feat:accessログ取得
+[33mfd9a008[m feat:iframe対応
