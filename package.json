@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "build": "echo 'no build step'"
+  },
   "dependencies": {
     "@azure/storage-blob": "^12.32.0"
   }
