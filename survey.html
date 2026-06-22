@@ -224,9 +224,9 @@ input[type="number"]::-webkit-inner-spin-button,
         html += '<input type="email" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '例）example@email.com') + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'number') {
-        var minAttr = (q.min !== undefined && q.min !== null && q.min !== '') ? ' min="' + q.min + '"' : '';
-        var maxAttr = (q.max !== undefined && q.max !== null && q.max !== '') ? ' max="' + q.max + '"' : '';
-        html += '<input type="number" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '"' + minAttr + maxAttr + ' style="-webkit-appearance:textfield;appearance:textfield">';
+        var minAttr = (q.min !== undefined && q.min !== null && q.min !== '') ? ' data-min="' + q.min + '"' : '';
+        var maxAttr = (q.max !== undefined && q.max !== null && q.max !== '') ? ' data-max="' + q.max + '"' : '';
+        html += '<input type="text" inputmode="numeric" pattern="[0-9]*" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '"' + minAttr + maxAttr + '>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'date') {
         html += '<input type="date" id="q_' + esc(q.id) + '">';
@@ -380,6 +380,14 @@ input[type="number"]::-webkit-inner-spin-button,
         if (q.type === 'text' || q.type === 'textarea' || q.type === 'tel' || q.type === 'email' || q.type === 'number' || q.type === 'date') {
           var el = document.getElementById('q_' + q.id);
           if (!el || !el.value.trim()) isEmpty = true;
+          if (q.type === 'number' && el && el.value.trim()) {
+            var num = parseFloat(el.value.trim());
+            var minVal = el.dataset.min !== '' && el.dataset.min !== undefined ? parseFloat(el.dataset.min) : null;
+            var maxVal = el.dataset.max !== '' && el.dataset.max !== undefined ? parseFloat(el.dataset.max) : null;
+            if (isNaN(num)) isEmpty = true;
+            else if (minVal !== null && !isNaN(minVal) && num < minVal) isEmpty = true;
+            else if (maxVal !== null && !isNaN(maxVal) && num > maxVal) isEmpty = true;
+          }
         } else if (q.type === 'select') {
           var el = document.getElementById('q_' + q.id);
           if (!el || !el.value) isEmpty = true;
