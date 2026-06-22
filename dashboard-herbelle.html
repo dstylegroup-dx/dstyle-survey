@@ -167,6 +167,26 @@
     .color-chip { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; }
     .color-chip:hover, .color-chip.selected { border-color: #333; transform: scale(1.15); }
     #qrcode { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block; }
+    /* ファイル管理 */
+    .file-modal-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; min-height: 40px; }
+    .file-modal-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f0f4f0; border-radius: 8px; border: 1px solid #c8d8c8; }
+    .file-modal-item .fm-name { flex: 1; font-size: 14px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-modal-item .fm-size { font-size: 12px; color: #888; white-space: nowrap; }
+    .file-modal-item .fm-tag { font-size: 11px; background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 8px; white-space: nowrap; }
+    .file-modal-item .fm-btns { display: flex; gap: 6px; }
+    .btn-file-dl { background: #4A5D4E; color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; }
+    .btn-file-dl:hover { background: #3b4d3f; }
+    .btn-file-del { background: none; border: 1px solid #ddd; color: #999; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .btn-file-del:hover { border-color: #e74c3c; color: #e74c3c; }
+    .file-upload-drop { border: 2px dashed #ddd; border-radius: 8px; padding: 18px; text-align: center; background: #fafafa; cursor: pointer; transition: all 0.2s; margin-top: 12px; }
+    .file-upload-drop:hover, .file-upload-drop.dragover { border-color: #4A5D4E; background: #f0f4f0; }
+    .file-upload-drop input[type="file"] { display: none; }
+    .file-modal-status { font-size: 13px; margin-top: 8px; min-height: 20px; }
+    .file-modal-status.uploading { color: #e67e22; }
+    .file-modal-status.done { color: #27ae60; }
+    .file-modal-status.error { color: #e74c3c; }
+    .btn-has-files { position: relative; }
+    .file-badge { display: inline-block; background: #27ae60; color: white; border-radius: 8px; font-size: 10px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; font-weight: bold; }
   </style>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
   <script>
@@ -482,6 +502,7 @@
                 <option value="email">📧 メールアドレス</option>
                 <option value="date">📅 日付選択</option>
                 <option value="image_choice">🖼️ 画像選択</option>
+                <option value="file">📎 ファイルアップロード</option>
               </select>
               <button class="btn btn-primary" onclick="openAddQuestion()">＋ 追加</button>
             </div>
@@ -880,6 +901,7 @@
           <option value="tel">📞 電話番号</option>
           <option value="email">📧 メールアドレス</option>
           <option value="date">📅 日付選択</option>
+          <option value="file">📎 ファイルアップロード</option>
         </select>
       </div>
       <div class="form-group" id="placeholderGroup"><label>記入例（任意）</label><input type="text" id="qPlaceholder" placeholder="例）山田 花子"></div>
@@ -914,6 +936,34 @@
         <p style="font-size:12px;color:#888;margin-bottom:8px">各選択肢に画像とラベルを設定します。PNG・JPG（500KB以内）</p>
         <div id="imageChoiceList"></div>
         <button class="add-option-btn" onclick="addImageChoiceRow()">＋ 画像選択肢を追加</button>
+      </div>
+      <div class="form-group" id="fileGroup" style="display:none">
+        <label>ファイルアップロード設定</label>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+          <div style="display:flex;gap:12px;align-items:center">
+            <label style="font-size:13px;color:#555;width:80px">最大サイズ</label>
+            <select id="qFileMaxMb" style="-webkit-appearance:auto;appearance:auto;padding:6px;border:1.5px solid #ddd;border-radius:6px;font-size:13px">
+              <option value="5">5MB</option>
+              <option value="10" selected>10MB</option>
+              <option value="20">20MB</option>
+              <option value="50">50MB</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <label style="font-size:13px;color:#555;width:80px">ファイル種別</label>
+            <select id="qFileAccept" style="-webkit-appearance:auto;appearance:auto;padding:6px;border:1.5px solid #ddd;border-radius:6px;font-size:13px">
+              <option value="*/*">すべてのファイル</option>
+              <option value="image/*">画像のみ（JPG/PNG/GIF）</option>
+              <option value=".pdf">PDFのみ</option>
+              <option value="image/*,.pdf">画像・PDF</option>
+              <option value=".xlsx,.xls,.csv">Excel・CSV</option>
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="qFileMultiple" style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer">
+            複数ファイルのアップロードを許可
+          </label>
+        </div>
       </div>
       <div class="form-group" id="ratingGroup" style="display:none">
         <label>最大評価数</label>
@@ -1165,7 +1215,7 @@
     var list = document.getElementById('questionsList');
     var questions = currentSurvey.questions || [];
     if (questions.length === 0) { list.innerHTML = '<div class="empty">質問がありません。下の「＋ 追加」から追加してください。</div>'; return; }
-    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択' };
+    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択', file: '📎ファイル' };
     list.innerHTML = questions.map(function(q, i) {
       var opts = (q.options || []).map(function(o) { return '<span class="option-tag">' + o + '</span>'; }).join('');
       var branchBadge = q.showIf ? '<span style="font-size:11px;background:#f3e9f9;color:#6B3FA0;border:1px solid #d8b4f0;border-radius:4px;padding:1px 6px;margin-left:4px">🔀 分岐</span>' : '';
@@ -1251,6 +1301,12 @@
     } else {
       document.getElementById('qImgPreviewWrap').style.display = 'none';
     }
+    // ファイル設定復元
+    if (q.type === 'file') {
+      document.getElementById('qFileMaxMb').value = q.fileMaxMb || 10;
+      document.getElementById('qFileAccept').value = q.fileAccept || '*/*';
+      document.getElementById('qFileMultiple').checked = q.fileMultiple || false;
+    }
     // 画像選択肢復元
     if (q.type === 'image_choice') {
       document.getElementById('imageChoiceList').innerHTML = '';
@@ -1282,6 +1338,7 @@
     if (type === 'image_choice' && document.getElementById('imageChoiceList').children.length === 0) {
       addImageChoiceRow(); addImageChoiceRow();
     }
+    document.getElementById('fileGroup').style.display = type === 'file' ? '' : 'none';
   }
 
   function addOptionRow(value) {
@@ -1315,6 +1372,7 @@
     }
     if (currentQImageBase64) q.imageBase64 = currentQImageBase64;
     if (type === 'image_choice') q.imageChoices = getImageChoices();
+    if (type === 'file') { q.fileMaxMb = parseInt(document.getElementById('qFileMaxMb').value)||10; q.fileAccept = document.getElementById('qFileAccept').value; q.fileMultiple = document.getElementById('qFileMultiple').checked; }
     // 分岐設定を保存
     if (document.getElementById('qBranchEnabled').checked) {
       var branchQid = document.getElementById('qBranchSourceQ').value;
@@ -1581,7 +1639,7 @@
       var emailVal = r.emailAddress || (r.answers ? Object.values(r.answers).find(function(v) { return typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()); }) : null) || '';
       var chkCol = selectMode ? '<td><input type="checkbox" class="row-check" data-email="' + esc(emailVal) + '" data-id="' + r.id + '" ' + (emailVal ? '' : 'disabled title="メールアドレスなし"') + ' style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:' + (emailVal ? 'pointer' : 'not-allowed') + '" onchange="updateSelectedCount()"></td>' : '';
       var rowStyle = '';
-      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
+      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
     }).join('');
   }
 
@@ -3149,5 +3207,158 @@
         </div>
       </div>
     </div>
+
+    <!-- ファイル管理モーダル -->
+    <div id="fileModal" class="modal-overlay" style="display:none">
+      <div class="modal" style="max-width:560px">
+        <h2>📎 添付ファイル管理</h2>
+        <div id="fileModalLoading" style="text-align:center;padding:20px;color:#888">読み込み中...</div>
+        <div id="fileModalContent" style="display:none">
+          <div id="fileModalList" class="file-modal-list"></div>
+          <div id="fileModalEmpty" style="display:none;text-align:center;padding:16px;color:#888;font-size:14px">添付ファイルはありません</div>
+          <!-- スタッフ追加アップロード -->
+          <div style="margin-top:16px">
+            <div style="font-size:13px;font-weight:bold;color:#555;margin-bottom:8px">📤 ファイルを追加アップロード</div>
+            <div class="file-upload-drop" id="staffDropArea" onclick="document.getElementById('staffFileInput').click()">
+              <div style="font-size:24px;margin-bottom:6px">📁</div>
+              <div style="font-size:13px;color:#888">クリックまたはドラッグ&ドロップ<br><span style="font-size:12px">最大20MB / 複数ファイル可</span></div>
+              <input type="file" id="staffFileInput" multiple onchange="staffUploadFiles(this.files)">
+            </div>
+            <div class="file-modal-status" id="staffUploadStatus"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:20px">
+          <button class="btn btn-secondary" onclick="closeFileModal()">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    // ============================================================
+    // ファイル管理
+    // ============================================================
+    var fileModalResponseId = null;
+    var fileModalSurveyId = null;
+
+    async function openFileModal(responseId, surveyId) {
+      fileModalResponseId = responseId;
+      fileModalSurveyId = surveyId;
+      document.getElementById('fileModal').style.display = 'flex';
+      document.getElementById('fileModalLoading').style.display = 'block';
+      document.getElementById('fileModalContent').style.display = 'none';
+      document.getElementById('staffUploadStatus').textContent = '';
+      await refreshFileList();
+    }
+
+    function closeFileModal() {
+      document.getElementById('fileModal').style.display = 'none';
+      fileModalResponseId = null;
+      fileModalSurveyId = null;
+    }
+
+    async function refreshFileList() {
+      try {
+        var res = await apiFetch(BASE_URL + '/api/filelist?tenant=' + TENANT + '&surveyId=' + fileModalSurveyId + '&responseId=' + fileModalResponseId);
+        var files = res.ok ? await res.json() : [];
+        var list = document.getElementById('fileModalList');
+        var empty = document.getElementById('fileModalEmpty');
+        document.getElementById('fileModalLoading').style.display = 'none';
+        document.getElementById('fileModalContent').style.display = 'block';
+        if (!files.length) { list.innerHTML = ''; empty.style.display = 'block'; }
+        else {
+          empty.style.display = 'none';
+          list.innerHTML = files.map(function(f) {
+            var sizeStr = f.size ? (f.size < 1024*1024 ? (f.size/1024).toFixed(1)+'KB' : (f.size/1024/1024).toFixed(1)+'MB') : '';
+            var tag = f.isStaffUpload ? '<span class="fm-tag">スタッフ</span>' : '';
+            return '<div class="file-modal-item">' +
+              '<span style="font-size:18px">📄</span>' +
+              '<span class="fm-name" title="' + esc(f.fileName) + '">' + esc(f.fileName) + '</span>' +
+              (sizeStr ? '<span class="fm-size">' + sizeStr + '</span>' : '') +
+              tag +
+              '<div class="fm-btns">' +
+              '<button class="btn-file-dl" onclick="downloadFile(\'' + esc(f.blobName) + '\',\'' + esc(f.fileName) + '\')">⬇ DL</button>' +
+              '<button class="btn-file-del" onclick="deleteFile(\'' + esc(f.blobName) + '\')">削除</button>' +
+              '</div></div>';
+          }).join('');
+        }
+        // ファイルバッジ更新
+        var btn = document.getElementById('filebtn_' + fileModalResponseId);
+        if (btn) btn.innerHTML = files.length ? '📎 <span class="file-badge">' + files.length + '</span>' : '📎';
+      } catch(e) {
+        document.getElementById('fileModalLoading').style.display = 'none';
+        document.getElementById('fileModalContent').style.display = 'block';
+        document.getElementById('fileModalList').innerHTML = '<div style="color:#e74c3c;font-size:13px">読み込みエラー: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    async function downloadFile(blobName, fileName) {
+      try {
+        var res = await apiFetch(BASE_URL + '/api/filedownload?blobName=' + encodeURIComponent(blobName));
+        if (!res.ok) throw new Error('URL取得失敗');
+        var data = await res.json();
+        var a = document.createElement('a');
+        a.href = data.downloadUrl;
+        a.download = fileName;
+        a.target = '_blank';
+        a.click();
+      } catch(e) { alert('ダウンロードエラー: ' + e.message); }
+    }
+
+    async function deleteFile(blobName) {
+      if (!confirm('このファイルを削除しますか？')) return;
+      try {
+        var res = await apiFetch(BASE_URL + '/api/filedelete?blobName=' + encodeURIComponent(blobName), { method: 'DELETE' });
+        if (!res.ok) throw new Error('削除失敗');
+        await refreshFileList();
+      } catch(e) { alert('削除エラー: ' + e.message); }
+    }
+
+    async function staffUploadFiles(fileList) {
+      if (!fileList || !fileList.length) return;
+      var statusEl = document.getElementById('staffUploadStatus');
+      var input = document.getElementById('staffFileInput');
+      for (var i = 0; i < fileList.length; i++) {
+        var file = fileList[i];
+        if (file.size > 20 * 1024 * 1024) {
+          statusEl.textContent = '❌ ' + file.name + ' は20MBを超えています';
+          statusEl.className = 'file-modal-status error';
+          continue;
+        }
+        try {
+          statusEl.textContent = 'アップロード中: ' + file.name;
+          statusEl.className = 'file-modal-status uploading';
+          var sasRes = await apiFetch(BASE_URL + '/api/staffupload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenant: TENANT, surveyId: fileModalSurveyId, responseId: fileModalResponseId, fileName: file.name })
+          });
+          if (!sasRes.ok) throw new Error('SAS URL取得失敗');
+          var sasData = await sasRes.json();
+          var putRes = await fetch(sasData.uploadUrl, {
+            method: 'PUT',
+            headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' },
+            body: file
+          });
+          if (!putRes.ok) throw new Error('アップロード失敗(' + putRes.status + ')');
+          statusEl.textContent = '✅ ' + file.name + ' をアップロードしました';
+          statusEl.className = 'file-modal-status done';
+          await refreshFileList();
+        } catch(e) {
+          statusEl.textContent = '❌ ' + e.message;
+          statusEl.className = 'file-modal-status error';
+        }
+      }
+      if (input) input.value = '';
+    }
+
+    // スタッフアップロードエリア ドラッグ&ドロップ
+    document.addEventListener('DOMContentLoaded', function() {
+      var drop = document.getElementById('staffDropArea');
+      if (!drop) return;
+      drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('dragover'); });
+      drop.addEventListener('dragleave', function() { drop.classList.remove('dragover'); });
+      drop.addEventListener('drop', function(e) { e.preventDefault(); drop.classList.remove('dragover'); staffUploadFiles(e.dataTransfer.files); });
+    });
+    </script>
 </body>
 </html>

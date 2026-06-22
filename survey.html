@@ -80,6 +80,22 @@ input[type="number"]::-webkit-inner-spin-button,
     .field-error-msg { color: #e74c3c; font-size: 13px; margin-top: 6px; display: none; }
     .field-error .field-error-msg { display: block; }
     @media (min-width: 480px) { .radio-group.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } }
+    /* ファイルアップロード */
+    .file-upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 24px; text-align: center; background: #fafafa; cursor: pointer; transition: all 0.2s; }
+    .file-upload-area:hover, .file-upload-area.dragover { border-color: #4A5D4E; background: #f0f4f0; }
+    .file-upload-area input[type="file"] { display: none; }
+    .file-upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .file-upload-text { font-size: 14px; color: #888; }
+    .file-upload-text strong { color: #4A5D4E; }
+    .file-preview-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .file-preview-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f0f4f0; border-radius: 8px; border: 1px solid #c8d8c8; }
+    .file-preview-item .file-name { flex: 1; font-size: 14px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-preview-item .file-size { font-size: 12px; color: #888; white-space: nowrap; }
+    .file-preview-item .file-remove { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; }
+    .file-upload-status { font-size: 13px; margin-top: 8px; }
+    .file-upload-status.uploading { color: #e67e22; }
+    .file-upload-status.done { color: #27ae60; }
+    .file-upload-status.error { color: #e74c3c; }
   </style>
 </head>
 <body>
@@ -255,6 +271,19 @@ input[type="number"]::-webkit-inner-spin-button,
         (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="checkbox" name="q_' + esc(q.id) + '" value="' + esc(opt) + '"> ' + esc(opt) + '</label>'; });
         html += '</div>';
         if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
+      } else if (q.type === 'file') {
+        var accept = q.fileAccept || '*/*';
+        var maxMb = q.fileMaxMb || 10;
+        var multiple = q.fileMultiple ? ' multiple' : '';
+        html += '<div class="file-upload-area" id="fileArea_' + esc(q.id) + '" data-maxmb="' + maxMb + '" onclick="document.getElementById(\'fileInput_' + esc(q.id) + '\').click()">';
+        html += '<div class="file-upload-icon">📎</div>';
+        html += '<div class="file-upload-text"><strong>クリックしてファイルを選択</strong><br>または、ここにドラッグ＆ドロップ<br><span style="font-size:12px">最大 ' + maxMb + 'MB</span></div>';
+        html += '<input type="file" id="fileInput_' + esc(q.id) + '" accept="' + esc(accept) + '"' + multiple + ' onchange="onFileSelected(\'' + esc(q.id) + '\', this.files)">';
+        html += '</div>';
+        html += '<div class="file-preview-list" id="filePreview_' + esc(q.id) + '"></div>';
+        html += '<div class="file-upload-status" id="fileStatus_' + esc(q.id) + '"></div>';
+        html += '<input type="hidden" id="q_' + esc(q.id) + '" value="">'; // アップロード済みblobNames（JSON配列）
+        if (q.required) html += '<div class="field-error-msg">ファイルをアップロードしてください</div>';
       }
       html += '</div>';
       if (i === survey.questions.length - 2) html += '<hr class="divider">';
@@ -287,6 +316,7 @@ input[type="number"]::-webkit-inner-spin-button,
 
     bindStarEvents();
     bindImageChoiceEvents();
+    bindFileDropEvents();
 
     // ── 設問分岐ロジック ────────────────────────────────
     function evaluateBranching() {
@@ -363,6 +393,9 @@ input[type="number"]::-webkit-inner-spin-button,
         } else if (q.type === 'checkbox') {
           var checked = document.querySelectorAll('input[name="q_' + q.id + '"]:checked');
           if (!checked.length) isEmpty = true;
+        } else if (q.type === 'file') {
+          var hidden = document.getElementById('q_' + q.id);
+          try { if (!hidden || !JSON.parse(hidden.value || '[]').length) isEmpty = true; } catch(e) { isEmpty = true; }
         }
         if (isEmpty && section) { section.classList.add('field-error'); hasError = true; }
       });
@@ -393,13 +426,16 @@ input[type="number"]::-webkit-inner-spin-button,
         } else if (q.type === 'checkbox') {
           var checkedBoxes = document.querySelectorAll('input[name="q_' + q.id + '"]:checked');
           answers[q.id] = Array.from(checkedBoxes).map(function(c) { return c.value; }).join(', ');
+        } else if (q.type === 'file') {
+          var hidden = document.getElementById('q_' + q.id);
+          try { answers[q.id] = JSON.parse(hidden.value || '[]').join(', ') || '（未アップロード）'; } catch(e) { answers[q.id] = '（未アップロード）'; }
         }
       });
       try {
         var res = await fetch(BASE_URL + '/api/response', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ surveyId: SURVEY_ID, tenant: TENANT, answers: answers })
+          body: JSON.stringify({ surveyId: SURVEY_ID, tenant: TENANT, answers: answers, responseId: surveyResponseId || undefined })
         });
         if (res.ok) {
           document.getElementById('formArea').style.display = 'none';
@@ -479,6 +515,110 @@ input[type="number"]::-webkit-inner-spin-button,
     var el = document.getElementById('starLabel_' + qId);
     if (el) el.textContent = val + '点' + (label ? '（' + label + '）' : '');
   }
+
+  // ============================================================
+  // ファイルアップロード処理
+  // ============================================================
+  var fileUploadMap = {}; // qId -> [{ blobName, fileName }]
+  var uploadingCount = 0;
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+  }
+
+  function renderFilePreview(qId) {
+    var files = fileUploadMap[qId] || [];
+    var container = document.getElementById('filePreview_' + qId);
+    if (!container) return;
+    if (!files.length) { container.innerHTML = ''; return; }
+    container.innerHTML = files.map(function(f, i) {
+      return '<div class="file-preview-item">' +
+        '<span style="font-size:18px">📄</span>' +
+        '<span class="file-name">' + esc(f.fileName) + '</span>' +
+        '<span class="file-size">' + (f.size ? formatFileSize(f.size) : '') + '</span>' +
+        '<button class="file-remove" onclick="removeFile(\'' + esc(qId) + '\',' + i + ')" title="削除">✕</button>' +
+        '</div>';
+    }).join('');
+    // hiddenフィールド更新
+    var hidden = document.getElementById('q_' + qId);
+    if (hidden) hidden.value = JSON.stringify(files.map(function(f) { return f.blobName; }));
+  }
+
+  function removeFile(qId, idx) {
+    if (fileUploadMap[qId]) fileUploadMap[qId].splice(idx, 1);
+    renderFilePreview(qId);
+  }
+
+  async function onFileSelected(qId, fileList) {
+    if (!fileList || !fileList.length) return;
+    var surveyEl = document.getElementById('q_' + qId);
+    var statusEl = document.getElementById('fileStatus_' + qId);
+    var question = null;
+    // questionsはclosure外なのでdata属性から取得
+    var fileArea = document.getElementById('fileArea_' + qId);
+    var maxMb = parseFloat(fileArea ? fileArea.dataset.maxmb || '10' : '10');
+
+    if (!fileUploadMap[qId]) fileUploadMap[qId] = [];
+
+    for (var i = 0; i < fileList.length; i++) {
+      var file = fileList[i];
+      if (file.size > maxMb * 1024 * 1024) {
+        if (statusEl) { statusEl.textContent = '❌ ' + file.name + ' はサイズ上限（' + maxMb + 'MB）を超えています'; statusEl.className = 'file-upload-status error'; }
+        continue;
+      }
+      // 仮のresponseIdを生成（送信前なので）
+      var tempResponseId = surveyResponseId || (surveyResponseId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+      try {
+        uploadingCount++;
+        if (statusEl) { statusEl.textContent = 'アップロード中...'; statusEl.className = 'file-upload-status uploading'; }
+        var sasRes = await fetch(BASE_URL + '/api/fileupload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenant: TENANT, surveyId: SURVEY_ID, responseId: tempResponseId, fileName: file.name, contentType: file.type || 'application/octet-stream' })
+        });
+        if (!sasRes.ok) throw new Error('SAS URL取得失敗');
+        var sasData = await sasRes.json();
+        // Blob Storageへ直接PUT
+        var putRes = await fetch(sasData.uploadUrl, {
+          method: 'PUT',
+          headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' },
+          body: file
+        });
+        if (!putRes.ok) throw new Error('アップロード失敗 (' + putRes.status + ')');
+        fileUploadMap[qId].push({ blobName: sasData.blobName, fileName: file.name, size: file.size });
+        renderFilePreview(qId);
+        uploadingCount--;
+        if (statusEl) {
+          statusEl.textContent = uploadingCount > 0 ? 'アップロード中...' : '✅ アップロード完了';
+          statusEl.className = 'file-upload-status ' + (uploadingCount > 0 ? 'uploading' : 'done');
+        }
+      } catch (e) {
+        uploadingCount = Math.max(0, uploadingCount - 1);
+        if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.className = 'file-upload-status error'; }
+      }
+    }
+    // input をリセットして同じファイルを再選択できるように
+    var input = document.getElementById('fileInput_' + qId);
+    if (input) input.value = '';
+  }
+
+  // ドラッグ&ドロップ対応（buildForm後にbindFileDropEvents()を呼ぶ）
+  function bindFileDropEvents() {
+    document.querySelectorAll('.file-upload-area').forEach(function(area) {
+      area.addEventListener('dragover', function(e) { e.preventDefault(); area.classList.add('dragover'); });
+      area.addEventListener('dragleave', function() { area.classList.remove('dragover'); });
+      area.addEventListener('drop', function(e) {
+        e.preventDefault();
+        area.classList.remove('dragover');
+        var qId = area.id.replace('fileArea_', '');
+        onFileSelected(qId, e.dataTransfer.files);
+      });
+    });
+  }
+
+  var surveyResponseId = null; // ファイルアップロード用の共通responseId
 
   // 星評価のイベントリスナー登録（buildForm後に呼ぶ）
   function bindStarEvents() {

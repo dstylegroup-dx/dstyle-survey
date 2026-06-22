@@ -4,7 +4,7 @@
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net https://login.microsoftonline.com https://graph.microsoft.com; frame-ancestors 'self' https://herbelle.jp;"
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net https://login.microsoftonline.com https://graph.microsoft.com https://stdstylesurveyfiles.blob.core.windows.net; frame-ancestors 'self' https://herbelle.jp;"
   },
   "routes": [
     {
