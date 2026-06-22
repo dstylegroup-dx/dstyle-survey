@@ -502,6 +502,7 @@
                 <option value="email">📧 メールアドレス</option>
                 <option value="date">📅 日付選択</option>
                 <option value="image_choice">🖼️ 画像選択</option>
+                <option value="file">📎 ファイルアップロード</option>
               </select>
               <button class="btn btn-primary" onclick="openAddQuestion()">＋ 追加</button>
             </div>
@@ -900,6 +901,7 @@
           <option value="tel">📞 電話番号</option>
           <option value="email">📧 メールアドレス</option>
           <option value="date">📅 日付選択</option>
+          <option value="file">📎 ファイルアップロード</option>
         </select>
       </div>
       <div class="form-group" id="placeholderGroup"><label>記入例（任意）</label><input type="text" id="qPlaceholder" placeholder="例）山田 花子"></div>
@@ -934,6 +936,34 @@
         <p style="font-size:12px;color:#888;margin-bottom:8px">各選択肢に画像とラベルを設定します。PNG・JPG（500KB以内）</p>
         <div id="imageChoiceList"></div>
         <button class="add-option-btn" onclick="addImageChoiceRow()">＋ 画像選択肢を追加</button>
+      </div>
+      <div class="form-group" id="fileGroup" style="display:none">
+        <label>ファイルアップロード設定</label>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+          <div style="display:flex;gap:12px;align-items:center">
+            <label style="font-size:13px;color:#555;width:80px">最大サイズ</label>
+            <select id="qFileMaxMb" style="-webkit-appearance:auto;appearance:auto;padding:6px;border:1.5px solid #ddd;border-radius:6px;font-size:13px">
+              <option value="5">5MB</option>
+              <option value="10" selected>10MB</option>
+              <option value="20">20MB</option>
+              <option value="50">50MB</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <label style="font-size:13px;color:#555;width:80px">ファイル種別</label>
+            <select id="qFileAccept" style="-webkit-appearance:auto;appearance:auto;padding:6px;border:1.5px solid #ddd;border-radius:6px;font-size:13px">
+              <option value="*/*">すべてのファイル</option>
+              <option value="image/*">画像のみ（JPG/PNG/GIF）</option>
+              <option value=".pdf">PDFのみ</option>
+              <option value="image/*,.pdf">画像・PDF</option>
+              <option value=".xlsx,.xls,.csv">Excel・CSV</option>
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="qFileMultiple" style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer">
+            複数ファイルのアップロードを許可
+          </label>
+        </div>
       </div>
       <div class="form-group" id="ratingGroup" style="display:none">
         <label>最大評価数</label>
@@ -1185,7 +1215,7 @@
     var list = document.getElementById('questionsList');
     var questions = currentSurvey.questions || [];
     if (questions.length === 0) { list.innerHTML = '<div class="empty">質問がありません。下の「＋ 追加」から追加してください。</div>'; return; }
-    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択' };
+    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択', file: '📎ファイル' };
     list.innerHTML = questions.map(function(q, i) {
       var opts = (q.options || []).map(function(o) { return '<span class="option-tag">' + o + '</span>'; }).join('');
       var branchBadge = q.showIf ? '<span style="font-size:11px;background:#f3e9f9;color:#6B3FA0;border:1px solid #d8b4f0;border-radius:4px;padding:1px 6px;margin-left:4px">🔀 分岐</span>' : '';
@@ -1271,6 +1301,12 @@
     } else {
       document.getElementById('qImgPreviewWrap').style.display = 'none';
     }
+    // ファイル設定復元
+    if (q.type === 'file') {
+      document.getElementById('qFileMaxMb').value = q.fileMaxMb || 10;
+      document.getElementById('qFileAccept').value = q.fileAccept || '*/*';
+      document.getElementById('qFileMultiple').checked = q.fileMultiple || false;
+    }
     // 画像選択肢復元
     if (q.type === 'image_choice') {
       document.getElementById('imageChoiceList').innerHTML = '';
@@ -1302,6 +1338,7 @@
     if (type === 'image_choice' && document.getElementById('imageChoiceList').children.length === 0) {
       addImageChoiceRow(); addImageChoiceRow();
     }
+    document.getElementById('fileGroup').style.display = type === 'file' ? '' : 'none';
   }
 
   function addOptionRow(value) {
@@ -1335,6 +1372,7 @@
     }
     if (currentQImageBase64) q.imageBase64 = currentQImageBase64;
     if (type === 'image_choice') q.imageChoices = getImageChoices();
+    if (type === 'file') { q.fileMaxMb = parseInt(document.getElementById('qFileMaxMb').value)||10; q.fileAccept = document.getElementById('qFileAccept').value; q.fileMultiple = document.getElementById('qFileMultiple').checked; }
     // 分岐設定を保存
     if (document.getElementById('qBranchEnabled').checked) {
       var branchQid = document.getElementById('qBranchSourceQ').value;
