@@ -2,47 +2,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 const { app } = require('@azure/functions');
 const { CosmosClient } = require('@azure/cosmos');
 const { EmailClient } = require('@azure/communication-email');
-const { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions, SASProtocol } = require('@azure/storage-blob');
 const crypto = require('crypto');
-
-// ----------------------------------------------------
-// 📁 Blob Storage ユーティリティ
-// ----------------------------------------------------
-function getBlobServiceClient() {
-    return BlobServiceClient.fromConnectionString(process.env.BLOB_CONNECTION_STRING);
-}
-
-function getStorageCredential() {
-    // 接続文字列からAccountNameとAccountKeyを取得
-    const connStr = process.env.BLOB_CONNECTION_STRING || '';
-    const nameMatch = connStr.match(/AccountName=([^;]+)/);
-    const keyMatch  = connStr.match(/AccountKey=([^;]+)/);
-    if (!nameMatch || !keyMatch) return null;
-    return {
-        accountName: nameMatch[1],
-        credential: new StorageSharedKeyCredential(nameMatch[1], keyMatch[1])
-    };
-}
-
-function generateSasUrl(blobName, permissions, expiryMinutes = 60) {
-    const cred = getStorageCredential();
-    if (!cred) throw new Error('Blob Storage 認証情報が取得できません');
-    const containerName = process.env.BLOB_CONTAINER_NAME || 'survey-files';
-    const startsOn = new Date();
-    const expiresOn = new Date(Date.now() + expiryMinutes * 60 * 1000);
-    const sasParams = generateBlobSASQueryParameters(
-        {
-            containerName,
-            blobName,
-            permissions: BlobSASPermissions.parse(permissions),
-            startsOn,
-            expiresOn,
-            protocol: SASProtocol.Https
-        },
-        cred.credential
-    );
-    return `https://${cred.accountName}.blob.core.windows.net/${containerName}/${blobName}?${sasParams.toString()}`;
-}
 
 
 // ----------------------------------------------------
@@ -355,7 +315,7 @@ app.http('response', {
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { surveyId, tenant, answers, responseId } = body;
+                const { surveyId, tenant, answers } = body;
                 if (!surveyId || !tenant || !answers) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
 
                 // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
@@ -399,7 +359,7 @@ app.http('response', {
 
                 // 回答を保存（2回目以降も保存する）
                 await container.items.create({
-                    id: responseId || crypto.randomUUID(),
+                    id: crypto.randomUUID(),
                     docType: 'survey_response',
                     surveyId, tenant, answers,
                     emailAddress: emailAnswer ? emailAnswer.trim().toLowerCase() : null,
@@ -1493,147 +1453,6 @@ app.http('msalauth', {
                 createdAt: new Date().toISOString()
             }).catch(() => {});
             return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
-        } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
-        }
-    }
-});
-// ----------------------------------------------------
-// 📁 【ファイルアップロード】回答者向け SAS URL 発行
-// POST /api/fileupload
-// Body: { tenant, surveyId, responseId, fileName, contentType }
-// Returns: { uploadUrl, blobName }
-// ----------------------------------------------------
-app.http('fileupload', {
-    methods: ['POST'],
-    authLevel: 'anonymous',
-    handler: async (request, context) => {
-        try {
-            const body = await request.json().catch(() => ({}));
-            const { tenant, surveyId, responseId, fileName, contentType } = body;
-            if (!tenant || !surveyId || !responseId || !fileName) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
-            }
-            // ファイル名をサニタイズ
-            const safeName = fileName.replace(/[^a-zA-Z0-9.\-_\u3040-\u9FFF\uFF00-\uFFEF]/g, '_');
-            const blobName = `${tenant}/${surveyId}/${responseId}/${Date.now()}_${safeName}`;
-            const uploadUrl = generateSasUrl(blobName, 'cw', 30); // create + write, 30分
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { uploadUrl, blobName } };
-        } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
-        }
-    }
-});
-
-// ----------------------------------------------------
-// 📁 【スタッフアップロード】管理者向け SAS URL 発行
-// POST /api/staffupload
-// Body: { tenant, surveyId, responseId, fileName }
-// Returns: { uploadUrl, blobName }
-// ----------------------------------------------------
-app.http('staffupload', {
-    methods: ['POST'],
-    authLevel: 'anonymous',
-    handler: async (request, context) => {
-        try {
-            const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
-            const body = await request.json().catch(() => ({}));
-            const { tenant, surveyId, responseId, fileName } = body;
-            if (!tenant || !surveyId || !responseId || !fileName) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
-            }
-            const safeName = fileName.replace(/[^a-zA-Z0-9.\-_\u3040-\u9FFF\uFF00-\uFFEF]/g, '_');
-            const blobName = `${tenant}/${surveyId}/${responseId}/staff_${Date.now()}_${safeName}`;
-            const uploadUrl = generateSasUrl(blobName, 'cw', 30);
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { uploadUrl, blobName } };
-        } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
-        }
-    }
-});
-
-// ----------------------------------------------------
-// 📁 【ファイルダウンロード】SAS URL 発行
-// GET /api/filedownload?blobName=xxx&tenant=xxx
-// Returns: { downloadUrl }
-// ----------------------------------------------------
-app.http('filedownload', {
-    methods: ['GET'],
-    authLevel: 'anonymous',
-    handler: async (request, context) => {
-        try {
-            const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
-            const url = new URL(request.url);
-            const blobName = url.searchParams.get('blobName');
-            if (!blobName) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'blobName は必須です' } };
-            const downloadUrl = generateSasUrl(blobName, 'r', 60); // read, 60分
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { downloadUrl } };
-        } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
-        }
-    }
-});
-
-// ----------------------------------------------------
-// 📁 【ファイル一覧】回答IDに紐づくファイル一覧
-// GET /api/filelist?tenant=xxx&surveyId=xxx&responseId=xxx
-// Returns: [{ blobName, fileName, size, lastModified }]
-// ----------------------------------------------------
-app.http('filelist', {
-    methods: ['GET'],
-    authLevel: 'anonymous',
-    handler: async (request, context) => {
-        try {
-            const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
-            const url = new URL(request.url);
-            const tenant = url.searchParams.get('tenant');
-            const surveyId = url.searchParams.get('surveyId');
-            const responseId = url.searchParams.get('responseId');
-            if (!tenant || !surveyId || !responseId) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant, surveyId, responseId は必須です' } };
-            }
-            const prefix = `${tenant}/${surveyId}/${responseId}/`;
-            const blobServiceClient = getBlobServiceClient();
-            const containerClient = blobServiceClient.getContainerClient(process.env.BLOB_CONTAINER_NAME || 'survey-files');
-            const files = [];
-            for await (const blob of containerClient.listBlobsFlat({ prefix })) {
-                const fileName = blob.name.split('/').pop().replace(/^\d+_/, '').replace(/^staff_\d+_/, '');
-                files.push({
-                    blobName: blob.name,
-                    fileName,
-                    size: blob.properties.contentLength,
-                    lastModified: blob.properties.lastModified,
-                    isStaffUpload: blob.name.includes('/staff_')
-                });
-            }
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: files };
-        } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
-        }
-    }
-});
-
-// ----------------------------------------------------
-// 📁 【ファイル削除】管理者向け
-// DELETE /api/filedelete?blobName=xxx
-// ----------------------------------------------------
-app.http('filedelete', {
-    methods: ['DELETE'],
-    authLevel: 'anonymous',
-    handler: async (request, context) => {
-        try {
-            const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
-            const url = new URL(request.url);
-            const blobName = url.searchParams.get('blobName');
-            if (!blobName) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'blobName は必須です' } };
-            const blobServiceClient = getBlobServiceClient();
-            const containerClient = blobServiceClient.getContainerClient(process.env.BLOB_CONTAINER_NAME || 'survey-files');
-            await containerClient.deleteBlob(blobName);
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
         } catch (e) {
             return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
         }

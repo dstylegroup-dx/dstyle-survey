@@ -4,14 +4,12 @@
   "description": "",
   "main": "src/functions/index.js",
   "scripts": {
-    "start": "func start",
-    "build": "echo 'no build step'"
+    "start": "func start"
   },
   "dependencies": {
     "@azure/communication-email": "^1.1.0",
     "@azure/cosmos": "^4.2.0",
     "@azure/functions": "^4.0.0",
-    "@azure/storage-blob": "^12.32.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"
   }
