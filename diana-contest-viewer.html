@@ -478,9 +478,34 @@ async function checkAccessAndShow() {
 async function getAdminToken() {
   const saved = sessionStorage.getItem('adminToken');
   if (saved) { adminToken = saved; return; }
-  // TODO: MSALトークン検証による専用エンドポイントに移行
-  // 現在はダッシュボードと同じパスワード認証を共用
-  // 本番運用前に /api/contest-token エンドポイントを実装してください
+  try {
+    // MSALのIDトークンとアクセストークンを取得
+    const tokenRes = await msalInstance.acquireTokenSilent({
+      scopes: ['User.Read', 'GroupMember.Read.All'],
+      account: currentAccount
+    });
+    // /api/msalauth でサーバー側トークンを発行
+    const res = await fetch(BASE_URL + '/api/msalauth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idToken: tokenRes.idToken,
+        accessToken: tokenRes.accessToken,
+        tenant: TENANT
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      adminToken = data.token;
+      sessionStorage.setItem('adminToken', adminToken);
+    } else {
+      const err = await res.json();
+      throw new Error(err.error || 'トークン取得失敗');
+    }
+  } catch (e) {
+    console.error('管理トークン取得エラー:', e.message);
+    throw e;
+  }
 }
 
 // ============================================================
