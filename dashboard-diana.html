@@ -262,6 +262,7 @@
       <div class="topbar-select-wrap"><select id="surveySelect" onchange="onSurveyChange()">
         <option value="">アンケートを選択...</option>
       </select></div>
+      <a href="/diana-contest-viewer.html" target="_blank" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:bold;text-decoration:none;white-space:nowrap;">🏆 コンテスト閲覧</a>
       <button class="logout" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
@@ -1293,12 +1294,14 @@
       var date = new Date(s.createdAt).toLocaleDateString('ja-JP');
       var qCount = (s.questions || []).length;
       var isActive = s.active !== false;
-      return '<div class="survey-item' + (isActive ? '' : ' inactive') + '">' +
+      var contestBadge = s.isContest ? '<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:4px;">🏆 コンテスト</span>' : '';
+      var contestLink = s.isContest ? '<a href="/diana-contest-viewer.html" target="_blank" class="btn btn-sm" style="background:#7B4F6E;color:white;text-decoration:none;display:inline-flex;align-items:center;">🏆 コンテスト閲覧</a>' : '';
+      return '<div class="survey-item' + (isActive ? '' : ' inactive') + (s.isContest ? '" style="border-color:#ffc107' : '') + '">' +
         '<div class="survey-item-info">' +
         '<div class="survey-item-title">' + s.title +
-        '<span class="' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? '公開中' : '非公開') + '</span></div>' +
+        '<span class="' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? '公開中' : '非公開') + '</span>' + contestBadge + '</div>' +
         '<div class="survey-item-meta">作成日：' + date + '　質問数：' + qCount + '件　回答数：<span id="cnt_' + s.id + '" style="color:#7B4F6E;font-weight:bold">...</span>件</div>' +
-        '</div><div class="survey-item-actions">' +
+        '</div><div class="survey-item-actions">' + contestLink +
         '<button class="btn btn-sm" style="' + (isActive ? 'background:#f39c12;color:white' : 'background:#27ae60;color:white') + ';min-width:76px" onclick="toggleActive(\'' + s.id + '\')">' + (isActive ? '⏸ 非公開' : '▶ 公開') + '</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="duplicateSurvey(\'' + s.id + '\')">📋 複製</button>' +
         '<button class="btn btn-primary btn-sm" onclick="selectSurveyFromList(\'' + s.id + '\')">編集・確認</button>' +
