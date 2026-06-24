@@ -326,6 +326,14 @@
             <div class="form-group"><label>アンケートタイトル</label><input type="text" id="surveyTitle" placeholder="例）無料体験アンケート"></div>
             <div class="form-group"><label>説明文（任意）</label><textarea id="surveyDescription" placeholder="例）本日はお越しいただきありがとうございました。率直なご感想をお聞かせください（約2分）"></textarea></div>
             <div class="form-group"><label>回答完了メッセージ（任意）</label><textarea id="surveyThanksMessage" placeholder="例）本日はご来店いただきありがとうございました。またのご来店をお待ちしております。"></textarea></div>
+            <div class="form-group">
+              <label>コンテスト設定</label>
+              <label style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid #ddd;border-radius:8px;background:#fafafa;cursor:pointer;font-weight:normal;">
+                <input type="checkbox" id="isContest" style="width:18px;height:18px;accent-color:#7B4F6E;cursor:pointer;">
+                <span style="font-size:14px;">🏆 コンテスト対象アンケートとして登録する</span>
+              </label>
+              <p style="font-size:12px;color:#888;margin-top:6px;">チェックをつけると Diana コンテスト閲覧ページの選択肢に表示されます。</p>
+            </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
               <div class="status-msg" id="infoStatus"></div>
@@ -1006,6 +1014,7 @@
     document.getElementById('surveyTitle').value = currentSurvey.title || '';
     document.getElementById('surveyDescription').value = currentSurvey.description || '';
     document.getElementById('surveyThanksMessage').value = currentSurvey.thanksMessage || '';
+    document.getElementById('isContest').checked = currentSurvey.isContest === true;
     renderQuestions();
     updateSurveyUrl();
     document.getElementById('qrArea').style.display = 'none';
@@ -1044,8 +1053,9 @@
     if (!title) { alert('タイトルを入力してください'); return; }
     try {
       var thanksMessage = document.getElementById('surveyThanksMessage').value.trim();
-      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage }) });
-      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
+      var isContest = document.getElementById('isContest').checked;
+      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest }) });
+      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
       else { showStatus('infoStatus', '❌ 保存失敗', 'error'); }
     } catch (e) { showStatus('infoStatus', '❌ エラー: ' + e.message, 'error'); }
   }

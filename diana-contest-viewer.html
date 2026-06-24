@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diana コンテスト 閲覧ページ</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f7f3f6; color: #333; min-height: 100vh; }
+
+    /* ローディング */
+    #loadingScreen {
+      position: fixed; inset: 0; background: #f7f3f6;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      z-index: 9999;
+    }
+    .loading-logo { font-size: 52px; }
+    .loading-text { color: #7B4F6E; font-size: 15px; font-weight: bold; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #e8d6e3; border-top-color: #7B4F6E; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ログイン */
+    #loginScreen { display: none; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+    #loginScreen.show { display: flex; }
+    .login-box { background: white; border-radius: 16px; padding: 48px 40px; width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(123,79,110,0.12); text-align: center; }
+    .login-logo { font-size: 56px; margin-bottom: 12px; }
+    .login-box h1 { font-size: 22px; color: #7B4F6E; margin-bottom: 6px; }
+    .login-box p { font-size: 13px; color: #888; margin-bottom: 32px; line-height: 1.6; }
+    .btn-ms {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; padding: 14px 20px; background: #0078d4; color: white;
+      border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer;
+    }
+    .btn-ms:hover { background: #006abd; }
+    .login-error { background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b; border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-top: 16px; display: none; }
+    .login-note { font-size: 12px; color: #aaa; margin-top: 20px; }
+
+    /* メイン */
+    #mainScreen { display: none; }
+    #mainScreen.show { display: block; }
+
+    .topbar {
+      background: #7B4F6E; color: white; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar h1 { font-size: 16px; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .user-badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+    .btn-logout { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .btn-logout:hover { background: rgba(255,255,255,0.25); }
+
+    .main { padding: 24px; max-width: 1300px; margin: 0 auto; }
+
+    /* コンテスト選択バー */
+    .contest-bar {
+      background: white; border-radius: 10px; padding: 16px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .contest-bar label { font-size: 13px; font-weight: bold; color: #555; white-space: nowrap; }
+    .select-wrap { position: relative; flex: 1; min-width: 240px; max-width: 400px; }
+    .select-wrap::after { content: "▼"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #7B4F6E; font-size: 10px; pointer-events: none; }
+    .contest-select {
+      width: 100%; padding: 10px 32px 10px 14px; border: 1.5px solid #ddd;
+      border-radius: 8px; font-size: 14px; background: #fafafa;
+      -webkit-appearance: none; appearance: none;
+    }
+    .contest-select:focus { border-color: #7B4F6E; outline: none; }
+    .contest-badge {
+      background: #f5eaf2; color: #7B4F6E; border: 1px solid #e0c8d8;
+      border-radius: 20px; padding: 4px 14px; font-size: 13px; font-weight: bold;
+      white-space: nowrap;
+    }
+
+    /* サマリー */
+    .summary-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+    .summary-card { background: white; border-radius: 10px; padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex: 1; min-width: 140px; }
+    .summary-card .lbl { font-size: 11px; color: #888; margin-bottom: 4px; }
+    .summary-card .val { font-size: 26px; font-weight: bold; color: #7B4F6E; }
+    .summary-card .sub { font-size: 11px; color: #aaa; }
+
+    /* ツールバー */
+    .toolbar {
+      background: white; border-radius: 10px; padding: 14px 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .search-input { padding: 8px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; width: 200px; }
+    .search-input:focus { border-color: #7B4F6E; outline: none; }
+    .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .btn-primary { background: #7B4F6E; color: white; }
+    .btn-primary:hover { background: #68435d; }
+    .btn-success { background: #27ae60; color: white; }
+    .btn-success:hover { background: #219a52; }
+    .btn-secondary { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+    .btn-secondary:hover { background: #eee; }
+    .ml-auto { margin-left: auto; }
+    .db-status { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .db-status.connected { background: #e8f5e9; color: #2e7d32; }
+    .db-status.disconnected { background: #fff3e0; color: #e65100; }
+    .db-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .db-status.connected .db-dot { background: #4caf50; }
+    .db-status.disconnected .db-dot { background: #ff9800; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+    /* 応募者グリッド */
+    .applicant-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .applicant-card {
+      background: white; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border: 2px solid transparent;
+      cursor: pointer; transition: all 0.2s;
+      overflow: hidden;
+    }
+    .applicant-card:hover { border-color: #7B4F6E; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(123,79,110,0.15); }
+    .card-header { background: linear-gradient(135deg, #7B4F6E, #a06090); color: white; padding: 14px 16px; }
+    .card-num { font-size: 11px; opacity: 0.8; margin-bottom: 2px; }
+    .card-name { font-size: 17px; font-weight: bold; }
+    .card-kana { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+    .card-body { padding: 14px 16px; }
+    .card-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #f5f0f3; font-size: 13px; }
+    .card-row:last-child { border-bottom: none; }
+    .card-row .key { color: #888; font-size: 12px; }
+    .card-row .val { font-weight: bold; color: #333; font-family: monospace; }
+    .card-footer { background: #fdf8fb; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .card-date { font-size: 11px; color: #aaa; }
+    .card-arrow { color: #7B4F6E; font-size: 18px; }
+    .has-measure { border-left: 4px solid #27ae60; }
+    .measure-chip { background: #e8f5e9; color: #2e7d32; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: bold; }
+    .no-measure-chip { background: #fff3e0; color: #e65100; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
+
+    /* 画像サムネイル */
+    .img-thumb-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .img-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; }
+
+    /* 空状態 */
+    .empty-state { text-align: center; padding: 60px 20px; color: #aaa; background: white; border-radius: 12px; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* エラーバナー */
+    .error-banner { background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b; border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+    /* ページネーション */
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 20px 0; }
+    .page-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 13px; color: #666; }
+    .page-btn:hover:not(:disabled) { border-color: #7B4F6E; color: #7B4F6E; }
+    .page-btn.active { background: #7B4F6E; color: white; border-color: #7B4F6E; }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .page-info { font-size: 13px; color: #888; }
+
+    /* ==============================
+       詳細モーダル
+    ============================== */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 1000;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white; border-radius: 16px;
+      width: 100%; max-width: 720px; max-height: 90vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    /* モーダルヘッダー */
+    .modal-header {
+      background: linear-gradient(135deg, #7B4F6E, #a06090);
+      color: white; padding: 16px 20px; border-radius: 16px 16px 0 0;
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    }
+    .modal-nav { display: flex; gap: 6px; }
+    .modal-nav-btn {
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+      color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 14px;
+    }
+    .modal-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.35); }
+    .modal-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .modal-title-wrap { flex: 1; }
+    .modal-subtitle { font-size: 11px; opacity: 0.8; }
+    .modal-name { font-size: 20px; font-weight: bold; }
+    .modal-kana { font-size: 13px; opacity: 0.85; }
+    .modal-close { background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 4px; flex-shrink: 0; }
+    .modal-close:hover { background: rgba(255,255,255,0.2); }
+
+    /* モーダルボディ */
+    .modal-body { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+    .detail-section { border: 1.5px solid #f0e8ed; border-radius: 10px; overflow: hidden; }
+    .detail-section-header {
+      background: #fdf8fb; padding: 10px 16px;
+      font-size: 12px; font-weight: bold; color: #7B4F6E;
+      letter-spacing: 0.5px; border-bottom: 1px solid #f0e8ed;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .detail-section-body { padding: 16px; }
+
+    .answer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+    .answer-item { display: flex; flex-direction: column; gap: 3px; }
+    .answer-lbl { font-size: 11px; color: #888; font-weight: bold; }
+    .answer-val { font-size: 14px; color: #333; word-break: break-word; }
+
+    /* 採寸グリッド */
+    .measure-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .measure-block { background: #f0f9f5; border: 1px solid #c8e6da; border-radius: 8px; padding: 10px 12px; }
+    .m-lbl { font-size: 11px; color: #666; margin-bottom: 2px; }
+    .m-val { font-size: 18px; font-weight: bold; color: #2e7d32; }
+    .m-unit { font-size: 11px; color: #888; }
+    .size-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+    .size-block { background: #f5eaf2; border: 1px solid #e0c8d8; border-radius: 8px; padding: 10px 12px; text-align: center; }
+    .size-lbl { font-size: 11px; color: #7B4F6E; margin-bottom: 4px; }
+    .size-val { font-size: 20px; font-weight: bold; color: #7B4F6E; }
+
+    /* 理想値 */
+    .ideal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .ideal-block { background: #f0f4ff; border: 1px solid #c5d0f0; border-radius: 8px; padding: 10px 12px; }
+    .ideal-lbl { font-size: 11px; color: #3a5096; margin-bottom: 2px; }
+    .ideal-val { font-size: 18px; font-weight: bold; color: #3a5096; }
+    .coming-soon { color: #aaa; font-size: 13px; font-style: italic; padding: 16px; text-align: center; }
+
+    /* 画像ギャラリー */
+    .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .img-gallery-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; aspect-ratio: 3/4; }
+    .img-gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+    .img-gallery-item:hover img { transform: scale(1.05); }
+    .no-image { color: #aaa; font-size: 13px; padding: 16px; text-align: center; }
+
+    /* 画像ライトボックス */
+    .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; align-items: center; justify-content: center; }
+    .lightbox.show { display: flex; }
+    .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 8px; }
+    .lightbox-close { position: absolute; top: 16px; right: 20px; color: white; font-size: 32px; cursor: pointer; background: none; border: none; }
+
+    /* 未選択状態 */
+    .no-contest { text-align: center; padding: 80px 20px; color: #aaa; }
+    .no-contest-icon { font-size: 56px; margin-bottom: 16px; }
+    .no-contest p { font-size: 15px; }
+
+    @media (max-width: 600px) {
+      .topbar h1 { font-size: 14px; }
+      .modal { max-height: 95vh; border-radius: 12px; }
+      .measure-grid { grid-template-columns: repeat(2, 1fr); }
+      .answer-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ローディング -->
+<div id="loadingScreen">
+  <div class="loading-logo">🏆</div>
+  <div class="spinner"></div>
+  <div class="loading-text">認証を確認しています...</div>
+</div>
+
+<!-- ログイン -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">🏆</div>
+    <h1>Diana コンテスト 閲覧</h1>
+    <p>Microsoftアカウントでログインしてください。<br>アクセスには所定のグループ権限が必要です。</p>
+    <button class="btn-ms" onclick="doLogin()">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/><rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/></svg>
+      Microsoftアカウントでログイン
+    </button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-note">ディライトテクノロジーズ事業部・Diana グループのメンバーのみ閲覧できます</div>
+  </div>
+</div>
+
+<!-- メイン -->
+<div id="mainScreen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span>🏆</span>
+      <h1>Diana コンテスト 閲覧ページ</h1>
+    </div>
+    <div class="topbar-right">
+      <span class="user-badge" id="userBadge">ログイン中</span>
+      <button class="btn-logout" onclick="doLogout()">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="error-banner" id="errorBanner"></div>
+
+    <!-- コンテスト選択 -->
+    <div class="contest-bar">
+      <label>🏆 コンテスト選択：</label>
+      <div class="select-wrap">
+        <select class="contest-select" id="contestSelect" onchange="onContestChange()">
+          <option value="">読み込み中...</option>
+        </select>
+      </div>
+      <span class="contest-badge" id="contestBadge" style="display:none"></span>
+      <div class="ml-auto" style="display:flex;gap:8px;">
+        <button class="btn btn-success" onclick="downloadCSV()" id="csvBtn" style="display:none">📥 CSV出力</button>
+        <button class="btn btn-primary" onclick="loadResponses()" id="refreshBtn" style="display:none">🔄 更新</button>
+      </div>
+    </div>
+
+    <!-- 未選択 -->
+    <div id="noContestMsg" class="no-contest">
+      <div class="no-contest-icon">🏆</div>
+      <p>上のドロップダウンからコンテストを選択してください</p>
+    </div>
+
+    <!-- データエリア -->
+    <div id="dataArea" style="display:none">
+      <!-- サマリー -->
+      <div class="summary-row">
+        <div class="summary-card">
+          <div class="lbl">総応募者数</div>
+          <div class="val" id="totalCount">0</div>
+          <div class="sub">名</div>
+        </div>
+        <div class="summary-card">
+          <div class="lbl">採寸データ取得済み</div>
+          <div class="val" id="matchedCount">0</div>
+          <div class="sub">名 / DB照合済み</div>
+        </div>
+        <div class="summary-card">
+          <div class="lbl">最終更新</div>
+          <div class="val" style="font-size:16px;" id="lastUpdated">-</div>
+          <div class="sub">自動取得</div>
+        </div>
+        <div class="summary-card" style="display:flex;align-items:center;">
+          <div id="dbStatus" class="db-status disconnected">
+            <div class="db-dot"></div>採寸DB 未接続
+          </div>
+        </div>
+      </div>
+
+      <!-- ツールバー -->
+      <div class="toolbar">
+        <span style="font-size:13px;font-weight:bold;color:#555;">🔍 絞り込み：</span>
+        <input type="text" class="search-input" id="searchInput" placeholder="氏名・コードで検索..." oninput="applyFilter()">
+        <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
+        <span id="filterCount" style="font-size:13px;color:#7B4F6E;font-weight:bold;"></span>
+      </div>
+
+      <!-- グリッド -->
+      <div class="applicant-grid" id="applicantGrid"></div>
+      <div class="pagination" id="pagination" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal-overlay" id="detailModal" onclick="onOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-nav">
+        <button class="modal-nav-btn" id="prevBtn" onclick="navigate(-1)">◀ 前</button>
+        <button class="modal-nav-btn" id="nextBtn" onclick="navigate(1)">次 ▶</button>
+      </div>
+      <div class="modal-title-wrap">
+        <div class="modal-subtitle" id="modalSubtitle">1 / 10</div>
+        <div class="modal-name" id="modalName">-</div>
+        <div class="modal-kana" id="modalKana"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ライトボックス -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<script>
+// ============================================================
+// 設定
+// ============================================================
+const MSAL_CONFIG = {
+  auth: {
+    clientId: '1f4f2ade-4eeb-4f65-8fbd-394378a63518',
+    authority: 'https://login.microsoftonline.com/2648ac1f-8786-40fb-80f8-14bd84511449',
+    redirectUri: window.location.origin + '/diana-contest-viewer.html'
+  },
+  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+};
+const ALLOWED_GROUPS = [
+  '560396ae-5774-4b3e-b451-9602d140f921', // 株式会社ダイアナ
+  '6e4af16e-cfe1-49a6-968e-05b8cef847d8'  // ディライトテクノロジーズ事業部
+];
+const TENANT = 'diana';
+const BASE_URL = location.hostname === 'localhost'
+  ? 'http://localhost:7071'
+  : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
+
+// ============================================================
+// 状態
+// ============================================================
+let msalInstance = null;
+let currentAccount = null;
+let adminToken = null;
+let allResponses = [];
+let filteredResponses = [];
+let currentPage = 1;
+const PAGE_SIZE = 24;
+let dbConnected = false;
+let currentDetailIndex = -1;
+let currentContest = null;
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// ============================================================
+// MSAL
+// ============================================================
+async function initMsal() {
+  try {
+    msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+    await msalInstance.initialize();
+    const result = await msalInstance.handleRedirectPromise();
+    if (result) currentAccount = result.account;
+    else {
+      const accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) currentAccount = accounts[0];
+    }
+    if (currentAccount) await checkAccessAndShow();
+    else showLogin();
+  } catch (e) { showLogin(); }
+}
+
+async function doLogin() {
+  try { await msalInstance.loginRedirect({ scopes: ['User.Read', 'GroupMember.Read.All'] }); }
+  catch (e) { showLoginError('ログインに失敗しました: ' + e.message); }
+}
+
+async function doLogout() {
+  sessionStorage.removeItem('adminToken');
+  await msalInstance.logoutRedirect({ account: currentAccount });
+}
+
+async function checkAccessAndShow() {
+  setLoadingText('グループ権限を確認しています...');
+  try {
+    const token = await msalInstance.acquireTokenSilent({ scopes: ['GroupMember.Read.All'], account: currentAccount });
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/memberOf?$select=id', { headers: { Authorization: 'Bearer ' + token.accessToken } });
+    const data = await res.json();
+    const userGroups = (data.value || []).map(g => g.id.toLowerCase());
+    const hasAccess = ALLOWED_GROUPS.some(g => userGroups.includes(g.toLowerCase()));
+    if (!hasAccess) { showLoginError('アクセス権限がありません。<br>ディライトテクノロジーズ事業部またはDianaグループのメンバーのみ閲覧できます。'); showLogin(); return; }
+    document.getElementById('userBadge').textContent = currentAccount.name || currentAccount.username;
+    hideLoading();
+    showMain();
+    await getAdminToken();
+    await loadContestList();
+  } catch (e) { showLoginError('権限の確認中にエラーが発生しました。再度ログインしてください。'); showLogin(); }
+}
+
+async function getAdminToken() {
+  const saved = sessionStorage.getItem('adminToken');
+  if (saved) { adminToken = saved; return; }
+  // TODO: MSALトークン検証による専用エンドポイントに移行
+  // 現在はダッシュボードと同じパスワード認証を共用
+  // 本番運用前に /api/contest-token エンドポイントを実装してください
+}
+
+// ============================================================
+// コンテスト一覧取得
+// ============================================================
+async function loadContestList() {
+  try {
+    const res = await fetch(BASE_URL + '/api/surveys?tenant=' + TENANT);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const surveys = await res.json();
+    const contests = surveys.filter(s => s.isContest === true);
+    const sel = document.getElementById('contestSelect');
+    if (contests.length === 0) {
+      sel.innerHTML = '<option value="">コンテスト対象アンケートがありません</option>';
+      return;
+    }
+    // 新しい順に並べる
+    contests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    sel.innerHTML = '<option value="">コンテストを選択してください...</option>' +
+      contests.map((s, i) => `<option value="${esc(s.id)}">${esc(s.title)}${s.active ? '' : ' （非公開）'}</option>`).join('');
+  } catch (e) { showError('コンテスト一覧の取得に失敗しました: ' + e.message); }
+}
+
+async function onContestChange() {
+  const sel = document.getElementById('contestSelect');
+  const surveyId = sel.value;
+  if (!surveyId) {
+    document.getElementById('noContestMsg').style.display = 'block';
+    document.getElementById('dataArea').style.display = 'none';
+    document.getElementById('contestBadge').style.display = 'none';
+    document.getElementById('csvBtn').style.display = 'none';
+    document.getElementById('refreshBtn').style.display = 'none';
+    currentContest = null;
+    return;
+  }
+  // 選択されたコンテスト情報
+  currentContest = { id: surveyId, title: sel.options[sel.selectedIndex].text };
+  const badge = document.getElementById('contestBadge');
+  badge.textContent = '🏆 ' + currentContest.title;
+  badge.style.display = 'inline-block';
+  document.getElementById('csvBtn').style.display = 'inline-block';
+  document.getElementById('refreshBtn').style.display = 'inline-block';
+  document.getElementById('noContestMsg').style.display = 'none';
+  document.getElementById('dataArea').style.display = 'block';
+  await loadResponses();
+}
+
+// ============================================================
+// 回答データ取得
+// ============================================================
+async function loadResponses() {
+  if (!currentContest) return;
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '⏳ 読込中...';
+  btn.disabled = true;
+  try {
+    const headers = adminToken ? { 'x-admin-token': adminToken } : {};
+    const res = await fetch(BASE_URL + '/api/response?surveyId=' + currentContest.id + '&tenant=' + TENANT, { headers });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    allResponses = (data || []).map(r => ({ ...r, measure: null }));
+
+    // PostgreSQL接続済みなら採寸データ付加
+    if (dbConnected) await enrichWithMeasure();
+
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('ja-JP');
+    updateSummary();
+    applyFilter();
+  } catch (e) { showError('データ取得に失敗しました: ' + e.message); }
+  btn.textContent = '🔄 更新';
+  btn.disabled = false;
+}
+
+// 採寸データ付加（PostgreSQL接続後に実装）
+async function enrichWithMeasure() {
+  for (const r of allResponses) {
+    const salonCode = getAnswerByKey(r, ['サロンコード']);
+    const dianaCode = getAnswerByKey(r, ['ダイアナコード', 'diana', 'Diana']);
+    const bday      = getAnswerByKey(r, ['生年月日', '生年', '誕生']);
+    if (!salonCode && !dianaCode) continue;
+    try {
+      const res = await fetch(BASE_URL + '/api/diana-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
+        body: JSON.stringify({ sldsslcd: salonCode, dia_cd: dianaCode, b_day: bday })
+      });
+      if (res.ok) r.measure = await res.json();
+    } catch (e) { /* silent */ }
+  }
+}
+
+// ============================================================
+// アンケート回答から値を取得するヘルパー
+// ============================================================
+function getAnswerByKey(r, keywords) {
+  const answers = r.answers || {};
+  for (const [k, v] of Object.entries(answers)) {
+    if (keywords.some(kw => k.includes(kw))) return typeof v === 'object' ? (v.value || '') : String(v);
+  }
+  return '';
+}
+
+function getAnswerEntries(r) {
+  const answers = r.answers || {};
+  return Object.entries(answers).map(([k, v]) => ({
+    key: k,
+    value: typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '')
+  }));
+}
+
+// 画像URLリストを取得
+function getImageUrls(r) {
+  const answers = r.answers || {};
+  const urls = [];
+  for (const [k, v] of Object.entries(answers)) {
+    if (typeof v === 'string' && (v.startsWith('https://stdstylesurveyfiles') || v.startsWith('https://') && (v.includes('.jpg') || v.includes('.png') || v.includes('.jpeg') || v.includes('.gif') || v.includes('.webp')))) {
+      urls.push({ label: k, url: v });
+    }
+    if (typeof v === 'object' && v !== null && v.url) urls.push({ label: k, url: v.url });
+    if (Array.isArray(v)) v.forEach(item => { if (item && item.url) urls.push({ label: k, url: item.url }); });
+  }
+  return urls;
+}
+
+// ============================================================
+// フィルター・表示
+// ============================================================
+function applyFilter() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  filteredResponses = allResponses.filter(r => {
+    if (!q) return true;
+    return JSON.stringify(r.answers).toLowerCase().includes(q);
+  });
+  currentPage = 1;
+  document.getElementById('filterCount').textContent = q ? filteredResponses.length + '件該当' : '';
+  renderGrid();
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  applyFilter();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('applicantGrid');
+  if (filteredResponses.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🔍</div><p>' + (allResponses.length === 0 ? '応募データがありません' : '検索結果がありません') + '</p></div>';
+    document.getElementById('pagination').style.display = 'none';
+    return;
+  }
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageData = filteredResponses.slice(start, start + PAGE_SIZE);
+  const globalStart = start; // グリッドインデックス → filteredResponses のインデックス
+
+  grid.innerHTML = pageData.map((r, localIdx) => {
+    const idx = globalStart + localIdx;
+    const name    = esc(getAnswerByKey(r, ['氏名', '名前', 'お名前']) || '（氏名なし）');
+    const kana    = esc(getAnswerByKey(r, ['カナ', 'かな', 'フリガナ']));
+    const salon   = esc(getAnswerByKey(r, ['サロンコード', 'サロン']));
+    const diana   = esc(getAnswerByKey(r, ['ダイアナコード', 'diana', 'Diana']));
+    const bday    = esc(getAnswerByKey(r, ['生年月日', '生年']));
+    const date    = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ja-JP') : '-';
+    const imgs    = getImageUrls(r);
+    const hasMeasure = r.measure && r.measure.diag_dt;
+
+    return `<div class="applicant-card ${hasMeasure ? 'has-measure' : ''}" onclick="showDetail(${idx})">
+      <div class="card-header">
+        <div class="card-num">No.${idx + 1}</div>
+        <div class="card-name">${name}</div>
+        ${kana ? '<div class="card-kana">' + kana + '</div>' : ''}
+      </div>
+      <div class="card-body">
+        <div class="card-row"><span class="key">サロンコード</span><span class="val">${salon || '-'}</span></div>
+        <div class="card-row"><span class="key">ダイアナコード</span><span class="val">${diana || '-'}</span></div>
+        <div class="card-row"><span class="key">生年月日</span><span class="val">${bday || '-'}</span></div>
+        ${hasMeasure ? `<div class="card-row"><span class="key">採寸日</span><span class="val">${esc(r.measure.diag_dt)}</span></div>` : ''}
+        ${imgs.length > 0 ? `<div class="img-thumb-row">${imgs.slice(0,3).map(img => `<img class="img-thumb" src="${esc(img.url)}" alt="${esc(img.label)}" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">`).join('')}${imgs.length > 3 ? `<span style="font-size:11px;color:#aaa;align-self:center;">+${imgs.length-3}</span>` : ''}</div>` : ''}
+      </div>
+      <div class="card-footer">
+        <span class="card-date">📅 ${date}</span>
+        <span>${hasMeasure ? '<span class="measure-chip">✅ 採寸済</span>' : '<span class="no-measure-chip">📋 ' + (dbConnected ? 'DB照合なし' : 'DB未接続') + '</span>'}</span>
+        <span class="card-arrow">›</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderPagination(filteredResponses.length);
+}
+
+function renderPagination(total) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const pag = document.getElementById('pagination');
+  if (totalPages <= 1) { pag.style.display = 'none'; return; }
+  pag.style.display = 'flex';
+  let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>＜</button>`;
+  for (let i = 1; i <= totalPages; i++) {
+    if (i===1||i===totalPages||Math.abs(i-currentPage)<=1) html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    else if (Math.abs(i-currentPage)===2) html += '<span class="page-info">…</span>';
+  }
+  html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>＞</button>`;
+  html += `<span class="page-info">${total}名中 ${(currentPage-1)*PAGE_SIZE+1}〜${Math.min(currentPage*PAGE_SIZE,total)}名</span>`;
+  pag.innerHTML = html;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filteredResponses.length / PAGE_SIZE);
+  if (p<1||p>totalPages) return;
+  currentPage = p;
+  renderGrid();
+  document.getElementById('dataArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// サマリー
+// ============================================================
+function updateSummary() {
+  document.getElementById('totalCount').textContent = allResponses.length;
+  document.getElementById('matchedCount').textContent = allResponses.filter(r => r.measure && r.measure.diag_dt).length;
+}
+
+// ============================================================
+// 詳細モーダル
+// ============================================================
+function showDetail(idx) {
+  currentDetailIndex = idx;
+  renderModal();
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function renderModal() {
+  const r = filteredResponses[currentDetailIndex];
+  if (!r) return;
+
+  const total = filteredResponses.length;
+  const name  = getAnswerByKey(r, ['氏名','名前','お名前']) || '（氏名なし）';
+  const kana  = getAnswerByKey(r, ['カナ','かな','フリガナ']);
+
+  document.getElementById('modalSubtitle').textContent = `${currentDetailIndex + 1} / ${total}`;
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('modalKana').textContent = kana;
+  document.getElementById('prevBtn').disabled = currentDetailIndex === 0;
+  document.getElementById('nextBtn').disabled = currentDetailIndex === total - 1;
+
+  const m = r.measure;
+  const imgs = getImageUrls(r);
+  const entries = getAnswerEntries(r);
+
+  // 回答内容
+  const answerHtml = entries.map(e =>
+    `<div class="answer-item"><div class="answer-lbl">${esc(e.key)}</div><div class="answer-val">${esc(e.value)}</div></div>`
+  ).join('');
+
+  // 採寸データ
+  const measureHtml = m && m.diag_dt ? `
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">📅 採寸日：${esc(m.diag_dt)}</div>
+    <div class="measure-grid">
+      ${mBlock('身長', m.calc_height, 'cm')}
+      ${mBlock('体重', m.weight, 'kg')}
+      ${mBlock('BMI', m.bmi, '')}
+      ${mBlock('PI', m.pi, '')}
+      ${mBlock('バスト（上）', m.top_bust, 'cm')}
+      ${mBlock('アンダーバスト', m.under_bust, 'cm')}
+      ${mBlock('ウエスト', m.waist, 'cm')}
+      ${mBlock('中ヒップ', m.mid_hip, 'cm')}
+      ${mBlock('ヒップ', m.hip, 'cm')}
+      ${mBlock('太もも（左）', m.left_thigh, 'cm')}
+      ${mBlock('太もも（右）', m.right_thigh, 'cm')}
+      ${mBlock('体脂肪率', m.fat_pctg, '%')}
+    </div>
+    <div class="size-grid" style="margin-top:14px;">
+      <div class="size-block"><div class="size-lbl">ブラサイズ</div><div class="size-val">${esc(m.bra_sz||'-')}</div></div>
+      <div class="size-block"><div class="size-lbl">コルセット</div><div class="size-val">${esc(m.corset_sz||'-')}</div></div>
+      <div class="size-block"><div class="size-lbl">ボディスーツ</div><div class="size-val">${esc(m.body_suit_sz||'-')}</div></div>
+    </div>
+  ` : `<div style="text-align:center;padding:20px;color:#aaa;">${dbConnected ? '照合データなし（コード不一致の可能性）' : '採寸DBが未接続です。PostgreSQL接続設定後に自動取得されます。'}</div>`;
+
+  // 理想値
+  const idealHtml = `<div class="coming-soon">理想値カラムは今後追加予定です</div>`;
+
+  // 画像ギャラリー
+  const galleryHtml = imgs.length > 0
+    ? `<div class="img-gallery">${imgs.map(img => `<div class="img-gallery-item" onclick="openLightbox('${esc(img.url)}')"><img src="${esc(img.url)}" alt="${esc(img.label)}" loading="lazy"></div>`).join('')}</div>`
+    : `<div class="no-image">添付画像なし</div>`;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-header">📋 応募内容
+        <span style="font-weight:normal;font-size:11px;color:#aaa;margin-left:auto;">応募日時：${r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '-'}</span>
+      </div>
+      <div class="detail-section-body"><div class="answer-grid">${answerHtml}</div></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-header">📐 初回採寸データ（DB自動取得）</div>
+      <div class="detail-section-body">${measureHtml}</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-header">🎯 理想値</div>
+      <div class="detail-section-body">${idealHtml}</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-header">🖼️ 応募写真</div>
+      <div class="detail-section-body">${galleryHtml}</div>
+    </div>
+  `;
+}
+
+function mBlock(label, val, unit) {
+  const hasVal = val !== null && val !== undefined && val !== 0 && val !== '';
+  return `<div class="measure-block">
+    <div class="m-lbl">${label}</div>
+    <div class="m-val">${hasVal ? esc(val) + '<span class="m-unit">' + unit + '</span>' : '<span style="color:#ccc;font-size:14px;">-</span>'}</div>
+  </div>`;
+}
+
+function navigate(dir) {
+  const newIdx = currentDetailIndex + dir;
+  if (newIdx < 0 || newIdx >= filteredResponses.length) return;
+  currentDetailIndex = newIdx;
+  renderModal();
+  document.getElementById('modalBody').scrollTop = 0;
+}
+
+function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+function onOverlayClick(e) { if (e.target === document.getElementById('detailModal')) closeModal(); }
+
+// キーボードナビ
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('detailModal').classList.contains('show')) return;
+  if (e.key === 'ArrowLeft') navigate(-1);
+  if (e.key === 'ArrowRight') navigate(1);
+  if (e.key === 'Escape') closeModal();
+});
+
+// ============================================================
+// ライトボックス
+// ============================================================
+function openLightbox(url) {
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+
+// ============================================================
+// CSV出力
+// ============================================================
+function downloadCSV() {
+  if (filteredResponses.length === 0) { alert('データがありません'); return; }
+  const answerKeys = [...new Set(filteredResponses.flatMap(r => Object.keys(r.answers || {})))];
+  const headers = ['No.', '応募日時', ...answerKeys, '採寸日', '身長(cm)', '体重(kg)', 'バスト上(cm)', 'ウエスト(cm)', 'ヒップ(cm)', 'BMI', 'ブラサイズ', 'コルセット', 'ボディスーツ', '理想体重', '理想ウエスト', '理想ヒップ'];
+  const rows = filteredResponses.map((r, i) => {
+    const m = r.measure || {};
+    return [
+      i + 1,
+      r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
+      ...answerKeys.map(k => { const v = (r.answers||{})[k]; return typeof v==='object'?JSON.stringify(v):String(v||''); }),
+      m.diag_dt||'', m.calc_height||'', m.weight||'', m.top_bust||'', m.waist||'', m.hip||'', m.bmi||'', m.bra_sz||'', m.corset_sz||'', m.body_suit_sz||'', '', '', ''
+    ];
+  });
+  const bom = '\uFEFF';
+  const csv = bom + [headers, ...rows].map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = 'diana_contest_' + (currentContest ? currentContest.title.replace(/\s/g,'_') : '') + '_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+// ============================================================
+// UI ヘルパー
+// ============================================================
+function hideLoading()      { document.getElementById('loadingScreen').style.display = 'none'; }
+function setLoadingText(t)  { document.querySelector('#loadingScreen .loading-text').textContent = t; }
+function showLogin()        { hideLoading(); document.getElementById('loginScreen').classList.add('show'); document.getElementById('mainScreen').classList.remove('show'); }
+function showMain()         { document.getElementById('loginScreen').classList.remove('show'); document.getElementById('mainScreen').classList.add('show'); }
+function showLoginError(m)  { const el = document.getElementById('loginError'); el.innerHTML = m; el.style.display = 'block'; }
+function showError(m)       { const el = document.getElementById('errorBanner'); el.textContent = m; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 8000); }
+
+function updateDbStatus(connected) {
+  dbConnected = connected;
+  const el = document.getElementById('dbStatus');
+  el.className = 'db-status ' + (connected ? 'connected' : 'disconnected');
+  el.innerHTML = `<div class="db-dot"></div>${connected ? '採寸DB 接続済' : '採寸DB 未接続'}`;
+}
+
+// ============================================================
+// 起動
+// ============================================================
+initMsal();
+</script>
+</body>
+</html>

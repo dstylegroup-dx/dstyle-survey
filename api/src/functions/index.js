@@ -307,7 +307,7 @@ app.http('surveys', {
 
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
-                const { id, tenant, title, description, questions, active, thanksMessage } = body;
+                const { id, tenant, title, description, questions, active, thanksMessage, isContest } = body;
                 if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
@@ -317,6 +317,7 @@ app.http('surveys', {
                     questions: questions ?? existing.questions,
                     active: active !== undefined ? active : existing.active,
                     thanksMessage: thanksMessage !== undefined ? thanksMessage : (existing.thanksMessage || ''),
+                    isContest: isContest !== undefined ? isContest : (existing.isContest || false),
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
