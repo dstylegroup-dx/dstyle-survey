@@ -163,19 +163,20 @@
     .modal-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.55); z-index: 1000;
-      align-items: center; justify-content: center; padding: 16px;
+      align-items: stretch; justify-content: stretch; padding: 0;
     }
     .modal-overlay.show { display: flex; }
     .modal {
-      background: white; border-radius: 16px;
-      width: 100%; max-width: 720px; max-height: 90vh;
+      background: white; border-radius: 0;
+      width: 100%; height: 100%;
+      max-width: 100%; max-height: 100%;
       display: flex; flex-direction: column;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      box-shadow: none;
     }
     /* モーダルヘッダー */
     .modal-header {
       background: linear-gradient(135deg, #7B4F6E, #a06090);
-      color: white; padding: 16px 20px; border-radius: 16px 16px 0 0;
+      color: white; padding: 16px 24px; border-radius: 0;
       display: flex; align-items: center; gap: 12px; flex-shrink: 0;
     }
     .modal-nav { display: flex; gap: 6px; }
@@ -193,7 +194,7 @@
     .modal-close:hover { background: rgba(255,255,255,0.2); }
 
     /* モーダルボディ */
-    .modal-body { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .modal-body { overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
 
     .detail-section { border: 1.5px solid #f0e8ed; border-radius: 10px; overflow: hidden; }
     .detail-section-header {
@@ -204,7 +205,7 @@
     }
     .detail-section-body { padding: 16px; }
 
-    .answer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+    .answer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
     .answer-item { display: flex; flex-direction: column; gap: 3px; }
     .answer-lbl { font-size: 11px; color: #888; font-weight: bold; }
     .answer-val { font-size: 14px; color: #333; word-break: break-word; }
@@ -228,7 +229,7 @@
     .coming-soon { color: #aaa; font-size: 13px; font-style: italic; padding: 16px; text-align: center; }
 
     /* 画像ギャラリー */
-    .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
     .img-gallery-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; aspect-ratio: 3/4; }
     .img-gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
     .img-gallery-item:hover img { transform: scale(1.05); }
@@ -647,7 +648,7 @@ async function getBlobUrl(blobPath) {
     const res = await fetch(BASE_URL + '/api/filedownload?blobName=' + encodeURIComponent(blobPath) + '&tenant=' + TENANT, {
       headers: adminToken ? { 'x-admin-token': adminToken } : {}
     });
-    if (res.ok) { const d = await res.json(); return d.url || null; }
+    if (res.ok) { const d = await res.json(); return d.downloadUrl || null; }
   } catch(e) {}
   return null;
 }
@@ -899,19 +900,53 @@ function closeLightbox() { document.getElementById('lightbox').classList.remove(
 // ============================================================
 function downloadCSV() {
   if (filteredResponses.length === 0) { alert('データがありません'); return; }
+
+  // 全回答に存在するキーを収集（順序保持）
   const answerKeys = [...new Set(filteredResponses.flatMap(r => Object.keys(r.answers || {})))];
-  const headers = ['No.', '応募日時', ...answerKeys, '採寸日', '身長(cm)', '体重(kg)', 'バスト上(cm)', 'ウエスト(cm)', 'ヒップ(cm)', 'BMI', 'ブラサイズ', 'コルセット', 'ボディスーツ', '理想体重', '理想ウエスト', '理想ヒップ'];
+
+  // questionLabelMapで日本語ラベルに変換（なければIDのまま）
+  const answerLabels = answerKeys.map(k => questionLabelMap[k] || k);
+
+  // ヘッダー行（日本語）
+  const headers = [
+    'No.', '応募日時',
+    ...answerLabels,
+    '採寸日', '身長(cm)', '体重(kg)', 'トップバスト(cm)', 'アンダーバスト(cm)',
+    'ウエスト(cm)', '中ヒップ(cm)', 'ヒップ(cm)', '太もも左(cm)', '太もも右(cm)',
+    '体脂肪率(%)', 'BMI', 'PI', 'ブラサイズ', 'コルセットサイズ', 'ボディスーツサイズ',
+    'ダイアナ歴(年)', 'ボディチェック総回数',
+    '理想体重', '理想ウエスト', '理想ヒップ'
+  ];
+
   const rows = filteredResponses.map((r, i) => {
     const m = r.measure || {};
     return [
       i + 1,
       r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
-      ...answerKeys.map(k => { const v = (r.answers||{})[k]; return typeof v==='object'?JSON.stringify(v):String(v||''); }),
-      m.diag_dt||'', m.calc_height||'', m.weight||'', m.top_bust||'', m.waist||'', m.hip||'', m.bmi||'', m.bra_sz||'', m.corset_sz||'', m.body_suit_sz||'', '', '', ''
+      // アンケート回答（画像パスは除外してファイル名だけ）
+      ...answerKeys.map(k => {
+        const v = (r.answers||{})[k];
+        if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) {
+          return v.split('/').pop(); // ファイル名のみ
+        }
+        return typeof v === 'object' ? JSON.stringify(v) : String(v||'');
+      }),
+      // 採寸データ
+      m.diag_dt||'', m.calc_height||'', m.weight||'',
+      m.top_bust||'', m.under_bust||'',
+      m.waist||'', m.mid_hip||'', m.hip||'',
+      m.left_thigh||'', m.right_thigh||'',
+      m.fat_pctg||'', m.bmi||'', m.pi||'',
+      m.bra_sz||'', m.corset_sz||'', m.body_suit_sz||'',
+      m.diana_years||'', m.total_body_check||'',
+      '', '', '' // 理想値（将来）
     ];
   });
+
   const bom = '\uFEFF';
-  const csv = bom + [headers, ...rows].map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const csv = bom + [headers, ...rows]
+    .map(r => r.map(v => '"' + String(v||'').replace(/"/g, '""') + '"').join(','))
+    .join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
   a.download = 'diana_contest_' + (currentContest ? currentContest.title.replace(/\s/g,'_') : '') + '_' + new Date().toISOString().slice(0,10) + '.csv';
