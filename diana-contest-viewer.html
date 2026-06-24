@@ -556,6 +556,8 @@ async function onContestChange() {
 // ============================================================
 // 回答データ取得
 // ============================================================
+let questionLabelMap = {}; // { q_XXXXXXXXX: '氏名' } のマップ
+
 async function loadResponses() {
   if (!currentContest) return;
   const btn = document.getElementById('refreshBtn');
@@ -563,9 +565,24 @@ async function loadResponses() {
   btn.disabled = true;
   try {
     const headers = adminToken ? { 'x-admin-token': adminToken } : {};
-    const res = await fetch(BASE_URL + '/api/response?surveyId=' + currentContest.id + '&tenant=' + TENANT, { headers });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+
+    // アンケート定義と回答データを並行取得
+    const [surveyRes, responseRes] = await Promise.all([
+      fetch(BASE_URL + '/api/surveys?tenant=' + TENANT + '&id=' + currentContest.id, { headers }),
+      fetch(BASE_URL + '/api/response?surveyId=' + currentContest.id + '&tenant=' + TENANT, { headers })
+    ]);
+
+    // 質問ラベルマップを構築
+    questionLabelMap = {};
+    if (surveyRes.ok) {
+      const survey = await surveyRes.json();
+      (survey.questions || []).forEach(q => {
+        if (q.id && q.label) questionLabelMap[q.id] = q.label;
+      });
+    }
+
+    if (!responseRes.ok) throw new Error('HTTP ' + responseRes.status);
+    const data = await responseRes.json();
     allResponses = (data || []).map(r => ({ ...r, measure: null }));
 
     // PostgreSQL接続済みなら採寸データ付加
@@ -610,22 +627,49 @@ function getAnswerByKey(r, keywords) {
 
 function getAnswerEntries(r) {
   const answers = r.answers || {};
-  return Object.entries(answers).map(([k, v]) => ({
-    key: k,
-    value: typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '')
-  }));
+  return Object.entries(answers).map(([k, v]) => {
+    const label = questionLabelMap[k] || k; // IDを日本語ラベルに変換
+    const value = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '');
+    return { key: label, rawKey: k, value };
+  });
 }
 
-// 画像URLリストを取得
-function getImageUrls(r) {
+// Blob Storageのパスかどうか判定
+function isBlobPath(v) {
+  if (typeof v !== 'string') return false;
+  return v.startsWith('https://stdstylesurveyfiles') ||
+    (v.startsWith('diana/') && (v.includes('.png') || v.includes('.jpg') || v.includes('.jpeg') || v.includes('.gif') || v.includes('.webp') || v.includes('.PNG') || v.includes('.JPG')));
+}
+
+// Blob StorageのパスからSAS URL取得（filedownloadエンドポイント使用）
+async function getBlobUrl(blobPath) {
+  try {
+    const res = await fetch(BASE_URL + '/api/filedownload?blobName=' + encodeURIComponent(blobPath) + '&tenant=' + TENANT, {
+      headers: adminToken ? { 'x-admin-token': adminToken } : {}
+    });
+    if (res.ok) { const d = await res.json(); return d.url || null; }
+  } catch(e) {}
+  return null;
+}
+
+// 画像URLリストを取得（Blobパス→SAS URL変換済み）
+async function getImageUrls(r) {
   const answers = r.answers || {};
   const urls = [];
   for (const [k, v] of Object.entries(answers)) {
-    if (typeof v === 'string' && (v.startsWith('https://stdstylesurveyfiles') || v.startsWith('https://') && (v.includes('.jpg') || v.includes('.png') || v.includes('.jpeg') || v.includes('.gif') || v.includes('.webp')))) {
-      urls.push({ label: k, url: v });
+    const label = questionLabelMap[k] || k;
+    if (typeof v === 'string' && isBlobPath(v)) {
+      const url = v.startsWith('https://') ? v : await getBlobUrl(v);
+      if (url) urls.push({ label, url });
+    } else if (typeof v === 'string' && v.startsWith('https://') && /\.(jpg|jpeg|png|gif|webp)/i.test(v)) {
+      urls.push({ label, url: v });
+    } else if (typeof v === 'object' && v !== null && v.url) {
+      urls.push({ label, url: v.url });
+    } else if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item && item.url) urls.push({ label, url: item.url });
+      }
     }
-    if (typeof v === 'object' && v !== null && v.url) urls.push({ label: k, url: v.url });
-    if (Array.isArray(v)) v.forEach(item => { if (item && item.url) urls.push({ label: k, url: item.url }); });
   }
   return urls;
 }
@@ -633,7 +677,7 @@ function getImageUrls(r) {
 // ============================================================
 // フィルター・表示
 // ============================================================
-function applyFilter() {
+async function applyFilter() {
   const q = (document.getElementById('searchInput').value || '').toLowerCase();
   filteredResponses = allResponses.filter(r => {
     if (!q) return true;
@@ -641,7 +685,7 @@ function applyFilter() {
   });
   currentPage = 1;
   document.getElementById('filterCount').textContent = q ? filteredResponses.length + '件該当' : '';
-  renderGrid();
+  await renderGrid();
 }
 
 function clearSearch() {
@@ -649,7 +693,7 @@ function clearSearch() {
   applyFilter();
 }
 
-function renderGrid() {
+async function renderGrid() {
   const grid = document.getElementById('applicantGrid');
   if (filteredResponses.length === 0) {
     grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🔍</div><p>' + (allResponses.length === 0 ? '応募データがありません' : '検索結果がありません') + '</p></div>';
@@ -660,7 +704,9 @@ function renderGrid() {
   const pageData = filteredResponses.slice(start, start + PAGE_SIZE);
   const globalStart = start; // グリッドインデックス → filteredResponses のインデックス
 
-  grid.innerHTML = pageData.map((r, localIdx) => {
+  const cardHtmlList = [];
+  for (let localIdx = 0; localIdx < pageData.length; localIdx++) {
+    const r = pageData[localIdx];
     const idx = globalStart + localIdx;
     const name    = esc(getAnswerByKey(r, ['氏名', '名前', 'お名前']) || '（氏名なし）');
     const kana    = esc(getAnswerByKey(r, ['カナ', 'かな', 'フリガナ']));
@@ -668,10 +714,9 @@ function renderGrid() {
     const diana   = esc(getAnswerByKey(r, ['ダイアナコード', 'diana', 'Diana']));
     const bday    = esc(getAnswerByKey(r, ['生年月日', '生年']));
     const date    = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ja-JP') : '-';
-    const imgs    = getImageUrls(r);
+    const imgs    = await getImageUrls(r);
     const hasMeasure = r.measure && r.measure.diag_dt;
-
-    return `<div class="applicant-card ${hasMeasure ? 'has-measure' : ''}" onclick="showDetail(${idx})">
+    cardHtmlList.push(`<div class="applicant-card ${hasMeasure ? 'has-measure' : ''}" onclick="showDetail(${idx})">
       <div class="card-header">
         <div class="card-num">No.${idx + 1}</div>
         <div class="card-name">${name}</div>
@@ -689,8 +734,9 @@ function renderGrid() {
         <span>${hasMeasure ? '<span class="measure-chip">✅ 採寸済</span>' : '<span class="no-measure-chip">📋 ' + (dbConnected ? 'DB照合なし' : 'DB未接続') + '</span>'}</span>
         <span class="card-arrow">›</span>
       </div>
-    </div>`;
-  }).join('');
+    </div>`);
+  }
+  grid.innerHTML = cardHtmlList.join('');
 
   renderPagination(filteredResponses.length);
 }
@@ -710,11 +756,11 @@ function renderPagination(total) {
   pag.innerHTML = html;
 }
 
-function goPage(p) {
+async function goPage(p) {
   const totalPages = Math.ceil(filteredResponses.length / PAGE_SIZE);
   if (p<1||p>totalPages) return;
   currentPage = p;
-  renderGrid();
+  await renderGrid();
   document.getElementById('dataArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -735,7 +781,7 @@ function showDetail(idx) {
   document.getElementById('detailModal').classList.add('show');
 }
 
-function renderModal() {
+async function renderModal() {
   const r = filteredResponses[currentDetailIndex];
   if (!r) return;
 
@@ -750,7 +796,7 @@ function renderModal() {
   document.getElementById('nextBtn').disabled = currentDetailIndex === total - 1;
 
   const m = r.measure;
-  const imgs = getImageUrls(r);
+  const imgs = await getImageUrls(r);
   const entries = getAnswerEntries(r);
 
   // 回答内容
