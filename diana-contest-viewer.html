@@ -230,7 +230,7 @@
 
     /* 画像ギャラリー */
     .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .img-gallery-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; aspect-ratio: 3/4; }
+    .img-gallery-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; aspect-ratio: 3/4; position: relative; }
     .img-gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
     .img-gallery-item:hover img { transform: scale(1.05); }
     .no-image { color: #aaa; font-size: 13px; padding: 16px; text-align: center; }
@@ -254,6 +254,7 @@
       padding: 8px; opacity: 0; transition: opacity 0.2s;
     }
     .img-gallery-item:hover .img-gallery-overlay { opacity: 1; }
+    .img-gallery-item:focus .img-gallery-overlay { opacity: 1; }
     .img-gallery-label { color: white; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .img-action-btn {
       background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
@@ -668,18 +669,33 @@ function getAnswerByKey(r, keywords) {
 
 function getAnswerEntries(r) {
   const answers = r.answers || {};
-  return Object.entries(answers).map(([k, v]) => {
-    const label = questionLabelMap[k] || k; // IDを日本語ラベルに変換
-    const value = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '');
-    return { key: label, rawKey: k, value };
-  });
+  return Object.entries(answers)
+    .filter(([k, v]) => {
+      // 画像パスは応募内容から除外（応募写真セクションで表示）
+      if (typeof v === 'string' && isBlobPath(v)) return false;
+      if (typeof v === 'string' && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) return false;
+      return true;
+    })
+    .map(([k, v]) => {
+      const label = questionLabelMap[k] || k;
+      const value = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '');
+      return { key: label, rawKey: k, value };
+    });
 }
 
 // Blob Storageのパスかどうか判定
 function isBlobPath(v) {
-  if (typeof v !== 'string') return false;
-  return v.startsWith('https://stdstylesurveyfiles') ||
-    (v.startsWith('diana/') && (v.includes('.png') || v.includes('.jpg') || v.includes('.jpeg') || v.includes('.gif') || v.includes('.webp') || v.includes('.PNG') || v.includes('.JPG')));
+  if (typeof v !== 'string' || !v) return false;
+  if (v.startsWith('https://stdstylesurveyfiles')) return true;
+  // diana/ で始まる相対パス（画像ファイルを含む）
+  if (v.startsWith('diana/') || v.startsWith('herbelle/') || v.startsWith('dstylehd/')) return true;
+  return false;
+}
+
+// 画像かどうか判定（拡張子ベース）
+function isImagePath(v) {
+  if (typeof v !== 'string' || !v) return false;
+  return /\.(png|jpg|jpeg|gif|webp|PNG|JPG|JPEG|GIF|WEBP)$/.test(v.split('?')[0]);
 }
 
 // Blob StorageのパスからSAS URL取得（filedownloadエンドポイント使用）
@@ -700,19 +716,42 @@ async function getImageUrls(r) {
   for (const [k, v] of Object.entries(answers)) {
     const label = questionLabelMap[k] || k;
     if (typeof v === 'string' && isBlobPath(v)) {
+      // Blob相対パス → SAS URL取得
       const url = v.startsWith('https://') ? v : await getBlobUrl(v);
-      if (url) urls.push({ label, url });
-    } else if (typeof v === 'string' && v.startsWith('https://') && /\.(jpg|jpeg|png|gif|webp)/i.test(v)) {
-      urls.push({ label, url: v });
-    } else if (typeof v === 'object' && v !== null && v.url) {
-      urls.push({ label, url: v.url });
+      if (url) urls.push({ label, blobName: v, url });
+    } else if (typeof v === 'string' && isBlobPath(v) && isImagePath(v)) {
+      const url = await getBlobUrl(v);
+      if (url) urls.push({ label, blobName: v, url });
+    } else if (typeof v === 'string' && v.startsWith('https://') && isImagePath(v)) {
+      urls.push({ label, blobName: null, url: v });
+    } else if (typeof v === 'object' && v !== null && !Array.isArray(v) && v.url) {
+      urls.push({ label, blobName: null, url: v.url });
     } else if (Array.isArray(v)) {
       for (const item of v) {
-        if (item && item.url) urls.push({ label, url: item.url });
+        if (item && item.url) urls.push({ label, blobName: null, url: item.url });
       }
     }
   }
   return urls;
+}
+
+// 画像ダウンロード
+async function downloadImage(blobName, label) {
+  try {
+    let url;
+    if (blobName) {
+      const res = await fetch(BASE_URL + '/api/filedownload?blobName=' + encodeURIComponent(blobName) + '&tenant=' + TENANT, {
+        headers: adminToken ? { 'x-admin-token': adminToken } : {}
+      });
+      if (res.ok) { const d = await res.json(); url = d.downloadUrl; }
+    }
+    if (!url) { alert('ダウンロードURLを取得できませんでした'); return; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = label || 'image';
+    a.target = '_blank';
+    a.click();
+  } catch(e) { alert('ダウンロードに失敗しました: ' + e.message); }
 }
 
 // ============================================================
@@ -882,18 +921,22 @@ async function renderModal() {
 
   // 画像ギャラリー（ダウンロードボタン付き）
   const galleryHtml = imgs.length > 0
-    ? `<div class="img-gallery">${imgs.map(img => `
-        <div class="img-gallery-item">
-          <img src="${esc(img.url)}" alt="${esc(img.label)}" loading="lazy" onclick="openLightbox('${esc(img.url)}')">
+    ? '<div class="img-gallery">' + imgs.map(img => {
+        const safeUrl = esc(img.url);
+        const safeLabel = esc(img.label);
+        const safeBlobName = img.blobName ? esc(img.blobName) : '';
+        return `<div class="img-gallery-item">
+          <img src="${safeUrl}" alt="${safeLabel}" loading="lazy" onclick="openLightbox('${safeUrl}')">
           <div class="img-gallery-overlay">
-            <div class="img-gallery-label">${esc(img.label)}</div>
+            <div class="img-gallery-label">${safeLabel}</div>
             <div style="display:flex;gap:6px;margin-top:6px;">
-              <button class="img-action-btn" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">🔍 拡大</button>
-              <a class="img-action-btn" href="${esc(img.url)}" download target="_blank" onclick="event.stopPropagation()">⬇️ DL</a>
+              <button class="img-action-btn" onclick="event.stopPropagation();openLightbox('${safeUrl}')">🔍 拡大</button>
+              <button class="img-action-btn" onclick="event.stopPropagation();downloadImage('${safeBlobName}','${safeLabel}')">⬇️ DL</button>
             </div>
           </div>
-        </div>`).join('')}</div>`
-    : `<div class="no-image">添付画像なし</div>`;
+        </div>`;
+      }).join('') + '</div>'
+    : '<div class="no-image">添付画像なし</div>';
 
   document.getElementById('modalBody').innerHTML = `
     <div class="detail-section">
