@@ -246,11 +246,51 @@
     .no-contest-icon { font-size: 56px; margin-bottom: 16px; }
     .no-contest p { font-size: 15px; }
 
-    @media (max-width: 600px) {
-      .topbar h1 { font-size: 14px; }
-      .modal { max-height: 95vh; border-radius: 12px; }
+    /* 画像オーバーレイ */
+    .img-gallery-item { position: relative; overflow: hidden; }
+    .img-gallery-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.75));
+      padding: 8px; opacity: 0; transition: opacity 0.2s;
+    }
+    .img-gallery-item:hover .img-gallery-overlay { opacity: 1; }
+    .img-gallery-label { color: white; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .img-action-btn {
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+      color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .img-action-btn:hover { background: rgba(255,255,255,0.35); }
+
+    /* スマホ対応 */
+    @media (max-width: 768px) {
+      .topbar h1 { font-size: 13px; }
+      .topbar-right { gap: 6px; }
+      .user-badge { display: none; }
+      .main { padding: 12px; }
+      .summary-row { gap: 10px; }
+      .summary-card { min-width: 120px; padding: 12px 14px; }
+      .summary-card .val { font-size: 22px; }
+      .contest-bar { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+      .select-wrap { max-width: 100%; min-width: 100%; }
+      .applicant-grid { grid-template-columns: 1fr; gap: 12px; }
+      .toolbar { gap: 8px; padding: 12px 14px; }
+      .search-input { width: 100%; }
+      .modal-header { padding: 12px 16px; }
+      .modal-name { font-size: 17px; }
+      .modal-body { padding: 14px; gap: 12px; }
       .measure-grid { grid-template-columns: repeat(2, 1fr); }
+      .size-grid { grid-template-columns: repeat(2, 1fr); }
       .answer-grid { grid-template-columns: 1fr; }
+      .img-gallery { grid-template-columns: repeat(2, 1fr); }
+      .img-gallery-overlay { opacity: 1; }
+      .detail-section-body { padding: 12px; }
+      .modal-nav-btn { padding: 5px 10px; font-size: 13px; }
+    }
+
+    @media (max-width: 400px) {
+      .applicant-grid { grid-template-columns: 1fr; }
+      .summary-row { flex-direction: column; }
     }
   </style>
 </head>
@@ -827,14 +867,32 @@ async function renderModal() {
       <div class="size-block"><div class="size-lbl">コルセット</div><div class="size-val">${esc(m.corset_sz||'-')}</div></div>
       <div class="size-block"><div class="size-lbl">ボディスーツ</div><div class="size-val">${esc(m.body_suit_sz||'-')}</div></div>
     </div>
-  ` : `<div style="text-align:center;padding:20px;color:#aaa;">${dbConnected ? '照合データなし（コード不一致の可能性）' : '採寸DBが未接続です。PostgreSQL接続設定後に自動取得されます。'}</div>`;
+  ` : `<div style="text-align:center;padding:24px 16px;">
+    ${dbConnected
+      ? '<div style="color:#888;font-size:14px;">⚠️ 照合データなし（コード不一致の可能性）</div>'
+      : '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:16px 20px;display:inline-block;text-align:left;">' +
+        '<div style="font-size:15px;font-weight:bold;color:#f57f17;margin-bottom:8px;">📋 採寸データ未取得</div>' +
+        '<div style="font-size:13px;color:#795548;line-height:1.7;">PostgreSQL接続設定後に<br>ダイアナコードと照合して<br>自動表示されます。</div>' +
+        '</div>'
+    }
+  </div>`;
 
   // 理想値
   const idealHtml = `<div class="coming-soon">理想値カラムは今後追加予定です</div>`;
 
-  // 画像ギャラリー
+  // 画像ギャラリー（ダウンロードボタン付き）
   const galleryHtml = imgs.length > 0
-    ? `<div class="img-gallery">${imgs.map(img => `<div class="img-gallery-item" onclick="openLightbox('${esc(img.url)}')"><img src="${esc(img.url)}" alt="${esc(img.label)}" loading="lazy"></div>`).join('')}</div>`
+    ? `<div class="img-gallery">${imgs.map(img => `
+        <div class="img-gallery-item">
+          <img src="${esc(img.url)}" alt="${esc(img.label)}" loading="lazy" onclick="openLightbox('${esc(img.url)}')">
+          <div class="img-gallery-overlay">
+            <div class="img-gallery-label">${esc(img.label)}</div>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <button class="img-action-btn" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">🔍 拡大</button>
+              <a class="img-action-btn" href="${esc(img.url)}" download target="_blank" onclick="event.stopPropagation()">⬇️ DL</a>
+            </div>
+          </div>
+        </div>`).join('')}</div>`
     : `<div class="no-image">添付画像なし</div>`;
 
   document.getElementById('modalBody').innerHTML = `
