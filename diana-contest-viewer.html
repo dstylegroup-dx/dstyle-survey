@@ -268,7 +268,7 @@
     <div class="login-logo">🏆</div>
     <h1>Diana コンテスト 閲覧</h1>
     <p>Microsoftアカウントでログインしてください。<br>アクセスには所定のグループ権限が必要です。</p>
-    <button class="btn-ms" onclick="doLogin()">
+    <button class="btn-ms" id="loginBtn" onclick="doLogin()" disabled style="opacity:0.6;cursor:not-allowed;">
       <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/><rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/></svg>
       Microsoftアカウントでログイン
     </button>
@@ -433,12 +433,22 @@ async function initMsal() {
       const accounts = msalInstance.getAllAccounts();
       if (accounts.length > 0) currentAccount = accounts[0];
     }
+    // 初期化完了後にログインボタンを有効化
+    const btn = document.getElementById('loginBtn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+
     if (currentAccount) await checkAccessAndShow();
     else showLogin();
-  } catch (e) { showLogin(); }
+  } catch (e) {
+    console.error('MSAL初期化エラー:', e);
+    const btn = document.getElementById('loginBtn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+    showLogin();
+  }
 }
 
 async function doLogin() {
+  if (!msalInstance) { showLoginError('初期化中です。少し待ってから再度お試しください。'); return; }
   try { await msalInstance.loginRedirect({ scopes: ['User.Read', 'GroupMember.Read.All'] }); }
   catch (e) { showLoginError('ログインに失敗しました: ' + e.message); }
 }
