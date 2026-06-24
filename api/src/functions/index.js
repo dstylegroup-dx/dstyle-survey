@@ -4,6 +4,7 @@ const { CosmosClient } = require('@azure/cosmos');
 const { EmailClient } = require('@azure/communication-email');
 const { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions, SASProtocol } = require('@azure/storage-blob');
 const crypto = require('crypto');
+const { Pool } = require('pg');
 
 // ----------------------------------------------------
 // 📁 Blob Storage ユーティリティ
@@ -1636,6 +1637,160 @@ app.http('filedelete', {
             await containerClient.deleteBlob(blobName);
             return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
         } catch (e) {
+            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 🐘 PostgreSQL 接続プール
+// ----------------------------------------------------
+let pgPool = null;
+function getPgPool() {
+    if (!pgPool) {
+        pgPool = new Pool({
+            host:     process.env.PG_HOST,
+            port:     parseInt(process.env.PG_PORT || '5432'),
+            database: process.env.PG_DB,
+            user:     process.env.PG_USER,
+            password: process.env.PG_PASS,
+            ssl:      process.env.PG_SSLMODE === 'require' ? { rejectUnauthorized: false } : false,
+            max: 5,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000,
+        });
+    }
+    return pgPool;
+}
+
+// ----------------------------------------------------
+// 👗 【Diana採寸データ取得】PostgreSQL連携
+// POST /api/diana-member
+// body: { sldsslcd, dia_cd, b_day }
+// ----------------------------------------------------
+app.http('diana-member', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        try {
+            const token = request.headers.get('x-admin-token');
+            if (!await verifyToken(token)) {
+                return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            }
+
+            const body = await request.json().catch(() => ({}));
+            const { sldsslcd, dia_cd, b_day } = body;
+
+            if (!sldsslcd && !dia_cd) {
+                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'sldsslcd または dia_cd は必須です' } };
+            }
+
+            const schema = process.env.PG_SCHEMA || 'public';
+            const pool = getPgPool();
+
+            // ① 顧客テーブルから CUST_CD を取得
+            // TRNF_DEL_FLG = 0（移籍・削除なし）のみ対象
+            let custQuery = `
+                SELECT "CUST_CD", "DIA_CD", "SLDSSLCD", "L_NM_KANJI", "F_NM_KANJI", "L_NM_KANA", "F_NM_KANA", "B_DAY", "L_REG_DT"
+                FROM "${schema}"."SLD_ADMIN_CUSTOMER_TBL"
+                WHERE "TRNF_DEL_FLG" = 0
+            `;
+            const params = [];
+
+            if (dia_cd) {
+                params.push(dia_cd);
+                custQuery += ` AND "DIA_CD" = $${params.length}`;
+            }
+            if (sldsslcd) {
+                params.push(sldsslcd);
+                custQuery += ` AND "SLDSSLCD" = $${params.length}`;
+            }
+            if (b_day) {
+                // 生年月日の形式を正規化（YYYY/MM/DD または YYYY-MM-DD）
+                const bdayNorm = b_day.replace(/-/g, '/');
+                params.push(bdayNorm);
+                custQuery += ` AND "B_DAY" = $${params.length}`;
+            }
+            custQuery += ' LIMIT 1';
+
+            const custResult = await pool.query(custQuery, params);
+            if (custResult.rows.length === 0) {
+                return { status: 404, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '顧客データが見つかりません' } };
+            }
+            const cust = custResult.rows[0];
+
+            // ② 採寸テーブルから初回採寸（最も古い DIAG_DT）を取得
+            const measureQuery = `
+                SELECT
+                    "CUST_CD", "DIAG_DT", "WEIGHT", "TOP_BUST", "UNDER_BUST",
+                    "WAIST", "MID_HIP", "HIP", "LEFT_THIGH", "RIGHT_THIGH",
+                    "LEFT_CALF", "RIGHT_CALF", "LEFT_ARM", "RIGHT_ARM",
+                    "FAT_PCTG", "CORSET_SZ", "BRA_SZ", "BODY_SUIT_SZ",
+                    "CALC_HEIGHT", "BMI", "PI", "REC_CRS"
+                FROM "${schema}"."SLD_ADMIN_MEASURE_TBL"
+                WHERE "CUST_CD" = $1
+                ORDER BY "DIAG_DT" ASC
+                LIMIT 1
+            `;
+            const measureResult = await pool.query(measureQuery, [cust.CUST_CD]);
+
+            // ③ ボディチェック総回数（全レコード数）
+            const countResult = await pool.query(
+                `SELECT COUNT(*) as cnt FROM "${schema}"."SLD_ADMIN_MEASURE_TBL" WHERE "CUST_CD" = $1`,
+                [cust.CUST_CD]
+            );
+            const totalBodyCheck = parseInt(countResult.rows[0]?.cnt || 0);
+
+            // ④ ダイアナ歴（L_REG_DT から計算）
+            let dianaYears = null;
+            if (cust.L_REG_DT) {
+                const regDate = new Date(cust.L_REG_DT);
+                const now = new Date();
+                dianaYears = Math.floor((now - regDate) / (1000 * 60 * 60 * 24 * 365));
+            }
+
+            const measure = measureResult.rows[0] || null;
+
+            return {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+                jsonBody: {
+                    // 顧客情報
+                    cust_cd:        cust.CUST_CD,
+                    dia_cd:         cust.DIA_CD,
+                    sldsslcd:       cust.SLDSSLCD,
+                    name_kanji:     (cust.L_NM_KANJI || '') + ' ' + (cust.F_NM_KANJI || ''),
+                    name_kana:      (cust.L_NM_KANA  || '') + ' ' + (cust.F_NM_KANA  || ''),
+                    b_day:          cust.B_DAY,
+                    diana_years:    dianaYears,
+                    total_body_check: totalBodyCheck,
+                    // 初回採寸
+                    diag_dt:        measure?.DIAG_DT        || null,
+                    calc_height:    measure?.CALC_HEIGHT     || null,
+                    weight:         measure?.WEIGHT          || null,
+                    top_bust:       measure?.TOP_BUST        || null,
+                    under_bust:     measure?.UNDER_BUST      || null,
+                    waist:          measure?.WAIST           || null,
+                    mid_hip:        measure?.MID_HIP         || null,
+                    hip:            measure?.HIP             || null,
+                    left_thigh:     measure?.LEFT_THIGH      || null,
+                    right_thigh:    measure?.RIGHT_THIGH     || null,
+                    left_calf:      measure?.LEFT_CALF       || null,
+                    right_calf:     measure?.RIGHT_CALF      || null,
+                    left_arm:       measure?.LEFT_ARM        || null,
+                    right_arm:      measure?.RIGHT_ARM       || null,
+                    fat_pctg:       measure?.FAT_PCTG        || null,
+                    corset_sz:      measure?.CORSET_SZ       || null,
+                    bra_sz:         measure?.BRA_SZ          || null,
+                    body_suit_sz:   measure?.BODY_SUIT_SZ    || null,
+                    bmi:            measure?.BMI             || null,
+                    pi:             measure?.PI              || null,
+                    rec_crs:        measure?.REC_CRS         || null,
+                }
+            };
+
+        } catch (e) {
+            context.log(`[diana-member] エラー: ${e.message}`);
             return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
         }
     }
