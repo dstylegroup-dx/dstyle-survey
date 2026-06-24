@@ -326,13 +326,13 @@
             <div class="form-group"><label>アンケートタイトル</label><input type="text" id="surveyTitle" placeholder="例）無料体験アンケート"></div>
             <div class="form-group"><label>説明文（任意）</label><textarea id="surveyDescription" placeholder="例）本日はお越しいただきありがとうございました。率直なご感想をお聞かせください（約2分）"></textarea></div>
             <div class="form-group"><label>回答完了メッセージ（任意）</label><textarea id="surveyThanksMessage" placeholder="例）本日はご来店いただきありがとうございました。またのご来店をお待ちしております。"></textarea></div>
-            <div class="form-group">
-              <div style="font-size:13px;font-weight:bold;color:#555;margin-bottom:6px;">コンテスト設定</div>
-              <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid #ddd;border-radius:8px;background:#fafafa;cursor:pointer;" onclick="document.getElementById('isContest').click()">
-                <input type="checkbox" id="isContest" style="width:18px;height:18px;accent-color:#7B4F6E;cursor:pointer;" onclick="event.stopPropagation()">
-                <span style="font-size:14px;cursor:pointer;">🏆 コンテスト対象アンケートとして登録する</span>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="font-size:13px;font-weight:bold;color:#555;">コンテスト設定</div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid #ddd;border-radius:8px;background:#fafafa;">
+                <input type="checkbox" id="isContest" style="width:18px;height:18px;min-width:18px;accent-color:#7B4F6E;cursor:pointer;padding:0;border:none;appearance:auto;-webkit-appearance:checkbox;border-radius:0;">
+                <span style="font-size:14px;cursor:pointer;" onclick="document.getElementById('isContest').click()">🏆 コンテスト対象アンケートとして登録する</span>
               </div>
-              <p style="font-size:12px;color:#888;margin-top:6px;">チェックをつけると Diana コンテスト閲覧ページの選択肢に表示されます。</p>
+              <p style="font-size:12px;color:#888;">チェックをつけると Diana コンテスト閲覧ページの選択肢に表示されます。</p>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
