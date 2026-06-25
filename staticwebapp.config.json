@@ -36,8 +36,8 @@
       "rewrite": "/diana-contest-viewer.html"
     },
     {
-      "route": "/*.html",
-      "redirect": "/404",
+      "route": "/diana-contest-viewer.html",
+      "redirect": "/diana-contest-viewer",
       "statusCode": 301
     }
   ],

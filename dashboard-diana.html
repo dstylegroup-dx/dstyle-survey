@@ -262,7 +262,7 @@
       <div class="topbar-select-wrap"><select id="surveySelect" onchange="onSurveyChange()">
         <option value="">アンケートを選択...</option>
       </select></div>
-      <a href="/diana-contest-viewer.html" target="_blank" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:bold;text-decoration:none;white-space:nowrap;">🏆 コンテスト閲覧</a>
+      <a href="/diana-contest-viewer" target="_blank" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:bold;text-decoration:none;white-space:nowrap;">🏆 コンテスト閲覧</a>
       <button class="logout" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
@@ -1295,7 +1295,7 @@
       var qCount = (s.questions || []).length;
       var isActive = s.active !== false;
       var contestBadge = s.isContest ? '<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:4px;">🏆 コンテスト</span>' : '';
-      var contestLink = s.isContest ? '<a href="/diana-contest-viewer.html" target="_blank" class="btn btn-sm" style="background:#7B4F6E;color:white;text-decoration:none;display:inline-flex;align-items:center;">🏆 コンテスト閲覧</a>' : '';
+      var contestLink = s.isContest ? '<a href="/diana-contest-viewer" target="_blank" class="btn btn-sm" style="background:#7B4F6E;color:white;text-decoration:none;display:inline-flex;align-items:center;">🏆 コンテスト閲覧</a>' : '';
       return '<div class="survey-item' + (isActive ? '' : ' inactive') + (s.isContest ? '" style="border-color:#ffc107' : '') + '">' +
         '<div class="survey-item-info">' +
         '<div class="survey-item-title">' + s.title +
