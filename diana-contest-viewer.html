@@ -682,8 +682,7 @@ async function loadResponses() {
     const data = await responseRes.json();
     allResponses = (data || []).map(r => ({ ...r, measure: null }));
 
-    // PostgreSQL接続済みなら採寸データ付加
-    if (dbConnected) await enrichWithMeasure();
+    // ※採寸データは詳細を開いた時に個別取得（遅延読み込み）
 
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('ja-JP');
     updateSummary();
@@ -980,10 +979,48 @@ function updateSummary() {
 // ============================================================
 // 詳細モーダル
 // ============================================================
-function showDetail(idx) {
+async function showDetail(idx) {
   currentDetailIndex = idx;
-  renderModal();
+  // まず採寸データなしで即座に表示
   document.getElementById('detailModal').classList.add('show');
+  renderModal();
+
+  // その1人分の採寸データをまだ取得していなければ取得
+  const r = filteredResponses[idx];
+  if (r && dbConnected && !r.measure) {
+    const salonCode = getAnswerByKey(r, ['サロンコード']);
+    const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
+    const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
+    if (salonCode || dianaCode) {
+      try {
+        // ローディング表示
+        const customerSection = document.querySelector('#modalBody .detail-section:nth-child(2) .detail-section-body');
+        const measureSection  = document.querySelector('#modalBody .detail-section:nth-child(3) .detail-section-body');
+        if (customerSection) customerSection.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">⏳ DB照合中...</div>';
+        if (measureSection)  measureSection.innerHTML  = '<div style="text-align:center;padding:20px;color:#888;">⏳ 採寸データ取得中...</div>';
+
+      const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒でタイムアウト
+        const res = await fetch(BASE_URL + '/api/diana-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
+          body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          r.measure = await res.json();
+          // allResponsesにも反映
+          const origIdx = allResponses.findIndex(a => a.id === r.id);
+          if (origIdx > -1) allResponses[origIdx].measure = r.measure;
+          // モーダルを再描画
+          if (currentDetailIndex === idx) renderModal();
+          // カードのバッジも更新
+          await renderGrid();
+        }
+      } catch (e) { /* silent */ }
+    }
+  }
 }
 
 async function renderModal() {
