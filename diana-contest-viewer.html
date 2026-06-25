@@ -658,7 +658,7 @@ async function loadResponses() {
 async function enrichWithMeasure() {
   for (const r of allResponses) {
     const salonCode = getAnswerByKey(r, ['サロンコード']);
-    const dianaCode = getAnswerByKey(r, ['ダイアナコード', 'diana', 'Diana']);
+    const dianaCode = getAnswerByKey(r, ['ダイアナコード', 'diana_cd']);
     const bday      = getAnswerByKey(r, ['生年月日', '生年', '誕生']);
     if (!salonCode && !dianaCode) continue;
     try {
@@ -817,11 +817,11 @@ async function renderGrid() {
   for (let localIdx = 0; localIdx < pageData.length; localIdx++) {
     const r = pageData[localIdx];
     const idx = globalStart + localIdx;
-    const name    = esc(getAnswerByKey(r, ['氏名', '名前', 'お名前']) || '（氏名なし）');
-    const kana    = esc(getAnswerByKey(r, ['カナ', 'かな', 'フリガナ']));
-    const salon   = esc(getAnswerByKey(r, ['サロンコード', 'サロン']));
-    const diana   = esc(getAnswerByKey(r, ['ダイアナコード', 'diana', 'Diana']));
-    const bday    = esc(getAnswerByKey(r, ['生年月日', '生年']));
+    const name    = esc(getAnswerByKey(r, ['応募者氏名', '氏名', '名前', 'お名前']) || '（氏名なし）');
+    const kana    = esc(getAnswerByKey(r, ['ふりがな', 'フリガナ', 'カナ', 'かな']));
+    const salon   = esc(getAnswerByKey(r, ['サロンコード']));
+    const diana   = esc(getAnswerByKey(r, ['ダイアナコード', 'diana_cd']));
+    const bday    = esc(getAnswerByKey(r, ['生年月日', '応募者 生年月日']));
     const date    = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ja-JP') : '-';
     const imgs    = await getImageUrls(r);
     const hasMeasure = r.measure && r.measure.diag_dt;
