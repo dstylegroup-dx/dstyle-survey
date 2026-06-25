@@ -1724,9 +1724,32 @@ app.http('diana-member', {
             }
             const cust = custResult.rows[0];
 
-            // ② 採寸テーブル（保留中）
-            const measure = null;
-            const totalBodyCheck = 0;
+            // ② body_checkから採寸データ取得
+            const bodyCheckQuery = `
+                SELECT
+                    "ダイアナコード", "チェック日", "採寸フラグ", "採寸フラグ名",
+                    "体重", "トップバスト", "アンダーバスト", "ウエスト",
+                    "ミドルヒップ", "ヒップ",
+                    "太もも左", "太もも右", "ふくらはぎ左", "ふくらはぎ右",
+                    "アーム左", "アーム右", "体脂肪率", "PI", "BMI",
+                    "チェック時身長", "チェック時年齢",
+                    "サロン名", "氏名", "チーフ名",
+                    "理想値_体重", "理想値_トップバスト", "理想値_アンダーバスト",
+                    "理想値_ウエスト", "理想値_ミドルヒップ", "理想値_ヒップ",
+                    "理想値_太もも左", "理想値_太もも右",
+                    "理想値_ふくらはぎ左", "理想値_ふくらはぎ右",
+                    "理想値_アーム左", "理想値_アーム右", "理想値_体脂肪率"
+                FROM ${schema}.body_check
+                WHERE "ダイアナコード"::text = $1
+                ORDER BY "チェック日" ASC
+            `;
+            const bodyCheckResult = await pool.query(bodyCheckQuery, [String(cust.diana_code)]);
+            const totalBodyCheck = bodyCheckResult.rows.length;
+            const firstCheck = bodyCheckResult.rows[0] || null;       // 初回
+            const latestCheck = bodyCheckResult.rows[totalBodyCheck - 1] || null; // 現在（最新）
+
+            // サロン名（body_checkから取得）
+            const salonName = latestCheck?.['サロン名'] || firstCheck?.['サロン名'] || null;
 
             // ③ ダイアナ歴（registration_date から計算）
             let dianaYears = null;
@@ -1736,42 +1759,91 @@ app.http('diana-member', {
                 dianaYears = Math.floor((now - regDate) / (1000 * 60 * 60 * 24 * 365));
             }
 
+            // 変化値を計算（現在 - 初回）
+            const calcDiff = (field) => {
+                const first = firstCheck?.[field];
+                const latest = latestCheck?.[field];
+                if (first == null || latest == null) return null;
+                return Math.round((parseFloat(latest) - parseFloat(first)) * 10) / 10;
+            };
+
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 jsonBody: {
                     // 顧客情報（customer_masterから取得）
-                    salon_code:       cust.salon_code,
-                    dia_cd:           cust.diana_code,
-                    name_kanji:       (cust.last_name_kanji || '') + ' ' + (cust.first_name_kanji || ''),
-                    name_kana:        (cust.last_name_kana  || '') + ' ' + (cust.first_name_kana  || ''),
-                    b_day:            cust.birth_date,
-                    diana_years:      dianaYears,
-                    age:              cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
+                    salon_code:        cust.salon_code,
+                    salon_name:        salonName,
+                    dia_cd:            cust.diana_code,
+                    name_kanji:        (cust.last_name_kanji || '') + ' ' + (cust.first_name_kanji || ''),
+                    name_kana:         (cust.last_name_kana  || '') + ' ' + (cust.first_name_kana  || ''),
+                    b_day:             cust.birth_date,
+                    diana_years:       dianaYears,
+                    age:               cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
                     registration_date: cust.registration_date,
-                    total_body_check: totalBodyCheck,
-                    // 初回採寸（採寸テーブル接続後に追加予定）
-                    diag_dt:        null,
-                    calc_height:    null,
-                    weight:         null,
-                    top_bust:       null,
-                    under_bust:     null,
-                    waist:          null,
-                    mid_hip:        null,
-                    hip:            null,
-                    left_thigh:     null,
-                    right_thigh:    null,
-                    left_calf:      null,
-                    right_calf:     null,
-                    left_arm:       null,
-                    right_arm:      null,
-                    fat_pctg:       null,
-                    corset_sz:      null,
-                    bra_sz:         null,
-                    body_suit_sz:   null,
-                    bmi:            null,
-                    pi:             null,
-                    rec_crs:        null,
+                    total_body_check:  totalBodyCheck,
+                    // 初回採寸
+                    first_check_date:  firstCheck?.['チェック日'] || null,
+                    first_height:      firstCheck?.['チェック時身長'] || null,
+                    first_weight:      firstCheck?.['体重'] || null,
+                    first_top_bust:    firstCheck?.['トップバスト'] || null,
+                    first_under_bust:  firstCheck?.['アンダーバスト'] || null,
+                    first_waist:       firstCheck?.['ウエスト'] || null,
+                    first_mid_hip:     firstCheck?.['ミドルヒップ'] || null,
+                    first_hip:         firstCheck?.['ヒップ'] || null,
+                    first_thigh_l:     firstCheck?.['太もも左'] || null,
+                    first_thigh_r:     firstCheck?.['太もも右'] || null,
+                    first_calf_l:      firstCheck?.['ふくらはぎ左'] || null,
+                    first_calf_r:      firstCheck?.['ふくらはぎ右'] || null,
+                    first_arm_l:       firstCheck?.['アーム左'] || null,
+                    first_arm_r:       firstCheck?.['アーム右'] || null,
+                    first_fat:         firstCheck?.['体脂肪率'] || null,
+                    first_bmi:         firstCheck?.['BMI'] || null,
+                    first_pi:          firstCheck?.['PI'] || null,
+                    first_age:         firstCheck?.['チェック時年齢'] || null,
+                    // 現在採寸（最新）
+                    latest_check_date: latestCheck?.['チェック日'] || null,
+                    latest_height:     latestCheck?.['チェック時身長'] || null,
+                    latest_weight:     latestCheck?.['体重'] || null,
+                    latest_top_bust:   latestCheck?.['トップバスト'] || null,
+                    latest_under_bust: latestCheck?.['アンダーバスト'] || null,
+                    latest_waist:      latestCheck?.['ウエスト'] || null,
+                    latest_mid_hip:    latestCheck?.['ミドルヒップ'] || null,
+                    latest_hip:        latestCheck?.['ヒップ'] || null,
+                    latest_thigh_l:    latestCheck?.['太もも左'] || null,
+                    latest_thigh_r:    latestCheck?.['太もも右'] || null,
+                    latest_calf_l:     latestCheck?.['ふくらはぎ左'] || null,
+                    latest_calf_r:     latestCheck?.['ふくらはぎ右'] || null,
+                    latest_arm_l:      latestCheck?.['アーム左'] || null,
+                    latest_arm_r:      latestCheck?.['アーム右'] || null,
+                    latest_fat:        latestCheck?.['体脂肪率'] || null,
+                    latest_bmi:        latestCheck?.['BMI'] || null,
+                    latest_pi:         latestCheck?.['PI'] || null,
+                    latest_age:        latestCheck?.['チェック時年齢'] || null,
+                    // 変化値（現在 - 初回）
+                    diff_weight:       calcDiff('体重'),
+                    diff_top_bust:     calcDiff('トップバスト'),
+                    diff_under_bust:   calcDiff('アンダーバスト'),
+                    diff_waist:        calcDiff('ウエスト'),
+                    diff_mid_hip:      calcDiff('ミドルヒップ'),
+                    diff_hip:          calcDiff('ヒップ'),
+                    diff_thigh_l:      calcDiff('太もも左'),
+                    diff_thigh_r:      calcDiff('太もも右'),
+                    diff_fat:          calcDiff('体脂肪率'),
+                    diff_bmi:          calcDiff('BMI'),
+                    diff_pi:           calcDiff('PI'),
+                    // 理想値（最新チェックから取得）
+                    ideal_weight:      latestCheck?.['理想値_体重'] || null,
+                    ideal_top_bust:    latestCheck?.['理想値_トップバスト'] || null,
+                    ideal_under_bust:  latestCheck?.['理想値_アンダーバスト'] || null,
+                    ideal_waist:       latestCheck?.['理想値_ウエスト'] || null,
+                    ideal_mid_hip:     latestCheck?.['理想値_ミドルヒップ'] || null,
+                    ideal_hip:         latestCheck?.['理想値_ヒップ'] || null,
+                    ideal_thigh_l:     latestCheck?.['理想値_太もも左'] || null,
+                    ideal_thigh_r:     latestCheck?.['理想値_太もも右'] || null,
+                    ideal_calf_l:      latestCheck?.['理想値_ふくらはぎ左'] || null,
+                    ideal_calf_r:      latestCheck?.['理想値_ふくらはぎ右'] || null,
+                    ideal_fat:         latestCheck?.['理想値_体脂肪率'] || null,
                 }
             };
 

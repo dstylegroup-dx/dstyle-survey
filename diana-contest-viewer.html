@@ -431,6 +431,7 @@
           <span style="font-size:13px;font-weight:bold;color:#555;white-space:nowrap;">🔍 絞り込み</span>
           <input type="text" class="search-input" id="searchName" placeholder="氏名・ふりがな..." oninput="applyFilter()" style="width:160px;">
           <input type="text" class="search-input" id="searchSalon" placeholder="サロンコード..." oninput="applyFilter()" style="width:140px;">
+          <input type="text" class="search-input" id="searchSalonName" placeholder="サロン名..." oninput="applyFilter()" style="width:140px;">
           <input type="text" class="search-input" id="searchDiana" placeholder="ダイアナコード..." oninput="applyFilter()" style="width:150px;">
           <select class="search-select" id="filterDivision" onchange="applyFilter()">
             <option value="">出場区分（すべて）</option>
@@ -833,6 +834,7 @@ async function downloadImage(blobName, label) {
 async function applyFilter() {
   const name    = (document.getElementById('searchName')?.value || '').toLowerCase();
   const salon   = (document.getElementById('searchSalon')?.value || '').toLowerCase();
+  const salonName = (document.getElementById('searchSalonName')?.value || '').toLowerCase();
   const diana   = (document.getElementById('searchDiana')?.value || '').toLowerCase();
   const div     = document.getElementById('filterDivision')?.value || '';
   const pref    = document.getElementById('filterPref')?.value || '';
@@ -847,6 +849,8 @@ async function applyFilter() {
 
     if (name   && !nameVal.includes(name) && !kanaVal.includes(name)) return false;
     if (salon  && !salonVal.includes(salon)) return false;
+    const salonNameVal = (r.measure?.salon_name || '').toLowerCase();
+    if (salonName && !salonNameVal.includes(salonName)) return false;
     if (diana  && !dianaVal.includes(diana)) return false;
     if (div    && divVal !== div) return false;
     if (pref   && prefVal !== pref) return false;
@@ -860,7 +864,7 @@ async function applyFilter() {
 }
 
 function clearSearch() {
-  ['searchName','searchSalon','searchDiana'].forEach(id => {
+  ['searchName','searchSalon','searchSalonName','searchDiana'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1036,44 +1040,55 @@ async function renderModal() {
       ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
       ${mBlock('登録日', m.registration_date ? new Date(m.registration_date).toLocaleDateString('ja-JP') : null, '')}
       ${mBlock('ボディチェック総回数', m.total_body_check || null, '回')}
+      ${mBlock('サロン名', m.salon_name || null, '')}
+      ${mBlock('身長', m.first_height || m.latest_height || null, 'cm')}
     </div>
   ` : '<div style="text-align:center;padding:12px;color:#aaa;font-size:13px;">DB照合データなし</div>';
 
-  // 採寸データ
-  const measureHtml = m && m.diag_dt ? `
-    <div style="font-size:12px;color:#888;margin-bottom:12px;">📅 採寸日：${esc(m.diag_dt)}</div>
-    <div class="measure-grid">
-      ${mBlock('身長', m.calc_height, 'cm')}
-      ${mBlock('体重', m.weight, 'kg')}
-      ${mBlock('BMI', m.bmi, '')}
-      ${mBlock('PI', m.pi, '')}
-      ${mBlock('バスト（上）', m.top_bust, 'cm')}
-      ${mBlock('アンダーバスト', m.under_bust, 'cm')}
-      ${mBlock('ウエスト', m.waist, 'cm')}
-      ${mBlock('中ヒップ', m.mid_hip, 'cm')}
-      ${mBlock('ヒップ', m.hip, 'cm')}
-      ${mBlock('太もも（左）', m.left_thigh, 'cm')}
-      ${mBlock('太もも（右）', m.right_thigh, 'cm')}
-      ${mBlock('体脂肪率', m.fat_pctg, '%')}
-    </div>
-    <div class="size-grid" style="margin-top:14px;">
-      <div class="size-block"><div class="size-lbl">ブラサイズ</div><div class="size-val">${esc(m.bra_sz||'-')}</div></div>
-      <div class="size-block"><div class="size-lbl">コルセット</div><div class="size-val">${esc(m.corset_sz||'-')}</div></div>
-      <div class="size-block"><div class="size-lbl">ボディスーツ</div><div class="size-val">${esc(m.body_suit_sz||'-')}</div></div>
+  // 採寸データ（初回・現在・変化・理想値の表）
+  const hasBodyCheck = m && m.first_check_date;
+  const measureHtml = hasBodyCheck ? `
+    <div style='overflow-x:auto;'>
+      <table style='width:100%;border-collapse:collapse;font-size:13px;'>
+        <thead>
+          <tr>
+            <th style='background:#f5eaf2;color:#7B4F6E;padding:8px 12px;text-align:left;border-bottom:2px solid #e0c8d8;white-space:nowrap;'>項目</th>
+            <th style='background:#f5eaf2;color:#7B4F6E;padding:8px 12px;text-align:center;border-bottom:2px solid #e0c8d8;white-space:nowrap;'>理想値</th>
+            <th style='background:#f0f9f5;color:#2e7d32;padding:8px 12px;text-align:center;border-bottom:2px solid #c8e6da;white-space:nowrap;'>初回<br><span style='font-size:11px;font-weight:normal;'>${esc(String(m.first_check_date||''))}</span></th>
+            <th style='background:#e8f4fd;color:#1565c0;padding:8px 12px;text-align:center;border-bottom:2px solid #b3d4f5;white-space:nowrap;'>現在<br><span style='font-size:11px;font-weight:normal;'>${esc(String(m.latest_check_date||''))}</span></th>
+            <th style='background:#fff8e1;color:#e65100;padding:8px 12px;text-align:center;border-bottom:2px solid #ffe082;white-space:nowrap;'>変化</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${measureRow('身長', 'cm', null, m.first_height, m.latest_height, null)}
+          ${measureRow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, m.diff_weight)}
+          ${measureRow('トップバスト', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, m.diff_top_bust)}
+          ${measureRow('アンダーバスト', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, m.diff_under_bust)}
+          ${measureRow('ウエスト', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, m.diff_waist)}
+          ${measureRow('ミドルヒップ', 'cm', m.ideal_mid_hip, m.first_mid_hip, m.latest_mid_hip, m.diff_mid_hip)}
+          ${measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, m.diff_hip)}
+          ${measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, m.diff_thigh_l)}
+          ${measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, m.diff_thigh_r)}
+          ${measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, m.diff_fat)}
+          ${measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, m.diff_bmi)}
+          ${measureRow('PI', '', null, m.first_pi, m.latest_pi, m.diff_pi)}
+        </tbody>
+      </table>
     </div>
   ` : '<div style="padding:20px 16px;">' + (dbConnected
       ? '<div style="display:flex;align-items:center;gap:10px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:10px;padding:14px 18px;">'  +
           '<span style="font-size:24px;">⚠️</span>' +
-          '<div><div style="font-weight:bold;color:#e65100;font-size:14px;margin-bottom:2px;">照合データなし</div>' +
-          '<div style="font-size:12px;color:#bf360c;">ダイアナコード・サロンコードが一致するデータが見つかりませんでした。</div></div></div>'
+          '<div><div style="font-weight:bold;color:#e65100;font-size:14px;margin-bottom:2px;">ボディチェックデータなし</div>' +
+          '<div style="font-size:12px;color:#bf360c;">ダイアナコードに一致する採寸データが見つかりませんでした。</div></div></div>'
       : '<div style="display:flex;align-items:flex-start;gap:12px;background:#f3f0ff;border:1.5px solid #9c8fd4;border-radius:10px;padding:16px 18px;">' +
           '<span style="font-size:28px;flex-shrink:0;">🔗</span>' +
           '<div><div style="font-weight:bold;color:#4527a0;font-size:15px;margin-bottom:6px;">採寸データ 未接続</div>' +
           '<div style="font-size:13px;color:#5e35b1;line-height:1.8;">PostgreSQL接続設定後にダイアナコードと照合して自動表示されます。</div></div></div>'
     ) + '</div>';
 
-  // 理想値
-  const idealHtml = `<div class="coming-soon">理想値カラムは今後追加予定です</div>`;
+  // 理想値（採寸テーブルに統合済み）
+  const idealHtml = '';
+
 
   // 画像ギャラリー（ダウンロードボタン付き）
   const galleryHtml = imgs.length > 0
@@ -1130,15 +1145,30 @@ async function renderModal() {
       <div class="detail-section-header">📐 初回採寸データ（DB自動取得）</div>
       <div class="detail-section-body">${measureHtml}</div>
     </div>
-    <div class="detail-section">
-      <div class="detail-section-header">🎯 理想値</div>
-      <div class="detail-section-body">${idealHtml}</div>
-    </div>
+
     <div class="detail-section">
       <div class="detail-section-header">🖼️ 応募写真</div>
       <div class="detail-section-body">${galleryHtml}</div>
     </div>
   `;
+}
+
+function measureRow(label, unit, ideal, first, latest, diff) {
+  const fmt = (v) => v != null && v !== '' ? `<strong>${esc(String(v))}</strong><span style="font-size:11px;color:#888;">${unit}</span>` : '<span style="color:#ccc;">-</span>';
+  const fmtDiff = (v) => {
+    if (v == null) return '<span style="color:#ccc;">-</span>';
+    const n = parseFloat(v);
+    const color = n < 0 ? '#27ae60' : n > 0 ? '#e74c3c' : '#888';
+    const sign = n > 0 ? '+' : '';
+    return `<span style="color:${color};font-weight:bold;">${sign}${esc(String(v))}<span style="font-size:11px;">${unit}</span></span>`;
+  };
+  return `<tr style="border-bottom:1px solid #f5f0f3;">
+    <td style="padding:8px 12px;color:#555;white-space:nowrap;">${esc(label)}</td>
+    <td style="padding:8px 12px;text-align:center;background:#fdf8fb;">${fmt(ideal)}</td>
+    <td style="padding:8px 12px;text-align:center;background:#f8fffe;">${fmt(first)}</td>
+    <td style="padding:8px 12px;text-align:center;background:#f0f8ff;">${fmt(latest)}</td>
+    <td style="padding:8px 12px;text-align:center;background:#fffdf0;">${fmtDiff(diff)}</td>
+  </tr>`;
 }
 
 function mBlock(label, val, unit) {
