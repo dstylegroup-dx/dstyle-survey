@@ -1039,9 +1039,12 @@ async function renderModal() {
       ${mBlock('ダイアナ歴', m.diana_years !== null && m.diana_years !== undefined ? m.diana_years + '年' : null, '')}
       ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
       ${mBlock('登録日', m.registration_date ? new Date(m.registration_date).toLocaleDateString('ja-JP') : null, '')}
+      ${mBlock('初回診断日', m.first_diagnosis_date ? new Date(m.first_diagnosis_date).toLocaleDateString('ja-JP') : null, '')}
       ${mBlock('ボディチェック総回数', m.total_body_check || null, '回')}
+      ${mBlock('最終BC日', m.last_body_check_date ? new Date(m.last_body_check_date).toLocaleDateString('ja-JP') : null, '')}
       ${mBlock('サロン名', m.salon_name || null, '')}
       ${mBlock('身長', m.first_height || m.latest_height || null, 'cm')}
+      ${mBlock('GP倶楽部', m.gp_club_type ? (m.gp_club_type + (m.gp_club_generation ? ' 第' + m.gp_club_generation + '期' : '')) : null, '')}
     </div>
   ` : '<div style="text-align:center;padding:12px;color:#aaa;font-size:13px;">DB照合データなし</div>';
 

@@ -1724,6 +1724,27 @@ app.http('diana-member', {
             }
             const cust = custResult.rows[0];
 
+            // ①-2 member_tblからGP倶楽部・ボディチェック情報を取得
+            let member = null;
+            try {
+                const memberResult = await pool.query(`
+                    SELECT
+                        body_check_count,
+                        last_body_check_date,
+                        first_diagnosis_date,
+                        gp_club_type,
+                        gp_club_generation,
+                        gp_club_expiration_date
+                    FROM ${schema}.member_tbl
+                    WHERE diana_cd::text = $1
+                      AND delete_flag::text = '0'
+                    LIMIT 1
+                `, [String(cust.diana_code)]);
+                if (memberResult.rows.length > 0) member = memberResult.rows[0];
+            } catch (e) {
+                context.log(`[diana-member] member_tbl取得エラー: ${e.message}`);
+            }
+
             // ② body_checkから採寸データ取得
             const bodyCheckQuery = `
                 SELECT
@@ -1781,7 +1802,13 @@ app.http('diana-member', {
                     diana_years:       dianaYears,
                     age:               cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
                     registration_date: cust.registration_date,
-                    total_body_check:  totalBodyCheck,
+                    // member_tblから取得
+                    total_body_check:  member?.body_check_count || totalBodyCheck,
+                    last_body_check_date: member?.last_body_check_date || null,
+                    first_diagnosis_date: member?.first_diagnosis_date || null,
+                    gp_club_type:      member?.gp_club_type || null,
+                    gp_club_generation: member?.gp_club_generation || null,
+                    gp_club_expiration_date: member?.gp_club_expiration_date || null,
                     // 初回採寸
                     first_check_date:  firstCheck?.['チェック日'] || null,
                     first_height:      firstCheck?.['チェック時身長'] || null,
