@@ -221,6 +221,28 @@
 
     /* 応募内容 */
     .answer-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
+    /* 基本情報（横並びグリッド） */
+    .answer-grid-short {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1px;
+      background: #f0e8ed;
+      border: 1px solid #f0e8ed;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .answer-item-short {
+      background: white;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .answer-item-short .answer-lbl { font-size: 11px; color: #888; font-weight: bold; }
+    .answer-item-short .answer-val { font-size: 14px; color: #333; font-weight: bold; word-break: break-word; }
+    /* 長文項目（縦並び） */
+    .answer-grid-long { display: grid; grid-template-columns: 1fr; gap: 0; border-top: 1px solid #f0e8ed; }
     .answer-item { display: grid; grid-template-columns: 160px 1fr; align-items: baseline; padding: 11px 8px; border-bottom: 1px solid #f0e8ed; gap: 16px; }
     .answer-item:last-child { border-bottom: none; }
     .answer-lbl { font-size: 12px; color: #888; font-weight: bold; line-height: 1.5; }
@@ -298,6 +320,7 @@
       .img-gallery { grid-template-columns: repeat(2, 1fr); gap: 10px; }
       .detail-section-body { padding: 6px 12px 12px; }
       .answer-grid { grid-template-columns: 1fr; }
+      .answer-grid-short { grid-template-columns: repeat(2, 1fr); }
       .img-gallery { grid-template-columns: repeat(2, 1fr); }
       .img-gallery-overlay { opacity: 1; }
       .detail-section-body { padding: 12px; }
@@ -913,10 +936,30 @@ async function renderModal() {
   const imgs = await getImageUrls(r);
   const entries = getAnswerEntries(r);
 
-  // 回答内容
-  const answerHtml = entries.map(e =>
-    `<div class="answer-item"><div class="answer-lbl">${esc(e.key)}</div><div class="answer-val">${esc(e.value)}</div></div>`
-  ).join('');
+  // 回答内容（基本情報は横並び・長文は縦）
+  const shortLabels = ['出場区分', '応募者氏名', 'ふりがな', 'ダイアナコード', '生年月日', 'サロンコード', '都道府県', 'サロン名', 'チーフ名', 'サロン所在地'];
+  const longLabels  = ['推薦理由', 'サクセスストーリー', '体型キープ', '夢・目標', '趣味', '家族構成', '承諾書'];
+
+  const shortEntries = entries.filter(e => shortLabels.some(k => e.key.includes(k)));
+  const longEntries  = entries.filter(e => !shortLabels.some(k => e.key.includes(k)));
+
+  const answerHtml =
+    (shortEntries.length > 0 ? `
+      <div class="answer-grid-short">
+        ${shortEntries.map(e => `
+          <div class="answer-item-short">
+            <div class="answer-lbl">${esc(e.key)}</div>
+            <div class="answer-val">${esc(e.value)}</div>
+          </div>`).join('')}
+      </div>` : '') +
+    (longEntries.length > 0 ? `
+      <div class="answer-grid-long">
+        ${longEntries.map(e => `
+          <div class="answer-item">
+            <div class="answer-lbl">${esc(e.key)}</div>
+            <div class="answer-val">${esc(e.value)}</div>
+          </div>`).join('')}
+      </div>` : '');
 
   // customer_master情報セクション
   const customerHtml = m && m.salon_code ? `
