@@ -205,14 +205,15 @@
     }
     .detail-section-body { padding: 16px 20px; }
 
+    /* 応募内容 */
     .answer-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
-    .answer-item { display: flex; flex-direction: row; align-items: flex-start; gap: 0; padding: 10px 4px; border-bottom: 1px solid #f0e8ed; }
+    .answer-item { display: grid; grid-template-columns: 160px 1fr; align-items: baseline; padding: 11px 8px; border-bottom: 1px solid #f0e8ed; gap: 16px; }
     .answer-item:last-child { border-bottom: none; }
-    .answer-lbl { font-size: 12px; color: #888; font-weight: bold; min-width: 180px; width: 180px; flex-shrink: 0; }
-    .answer-val { font-size: 14px; color: #333; word-break: break-word; flex: 1; line-height: 1.6; }
+    .answer-lbl { font-size: 12px; color: #888; font-weight: bold; line-height: 1.5; }
+    .answer-val { font-size: 14px; color: #333; word-break: break-word; line-height: 1.7; white-space: pre-wrap; }
 
     /* 採寸グリッド */
-    .measure-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .measure-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
     .measure-block { background: #f0f9f5; border: 1px solid #c8e6da; border-radius: 8px; padding: 10px 12px; }
     .m-lbl { font-size: 11px; color: #666; margin-bottom: 2px; }
     .m-val { font-size: 18px; font-weight: bold; color: #2e7d32; }
@@ -223,18 +224,13 @@
     .size-val { font-size: 20px; font-weight: bold; color: #7B4F6E; }
 
     /* 理想値 */
-    .ideal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-    .ideal-block { background: #f0f4ff; border: 1px solid #c5d0f0; border-radius: 8px; padding: 10px 12px; }
-    .ideal-lbl { font-size: 11px; color: #3a5096; margin-bottom: 2px; }
-    .ideal-val { font-size: 18px; font-weight: bold; color: #3a5096; }
     .coming-soon { color: #aaa; font-size: 13px; font-style: italic; padding: 16px; text-align: center; }
 
     /* 画像ギャラリー */
-    .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-    .img-gallery-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; aspect-ratio: 4/3; position: relative; background: #f5f5f5; }
-    .img-gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
-    .img-gallery-item:hover img { transform: scale(1.05); }
-    .no-image { color: #aaa; font-size: 13px; padding: 16px; text-align: center; }
+    .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    .img-gallery-item { border-radius: 10px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; position: relative; background: #f5f5f5; aspect-ratio: 4/3; }
+    .img-gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .no-image { color: #aaa; font-size: 13px; padding: 24px; text-align: center; }
 
     /* 画像ライトボックス */
     .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; align-items: center; justify-content: center; }
@@ -247,26 +243,24 @@
     .no-contest-icon { font-size: 56px; margin-bottom: 16px; }
     .no-contest p { font-size: 15px; }
 
-    /* 画像オーバーレイ */
-    .img-gallery-item { position: relative; overflow: hidden; }
+    /* 画像オーバーレイ（DLボタン常時表示） */
     .img-gallery-overlay {
       position: absolute; bottom: 0; left: 0; right: 0;
-      background: linear-gradient(transparent, rgba(0,0,0,0.8));
-      padding: 8px; opacity: 1;
+      background: linear-gradient(transparent, rgba(0,0,0,0.75));
+      padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px;
     }
     .img-gallery-label { color: white; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .img-action-row { display: flex; gap: 6px; }
     .img-action-btn {
-      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
-      color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px;
-      cursor: pointer; text-decoration: none; display: inline-block;
+      background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5);
+      color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px;
+      cursor: pointer; text-decoration: none; display: inline-block; flex: 1; text-align: center;
     }
-    .img-action-btn:hover { background: rgba(255,255,255,0.35); }
+    .img-action-btn:hover { background: rgba(255,255,255,0.4); }
 
     /* スマホ対応 */
     @media (max-width: 768px) {
       .topbar h1 { font-size: 13px; }
-      .answer-lbl { min-width: 120px; width: 120px; font-size: 11px; }
-      .answer-val { font-size: 13px; }
       .topbar-right { gap: 6px; }
       .user-badge { display: none; }
       .main { padding: 12px; }
@@ -280,9 +274,13 @@
       .search-input { width: 100%; }
       .modal-header { padding: 12px 16px; }
       .modal-name { font-size: 17px; }
-      .modal-body { padding: 14px; gap: 12px; }
+      .modal-body { padding: 12px; gap: 12px; }
+      .answer-item { grid-template-columns: 110px 1fr; gap: 10px; padding: 10px 6px; }
+      .answer-lbl { font-size: 11px; }
+      .answer-val { font-size: 13px; }
       .measure-grid { grid-template-columns: repeat(2, 1fr); }
       .size-grid { grid-template-columns: repeat(2, 1fr); }
+      .img-gallery { grid-template-columns: repeat(2, 1fr); gap: 10px; }
       .answer-grid { grid-template-columns: 1fr; }
       .img-gallery { grid-template-columns: repeat(2, 1fr); }
       .img-gallery-overlay { opacity: 1; }
@@ -931,7 +929,7 @@ async function renderModal() {
           <img src="${safeUrl}" alt="${safeLabel}" loading="lazy" onclick="openLightbox('${safeUrl}')">
           <div class="img-gallery-overlay">
             <div class="img-gallery-label">${safeLabel}</div>
-            <div style="display:flex;gap:6px;margin-top:6px;">
+            <div class="img-action-row">
               <button class="img-action-btn" onclick="event.stopPropagation();openLightbox('${safeUrl}')">🔍 拡大</button>
               <button class="img-action-btn" onclick="event.stopPropagation();downloadImage('${safeBlobName}','${safeLabel}')">⬇️ DL</button>
             </div>
