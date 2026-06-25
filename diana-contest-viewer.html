@@ -678,7 +678,8 @@ async function enrichWithMeasure() {
 function getAnswerByKey(r, keywords) {
   const answers = r.answers || {};
   for (const [k, v] of Object.entries(answers)) {
-    if (keywords.some(kw => k.includes(kw))) return typeof v === 'object' ? (v.value || '') : String(v);
+    const label = questionLabelMap[k] || k;
+    if (keywords.some(kw => label.includes(kw) || k.includes(kw))) return typeof v === 'object' ? (v.value || '') : String(v);
   }
   return '';
 }
