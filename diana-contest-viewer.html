@@ -92,6 +92,11 @@
     }
     .search-input { padding: 8px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; width: 200px; }
     .search-input:focus { border-color: #7B4F6E; outline: none; }
+    .search-select {
+      padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 13px; background: #fafafa; cursor: pointer; color: #333;
+    }
+    .search-select:focus { border-color: #7B4F6E; outline: none; }
     .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
     .btn-primary { background: #7B4F6E; color: white; }
     .btn-primary:hover { background: #68435d; }
@@ -421,11 +426,21 @@
       </div>
 
       <!-- ツールバー -->
-      <div class="toolbar">
-        <span style="font-size:13px;font-weight:bold;color:#555;">🔍 絞り込み：</span>
-        <input type="text" class="search-input" id="searchInput" placeholder="氏名・コードで検索..." oninput="applyFilter()">
-        <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
-        <span id="filterCount" style="font-size:13px;color:#7B4F6E;font-weight:bold;"></span>
+      <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:13px;font-weight:bold;color:#555;white-space:nowrap;">🔍 絞り込み</span>
+          <input type="text" class="search-input" id="searchName" placeholder="氏名・ふりがな..." oninput="applyFilter()" style="width:160px;">
+          <input type="text" class="search-input" id="searchSalon" placeholder="サロンコード..." oninput="applyFilter()" style="width:140px;">
+          <input type="text" class="search-input" id="searchDiana" placeholder="ダイアナコード..." oninput="applyFilter()" style="width:150px;">
+          <select class="search-select" id="filterDivision" onchange="applyFilter()">
+            <option value="">出場区分（すべて）</option>
+          </select>
+          <select class="search-select" id="filterPref" onchange="applyFilter()">
+            <option value="">都道府県（すべて）</option>
+          </select>
+          <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
+          <span id="filterCount" style="font-size:13px;color:#7B4F6E;font-weight:bold;white-space:nowrap;"></span>
+        </div>
       </div>
 
       <!-- グリッド -->
@@ -671,6 +686,7 @@ async function loadResponses() {
 
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('ja-JP');
     updateSummary();
+    buildFilterOptions();
     applyFilter();
   } catch (e) { showError('データ取得に失敗しました: ' + e.message); }
   btn.textContent = '🔄 更新';
@@ -709,9 +725,13 @@ function getAnswerByKey(r, keywords) {
 
 function getAnswerEntries(r) {
   const answers = r.answers || {};
+  // 上部表示する写真ラベル
+  const topPhotoLabels = ['ダイアナスタート前の全身写真', '現在の全身写真', '現在の顔写真'];
+
   return Object.entries(answers)
     .filter(([k, v]) => {
-      // 画像パスは応募内容から除外（応募写真セクションで表示）
+      const label = questionLabelMap[k] || k;
+      // 画像パスは応募内容から除外（応募写真・上部写真セクションで表示）
       if (typeof v === 'string' && isBlobPath(v)) return false;
       if (typeof v === 'string' && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) return false;
       return true;
@@ -811,19 +831,63 @@ async function downloadImage(blobName, label) {
 // フィルター・表示
 // ============================================================
 async function applyFilter() {
-  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const name    = (document.getElementById('searchName')?.value || '').toLowerCase();
+  const salon   = (document.getElementById('searchSalon')?.value || '').toLowerCase();
+  const diana   = (document.getElementById('searchDiana')?.value || '').toLowerCase();
+  const div     = document.getElementById('filterDivision')?.value || '';
+  const pref    = document.getElementById('filterPref')?.value || '';
+
   filteredResponses = allResponses.filter(r => {
-    if (!q) return true;
-    return JSON.stringify(r.answers).toLowerCase().includes(q);
+    const nameVal  = (getAnswerByKey(r, ['応募者氏名', '氏名', 'ふりがな']) || '').toLowerCase();
+    const kanaVal  = (getAnswerByKey(r, ['ふりがな']) || '').toLowerCase();
+    const salonVal = (getAnswerByKey(r, ['サロンコード']) || '').toLowerCase();
+    const dianaVal = (getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']) || '').toLowerCase();
+    const divVal   = getAnswerByKey(r, ['出場区分']) || '';
+    const prefVal  = getAnswerByKey(r, ['応募者 都道府県', '都道府県']) || '';
+
+    if (name   && !nameVal.includes(name) && !kanaVal.includes(name)) return false;
+    if (salon  && !salonVal.includes(salon)) return false;
+    if (diana  && !dianaVal.includes(diana)) return false;
+    if (div    && divVal !== div) return false;
+    if (pref   && prefVal !== pref) return false;
+    return true;
   });
+
   currentPage = 1;
-  document.getElementById('filterCount').textContent = q ? filteredResponses.length + '件該当' : '';
+  const hasFilter = name || salon || diana || div || pref;
+  document.getElementById('filterCount').textContent = hasFilter ? filteredResponses.length + '件該当' : '';
   await renderGrid();
 }
 
 function clearSearch() {
-  document.getElementById('searchInput').value = '';
+  ['searchName','searchSalon','searchDiana'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['filterDivision','filterPref'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   applyFilter();
+}
+
+// 絞り込みドロップダウンの選択肢を生成
+function buildFilterOptions() {
+  const divisions = [...new Set(allResponses.map(r => getAnswerByKey(r, ['出場区分'])).filter(Boolean))].sort();
+  const prefs     = [...new Set(allResponses.map(r => getAnswerByKey(r, ['応募者 都道府県', '都道府県'])).filter(Boolean))].sort();
+
+  const divSel = document.getElementById('filterDivision');
+  if (divSel) {
+    const cur = divSel.value;
+    divSel.innerHTML = '<option value="">出場区分（すべて）</option>' +
+      divisions.map(d => `<option value="${esc(d)}" ${cur===d?'selected':''}>${esc(d)}</option>`).join('');
+  }
+  const prefSel = document.getElementById('filterPref');
+  if (prefSel) {
+    const cur = prefSel.value;
+    prefSel.innerHTML = '<option value="">都道府県（すべて）</option>' +
+      prefs.map(p => `<option value="${esc(p)}" ${cur===p?'selected':''}>${esc(p)}</option>`).join('');
+  }
 }
 
 async function renderGrid() {
@@ -933,7 +997,11 @@ async function renderModal() {
   document.getElementById('nextBtn').disabled = currentDetailIndex === total - 1;
 
   const m = r.measure;
-  const imgs = await getImageUrls(r);
+  const allImgs = await getImageUrls(r);
+  const topPhotoKeys = ['ダイアナスタート前の全身写真', '現在の全身写真', '現在の顔写真'];
+  const topImgs  = allImgs.filter(img => topPhotoKeys.some(k => img.label.includes(k)));
+  const restImgs = allImgs.filter(img => !topPhotoKeys.some(k => img.label.includes(k)));
+  const imgs = restImgs; // 下部ギャラリー用
   const entries = getAnswerEntries(r);
 
   // 回答内容（基本情報は横並び・長文は縦）
@@ -1026,7 +1094,28 @@ async function renderModal() {
       }).join('') + '</div>'
     : '<div class="no-image">添付画像なし</div>';
 
-  document.getElementById('modalBody').innerHTML = `
+  // 上部写真HTML
+  const topPhotoHtml = topImgs.length > 0 ? `
+    <div class="detail-section">
+      <div class="detail-section-header">📸 応募写真（スタート前・現在）</div>
+      <div class="detail-section-body">
+        <div class="img-gallery" style="grid-template-columns:repeat(${Math.min(topImgs.length,3)},1fr);">
+          ${topImgs.map(img => `
+            <div class="img-gallery-item">
+              <img src="${esc(img.url)}" alt="${esc(img.label)}" loading="lazy" onclick="openLightbox('${esc(img.url)}')">
+              <div class="img-gallery-overlay">
+                <div class="img-gallery-label">${esc(img.label)}</div>
+                <div class="img-action-row">
+                  <button class="img-action-btn" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">🔍 拡大</button>
+                  <button class="img-action-btn" onclick="event.stopPropagation();downloadImage('${esc(img.blobName || '')}','${esc(img.label)}')">⬇️ DL</button>
+                </div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>` : '';
+
+  document.getElementById('modalBody').innerHTML = topPhotoHtml + `
     <div class="detail-section">
       <div class="detail-section-header">📋 応募内容
         <span style="font-weight:normal;font-size:11px;color:#aaa;margin-left:auto;">応募日時：${r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '-'}</span>
