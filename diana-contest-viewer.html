@@ -197,6 +197,12 @@
     .modal-subtitle { font-size: 11px; opacity: 0.8; }
     .modal-name { font-size: 18px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .modal-kana { font-size: 12px; opacity: 0.85; }
+    .modal-csv-btn {
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+      color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: bold; white-space: nowrap; flex-shrink: 0;
+    }
+    .modal-csv-btn:hover { background: rgba(255,255,255,0.35); }
     .modal-close { background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 4px 8px; border-radius: 4px; flex-shrink: 0; line-height: 1; }
     .modal-close:hover { background: rgba(255,255,255,0.2); }
 
@@ -419,6 +425,7 @@
         <div class="modal-name" id="modalName">-</div>
         <div class="modal-kana" id="modalKana"></div>
       </div>
+      <button class="modal-csv-btn" onclick="downloadSingleCSV()" title="この応募者のデータをCSVでダウンロード">📥 CSV</button>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
@@ -1022,6 +1029,53 @@ function closeLightbox() { document.getElementById('lightbox').classList.remove(
 // ============================================================
 // CSV出力
 // ============================================================
+
+// 個人CSV（モーダルで表示中の1名分）
+function downloadSingleCSV() {
+  const r = filteredResponses[currentDetailIndex];
+  if (!r) return;
+
+  const answerKeys = Object.keys(r.answers || {});
+  const answerLabels = answerKeys.map(k => questionLabelMap[k] || k);
+  const m = r.measure || {};
+
+  const headers = [
+    'No.', '応募日時',
+    ...answerLabels,
+    '採寸日', '身長(cm)', '体重(kg)', 'トップバスト(cm)', 'アンダーバスト(cm)',
+    'ウエスト(cm)', '中ヒップ(cm)', 'ヒップ(cm)', '太もも左(cm)', '太もも右(cm)',
+    '体脂肪率(%)', 'BMI', 'PI', 'ブラサイズ', 'コルセットサイズ', 'ボディスーツサイズ',
+    'ダイアナ歴(年)', 'ボディチェック総回数',
+    '理想体重', '理想ウエスト', '理想ヒップ'
+  ];
+
+  const row = [
+    currentDetailIndex + 1,
+    r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
+    ...answerKeys.map(k => {
+      const v = (r.answers||{})[k];
+      if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) return v.split('/').pop();
+      return typeof v === 'object' ? JSON.stringify(v) : String(v||'');
+    }),
+    m.diag_dt||'', m.calc_height||'', m.weight||'',
+    m.top_bust||'', m.under_bust||'',
+    m.waist||'', m.mid_hip||'', m.hip||'',
+    m.left_thigh||'', m.right_thigh||'',
+    m.fat_pctg||'', m.bmi||'', m.pi||'',
+    m.bra_sz||'', m.corset_sz||'', m.body_suit_sz||'',
+    m.diana_years||'', m.total_body_check||'',
+    '', '', ''
+  ];
+
+  const name = getAnswerByKey(r, ['氏名','名前','お名前']) || '応募者';
+  const bom = '\uFEFF';
+  const csv = bom + [headers, row].map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = 'diana_' + name + '_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
 function downloadCSV() {
   if (filteredResponses.length === 0) { alert('データがありません'); return; }
 
