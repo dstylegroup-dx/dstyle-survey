@@ -1698,17 +1698,17 @@ app.http('diana-member', {
                     birth_date, registration_date,
                     transfer_delete_flag
                 FROM ${schema}.customer_master
-                WHERE transfer_delete_flag = 0
+                WHERE transfer_delete_flag::text = '0'
             `;
             const params = [];
 
             if (dia_cd) {
-                params.push(dia_cd);
-                custQuery += ` AND diana_code = $${params.length}`;
+                params.push(String(dia_cd));
+                custQuery += ` AND diana_code::text = $${params.length}`;
             }
             if (sldsslcd) {
-                params.push(sldsslcd);
-                custQuery += ` AND salon_code = $${params.length}`;
+                params.push(String(sldsslcd));
+                custQuery += ` AND salon_code::text = $${params.length}`;
             }
             if (b_day) {
                 // 生年月日の形式を正規化（YYYY-MM-DD）
