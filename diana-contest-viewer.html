@@ -906,15 +906,16 @@ async function renderModal() {
       <div class="size-block"><div class="size-lbl">コルセット</div><div class="size-val">${esc(m.corset_sz||'-')}</div></div>
       <div class="size-block"><div class="size-lbl">ボディスーツ</div><div class="size-val">${esc(m.body_suit_sz||'-')}</div></div>
     </div>
-  ` : `<div style="text-align:center;padding:24px 16px;">
-    ${dbConnected
-      ? '<div style="color:#888;font-size:14px;">⚠️ 照合データなし（コード不一致の可能性）</div>'
-      : '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:16px 20px;display:inline-block;text-align:left;">' +
-        '<div style="font-size:15px;font-weight:bold;color:#f57f17;margin-bottom:8px;">📋 採寸データ未取得</div>' +
-        '<div style="font-size:13px;color:#795548;line-height:1.7;">PostgreSQL接続設定後に<br>ダイアナコードと照合して<br>自動表示されます。</div>' +
-        '</div>'
-    }
-  </div>`;
+  ` : '<div style="padding:20px 16px;">' + (dbConnected
+      ? '<div style="display:flex;align-items:center;gap:10px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:10px;padding:14px 18px;">'  +
+          '<span style="font-size:24px;">⚠️</span>' +
+          '<div><div style="font-weight:bold;color:#e65100;font-size:14px;margin-bottom:2px;">照合データなし</div>' +
+          '<div style="font-size:12px;color:#bf360c;">ダイアナコード・サロンコードが一致するデータが見つかりませんでした。</div></div></div>'
+      : '<div style="display:flex;align-items:flex-start;gap:12px;background:#f3f0ff;border:1.5px solid #9c8fd4;border-radius:10px;padding:16px 18px;">' +
+          '<span style="font-size:28px;flex-shrink:0;">🔗</span>' +
+          '<div><div style="font-weight:bold;color:#4527a0;font-size:15px;margin-bottom:6px;">採寸データ 未接続</div>' +
+          '<div style="font-size:13px;color:#5e35b1;line-height:1.8;">PostgreSQL接続設定後にダイアナコードと照合して自動表示されます。</div></div></div>'
+    ) + '</div>';
 
   // 理想値
   const idealHtml = `<div class="coming-soon">理想値カラムは今後追加予定です</div>`;
