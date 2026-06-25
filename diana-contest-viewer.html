@@ -665,7 +665,7 @@ async function enrichWithMeasure() {
       const res = await fetch(BASE_URL + '/api/diana-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
-        body: JSON.stringify({ sldsslcd: salonCode, dia_cd: dianaCode, b_day: bday })
+        body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday })
       });
       if (res.ok) r.measure = await res.json();
     } catch (e) { /* silent */ }
