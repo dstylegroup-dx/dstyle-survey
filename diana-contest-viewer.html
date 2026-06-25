@@ -755,11 +755,24 @@ async function downloadImage(blobName, label) {
       if (res.ok) { const d = await res.json(); url = d.downloadUrl; }
     }
     if (!url) { alert('ダウンロードURLを取得できませんでした'); return; }
+
+    // SASのURLはクロスオリジンのためdownload属性が効かないので
+    // fetchでバイナリ取得→BlobURL経由で強制ダウンロード
+    const imgRes = await fetch(url);
+    if (!imgRes.ok) throw new Error('画像取得失敗');
+    const blob = await imgRes.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    // ファイル名を取得（元のパスの末尾）
+    const fileName = label || blobName.split('/').pop() || 'image';
+
     const a = document.createElement('a');
-    a.href = url;
-    a.download = label || 'image';
-    a.target = '_blank';
+    a.href = blobUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   } catch(e) { alert('ダウンロードに失敗しました: ' + e.message); }
 }
 

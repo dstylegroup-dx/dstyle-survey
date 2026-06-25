@@ -9,9 +9,7 @@
   "routes": [
     {
       "route": "/api/*",
-      "allowedRoles": [
-        "anonymous"
-      ]
+      "allowedRoles": ["anonymous"]
     },
     {
       "route": "/dashboard-herbelle",
@@ -36,6 +34,11 @@
     {
       "route": "/diana-contest-viewer",
       "rewrite": "/diana-contest-viewer.html"
+    },
+    {
+      "route": "/*.html",
+      "redirect": "/404",
+      "statusCode": 301
     }
   ],
   "navigationFallback": {
