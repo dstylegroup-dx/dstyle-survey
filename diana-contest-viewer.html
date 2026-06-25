@@ -694,13 +694,13 @@ async function loadResponses() {
   btn.disabled = false;
 }
 
-// customer_master照合（ダイアナ歴・年齢・氏名補完）
+// customer_master照合（ダイアナ歴・年齢・氏名補完）- 並列処理
 async function enrichWithMeasure() {
-  for (const r of allResponses) {
+  await Promise.all(allResponses.map(async r => {
     const salonCode = getAnswerByKey(r, ['サロンコード']);
     const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
     const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
-    if (!salonCode && !dianaCode) continue;
+    if (!salonCode && !dianaCode) return;
     try {
       const res = await fetch(BASE_URL + '/api/diana-member', {
         method: 'POST',
@@ -709,7 +709,7 @@ async function enrichWithMeasure() {
       });
       if (res.ok) r.measure = await res.json();
     } catch (e) { /* silent */ }
-  }
+  }));
 }
 
 // ============================================================
