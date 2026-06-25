@@ -469,7 +469,7 @@ let allResponses = [];
 let filteredResponses = [];
 let currentPage = 1;
 const PAGE_SIZE = 24;
-let dbConnected = false;
+let dbConnected = true; // customer_master接続済み
 let currentDetailIndex = -1;
 let currentContest = null;
 
@@ -654,7 +654,7 @@ async function loadResponses() {
   btn.disabled = false;
 }
 
-// 採寸データ付加（PostgreSQL接続後に実装）
+// customer_master照合（ダイアナ歴・年齢・氏名補完）
 async function enrichWithMeasure() {
   for (const r of allResponses) {
     const salonCode = getAnswerByKey(r, ['サロンコード']);
@@ -826,7 +826,10 @@ async function renderGrid() {
     const date    = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ja-JP') : '-';
     const imgs    = await getImageUrls(r);
     const hasMeasure = r.measure && r.measure.diag_dt;
-    cardHtmlList.push(`<div class="applicant-card ${hasMeasure ? 'has-measure' : ''}" onclick="showDetail(${idx})">
+    const hasCustomer = r.measure && r.measure.salon_code;
+    const dianaYears = r.measure?.diana_years;
+    const age = r.measure?.age;
+    cardHtmlList.push(`<div class="applicant-card ${hasCustomer ? 'has-measure' : ''}" onclick="showDetail(${idx})">
       <div class="card-header">
         <div class="card-num">No.${idx + 1}</div>
         <div class="card-name">${name}</div>
@@ -836,12 +839,13 @@ async function renderGrid() {
         <div class="card-row"><span class="key">サロンコード</span><span class="val">${salon || '-'}</span></div>
         <div class="card-row"><span class="key">ダイアナコード</span><span class="val">${diana || '-'}</span></div>
         <div class="card-row"><span class="key">生年月日</span><span class="val">${bday || '-'}</span></div>
-        ${hasMeasure ? `<div class="card-row"><span class="key">採寸日</span><span class="val">${esc(r.measure.diag_dt)}</span></div>` : ''}
+        ${dianaYears !== null && dianaYears !== undefined ? `<div class="card-row"><span class="key">ダイアナ歴</span><span class="val">${dianaYears}年</span></div>` : ''}
+        ${age !== null && age !== undefined ? `<div class="card-row"><span class="key">年齢</span><span class="val">${age}歳</span></div>` : ''}
         ${imgs.length > 0 ? `<div class="img-thumb-row">${imgs.slice(0,3).map(img => `<img class="img-thumb" src="${esc(img.url)}" alt="${esc(img.label)}" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">`).join('')}${imgs.length > 3 ? `<span style="font-size:11px;color:#aaa;align-self:center;">+${imgs.length-3}</span>` : ''}</div>` : ''}
       </div>
       <div class="card-footer">
         <span class="card-date">📅 ${date}</span>
-        <span>${hasMeasure ? '<span class="measure-chip">✅ 採寸済</span>' : '<span class="no-measure-chip">📋 ' + (dbConnected ? 'DB照合なし' : 'DB未接続') + '</span>'}</span>
+        <span>${hasCustomer ? '<span class="measure-chip">✅ DB照合済</span>' : '<span class="no-measure-chip">📋 DB照合なし</span>'}</span>
         <span class="card-arrow">›</span>
       </div>
     </div>`);
@@ -879,7 +883,7 @@ async function goPage(p) {
 // ============================================================
 function updateSummary() {
   document.getElementById('totalCount').textContent = allResponses.length;
-  document.getElementById('matchedCount').textContent = allResponses.filter(r => r.measure && r.measure.diag_dt).length;
+  document.getElementById('matchedCount').textContent = allResponses.filter(r => r.measure && r.measure.salon_code).length;
 }
 
 // ============================================================
@@ -913,6 +917,16 @@ async function renderModal() {
   const answerHtml = entries.map(e =>
     `<div class="answer-item"><div class="answer-lbl">${esc(e.key)}</div><div class="answer-val">${esc(e.value)}</div></div>`
   ).join('');
+
+  // customer_master情報セクション
+  const customerHtml = m && m.salon_code ? `
+    <div class="measure-grid">
+      ${mBlock('ダイアナ歴', m.diana_years !== null && m.diana_years !== undefined ? m.diana_years + '年' : null, '')}
+      ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
+      ${mBlock('登録日', m.registration_date ? new Date(m.registration_date).toLocaleDateString('ja-JP') : null, '')}
+      ${mBlock('ボディチェック総回数', m.total_body_check || null, '回')}
+    </div>
+  ` : '<div style="text-align:center;padding:12px;color:#aaa;font-size:13px;">DB照合データなし</div>';
 
   // 採寸データ
   const measureHtml = m && m.diag_dt ? `
@@ -975,6 +989,10 @@ async function renderModal() {
         <span style="font-weight:normal;font-size:11px;color:#aaa;margin-left:auto;">応募日時：${r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '-'}</span>
       </div>
       <div class="detail-section-body"><div class="answer-grid">${answerHtml}</div></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-header">👤 会員情報（DBから取得）</div>
+      <div class="detail-section-body">${customerHtml}</div>
     </div>
     <div class="detail-section">
       <div class="detail-section-header">📐 初回採寸データ（DB自動取得）</div>

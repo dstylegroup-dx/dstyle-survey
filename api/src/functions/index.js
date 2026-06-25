@@ -1747,6 +1747,7 @@ app.http('diana-member', {
                     name_kana:        (cust.last_name_kana  || '') + ' ' + (cust.first_name_kana  || ''),
                     b_day:            cust.birth_date,
                     diana_years:      dianaYears,
+                    age:              cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
                     registration_date: cust.registration_date,
                     total_body_check: totalBodyCheck,
                     // 初回採寸（採寸テーブル接続後に追加予定）
