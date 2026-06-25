@@ -1688,28 +1688,33 @@ app.http('diana-member', {
             const schema = process.env.PG_SCHEMA || 'public';
             const pool = getPgPool();
 
-            // ① 顧客テーブルから CUST_CD を取得
-            // TRNF_DEL_FLG = 0（移籍・削除なし）のみ対象
+            // ① customer_master から顧客情報を取得
+            // transfer_delete_flag = 0（移籍・削除なし）のみ対象
             let custQuery = `
-                SELECT "CUST_CD", "DIA_CD", "SLDSSLCD", "L_NM_KANJI", "F_NM_KANJI", "L_NM_KANA", "F_NM_KANA", "B_DAY", "L_REG_DT"
-                FROM "${schema}"."SLD_ADMIN_CUSTOMER_TBL"
-                WHERE "TRNF_DEL_FLG" = 0
+                SELECT
+                    salon_code, diana_cd,
+                    last_name_kanji, first_name_kanji,
+                    last_name_kana, first_name_kana,
+                    birth_date, registration_date,
+                    transfer_delete_flag
+                FROM ${schema}.customer_master
+                WHERE transfer_delete_flag = 0
             `;
             const params = [];
 
             if (dia_cd) {
                 params.push(dia_cd);
-                custQuery += ` AND "DIA_CD" = $${params.length}`;
+                custQuery += ` AND diana_cd = $${params.length}`;
             }
             if (sldsslcd) {
                 params.push(sldsslcd);
-                custQuery += ` AND "SLDSSLCD" = $${params.length}`;
+                custQuery += ` AND salon_code = $${params.length}`;
             }
             if (b_day) {
-                // 生年月日の形式を正規化（YYYY/MM/DD または YYYY-MM-DD）
-                const bdayNorm = b_day.replace(/-/g, '/');
+                // 生年月日の形式を正規化（YYYY-MM-DD）
+                const bdayNorm = b_day.replace(/\//g, '-');
                 params.push(bdayNorm);
-                custQuery += ` AND "B_DAY" = $${params.length}`;
+                custQuery += ` AND birth_date::text LIKE $${params.length} || '%'`;
             }
             custQuery += ' LIMIT 1';
 
@@ -1719,73 +1724,53 @@ app.http('diana-member', {
             }
             const cust = custResult.rows[0];
 
-            // ② 採寸テーブルから初回採寸（最も古い DIAG_DT）を取得
-            const measureQuery = `
-                SELECT
-                    "CUST_CD", "DIAG_DT", "WEIGHT", "TOP_BUST", "UNDER_BUST",
-                    "WAIST", "MID_HIP", "HIP", "LEFT_THIGH", "RIGHT_THIGH",
-                    "LEFT_CALF", "RIGHT_CALF", "LEFT_ARM", "RIGHT_ARM",
-                    "FAT_PCTG", "CORSET_SZ", "BRA_SZ", "BODY_SUIT_SZ",
-                    "CALC_HEIGHT", "BMI", "PI", "REC_CRS"
-                FROM "${schema}"."SLD_ADMIN_MEASURE_TBL"
-                WHERE "CUST_CD" = $1
-                ORDER BY "DIAG_DT" ASC
-                LIMIT 1
-            `;
-            const measureResult = await pool.query(measureQuery, [cust.CUST_CD]);
+            // ② 採寸テーブル（保留中）
+            const measure = null;
+            const totalBodyCheck = 0;
 
-            // ③ ボディチェック総回数（全レコード数）
-            const countResult = await pool.query(
-                `SELECT COUNT(*) as cnt FROM "${schema}"."SLD_ADMIN_MEASURE_TBL" WHERE "CUST_CD" = $1`,
-                [cust.CUST_CD]
-            );
-            const totalBodyCheck = parseInt(countResult.rows[0]?.cnt || 0);
-
-            // ④ ダイアナ歴（L_REG_DT から計算）
+            // ③ ダイアナ歴（registration_date から計算）
             let dianaYears = null;
-            if (cust.L_REG_DT) {
-                const regDate = new Date(cust.L_REG_DT);
+            if (cust.registration_date) {
+                const regDate = new Date(cust.registration_date);
                 const now = new Date();
                 dianaYears = Math.floor((now - regDate) / (1000 * 60 * 60 * 24 * 365));
             }
-
-            const measure = measureResult.rows[0] || null;
 
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 jsonBody: {
-                    // 顧客情報
-                    cust_cd:        cust.CUST_CD,
-                    dia_cd:         cust.DIA_CD,
-                    sldsslcd:       cust.SLDSSLCD,
-                    name_kanji:     (cust.L_NM_KANJI || '') + ' ' + (cust.F_NM_KANJI || ''),
-                    name_kana:      (cust.L_NM_KANA  || '') + ' ' + (cust.F_NM_KANA  || ''),
-                    b_day:          cust.B_DAY,
-                    diana_years:    dianaYears,
+                    // 顧客情報（customer_masterから取得）
+                    salon_code:       cust.salon_code,
+                    dia_cd:           cust.diana_cd,
+                    name_kanji:       (cust.last_name_kanji || '') + ' ' + (cust.first_name_kanji || ''),
+                    name_kana:        (cust.last_name_kana  || '') + ' ' + (cust.first_name_kana  || ''),
+                    b_day:            cust.birth_date,
+                    diana_years:      dianaYears,
+                    registration_date: cust.registration_date,
                     total_body_check: totalBodyCheck,
-                    // 初回採寸
-                    diag_dt:        measure?.DIAG_DT        || null,
-                    calc_height:    measure?.CALC_HEIGHT     || null,
-                    weight:         measure?.WEIGHT          || null,
-                    top_bust:       measure?.TOP_BUST        || null,
-                    under_bust:     measure?.UNDER_BUST      || null,
-                    waist:          measure?.WAIST           || null,
-                    mid_hip:        measure?.MID_HIP         || null,
-                    hip:            measure?.HIP             || null,
-                    left_thigh:     measure?.LEFT_THIGH      || null,
-                    right_thigh:    measure?.RIGHT_THIGH     || null,
-                    left_calf:      measure?.LEFT_CALF       || null,
-                    right_calf:     measure?.RIGHT_CALF      || null,
-                    left_arm:       measure?.LEFT_ARM        || null,
-                    right_arm:      measure?.RIGHT_ARM       || null,
-                    fat_pctg:       measure?.FAT_PCTG        || null,
-                    corset_sz:      measure?.CORSET_SZ       || null,
-                    bra_sz:         measure?.BRA_SZ          || null,
-                    body_suit_sz:   measure?.BODY_SUIT_SZ    || null,
-                    bmi:            measure?.BMI             || null,
-                    pi:             measure?.PI              || null,
-                    rec_crs:        measure?.REC_CRS         || null,
+                    // 初回採寸（採寸テーブル接続後に追加予定）
+                    diag_dt:        null,
+                    calc_height:    null,
+                    weight:         null,
+                    top_bust:       null,
+                    under_bust:     null,
+                    waist:          null,
+                    mid_hip:        null,
+                    hip:            null,
+                    left_thigh:     null,
+                    right_thigh:    null,
+                    left_calf:      null,
+                    right_calf:     null,
+                    left_arm:       null,
+                    right_arm:      null,
+                    fat_pctg:       null,
+                    corset_sz:      null,
+                    bra_sz:         null,
+                    body_suit_sz:   null,
+                    bmi:            null,
+                    pi:             null,
+                    rec_crs:        null,
                 }
             };
 
