@@ -658,8 +658,8 @@ async function loadResponses() {
 async function enrichWithMeasure() {
   for (const r of allResponses) {
     const salonCode = getAnswerByKey(r, ['サロンコード']);
-    const dianaCode = getAnswerByKey(r, ['ダイアナコード', 'diana_cd']);
-    const bday      = getAnswerByKey(r, ['生年月日', '生年', '誕生']);
+    const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
+    const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
     if (!salonCode && !dianaCode) continue;
     try {
       const res = await fetch(BASE_URL + '/api/diana-member', {
@@ -820,8 +820,8 @@ async function renderGrid() {
     const name    = esc(getAnswerByKey(r, ['応募者氏名', '氏名', '名前', 'お名前']) || '（氏名なし）');
     const kana    = esc(getAnswerByKey(r, ['ふりがな', 'フリガナ', 'カナ', 'かな']));
     const salon   = esc(getAnswerByKey(r, ['サロンコード']));
-    const diana   = esc(getAnswerByKey(r, ['ダイアナコード', 'diana_cd']));
-    const bday    = esc(getAnswerByKey(r, ['生年月日', '応募者 生年月日']));
+    const diana   = esc(getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']));
+    const bday    = esc(getAnswerByKey(r, ['応募者 生年月日', '生年月日']));
     const date    = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ja-JP') : '-';
     const imgs    = await getImageUrls(r);
     const hasMeasure = r.measure && r.measure.diag_dt;
@@ -895,8 +895,8 @@ async function renderModal() {
   if (!r) return;
 
   const total = filteredResponses.length;
-  const name  = getAnswerByKey(r, ['氏名','名前','お名前']) || '（氏名なし）';
-  const kana  = getAnswerByKey(r, ['カナ','かな','フリガナ']);
+  const name  = getAnswerByKey(r, ['応募者氏名', '氏名','名前','お名前']) || '（氏名なし）';
+  const kana  = getAnswerByKey(r, ['ふりがな', 'フリガナ','カナ','かな']);
 
   document.getElementById('modalSubtitle').textContent = `${currentDetailIndex + 1} / ${total}`;
   document.getElementById('modalName').textContent = name;
@@ -1067,7 +1067,7 @@ function downloadSingleCSV() {
     '', '', ''
   ];
 
-  const name = getAnswerByKey(r, ['氏名','名前','お名前']) || '応募者';
+  const name = getAnswerByKey(r, ['応募者氏名', '氏名','名前','お名前']) || '応募者';
   const bom = '\uFEFF';
   const csv = bom + [headers, row].map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a');
