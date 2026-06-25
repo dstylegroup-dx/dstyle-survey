@@ -1692,7 +1692,7 @@ app.http('diana-member', {
             // transfer_delete_flag = 0（移籍・削除なし）のみ対象
             let custQuery = `
                 SELECT
-                    salon_code, diana_cd,
+                    salon_code, diana_code,
                     last_name_kanji, first_name_kanji,
                     last_name_kana, first_name_kana,
                     birth_date, registration_date,
@@ -1704,7 +1704,7 @@ app.http('diana-member', {
 
             if (dia_cd) {
                 params.push(dia_cd);
-                custQuery += ` AND diana_cd = $${params.length}`;
+                custQuery += ` AND diana_code = $${params.length}`;
             }
             if (sldsslcd) {
                 params.push(sldsslcd);
@@ -1742,7 +1742,7 @@ app.http('diana-member', {
                 jsonBody: {
                     // 顧客情報（customer_masterから取得）
                     salon_code:       cust.salon_code,
-                    dia_cd:           cust.diana_cd,
+                    dia_cd:           cust.diana_code,
                     name_kanji:       (cust.last_name_kanji || '') + ' ' + (cust.first_name_kanji || ''),
                     name_kana:        (cust.last_name_kana  || '') + ' ' + (cust.first_name_kana  || ''),
                     b_day:            cust.birth_date,
