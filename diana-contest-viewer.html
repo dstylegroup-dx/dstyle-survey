@@ -498,11 +498,6 @@ const BASE_URL = location.hostname === 'localhost'
   ? 'http://localhost:7071'
   : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
 
-// diana-member は Static Web Apps を経由せず直接 Functions を叩く（30秒タイムアウト回避）
-const FUNC_DIRECT_URL = location.hostname === 'localhost'
-  ? 'http://localhost:7071'
-  : 'https://func-dstyle-survey.azurewebsites.net';
-
 // ============================================================
 // 状態
 // ============================================================
@@ -706,7 +701,7 @@ async function enrichWithMeasure() {
     const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
     if (!salonCode && !dianaCode) return;
     try {
-      const res = await fetch(FUNC_DIRECT_URL + '/api/diana-member', {
+      const res = await fetch(BASE_URL + '/api/diana-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
         body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday })
@@ -1010,7 +1005,7 @@ async function showDetail(idx) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒でタイムアウト
-          const res = await fetch(FUNC_DIRECT_URL + '/api/diana-member', {
+          const res = await fetch(BASE_URL + '/api/diana-member', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
             body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday }),

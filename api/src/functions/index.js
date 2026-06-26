@@ -1772,6 +1772,7 @@ app.http('diana-member', {
             // ①-2 member_tblからGP倶楽部・ボディチェック情報を取得
             let member = null;
             try {
+                context.log(`[diana-member] member_tblクエリ開始: ${Date.now() - t0}ms`);
                 const memberResult = await pool.query(`
                     SELECT
                         body_check_count,
@@ -1786,6 +1787,7 @@ app.http('diana-member', {
                     LIMIT 1
                 `, [String(cust.diana_code)]);
                 if (memberResult.rows.length > 0) member = memberResult.rows[0];
+                context.log(`[diana-member] member_tblクエリ完了: ${Date.now() - t0}ms`);
             } catch (e) {
                 context.log(`[diana-member] member_tbl取得エラー: ${e.message}`);
             }
@@ -1809,7 +1811,9 @@ app.http('diana-member', {
                 WHERE "ダイアナコード"::text = $1
                 ORDER BY "チェック日" ASC
             `;
+            context.log(`[diana-member] body_checkクエリ開始: ${Date.now() - t0}ms`);
             const bodyCheckResult = await pool.query(bodyCheckQuery, [String(cust.diana_code)]);
+            context.log(`[diana-member] body_checkクエリ完了: ${Date.now() - t0}ms 件数=${bodyCheckResult.rows.length}`);
             const totalBodyCheck = bodyCheckResult.rows.length;
             const firstCheck = bodyCheckResult.rows[0] || null;       // 初回
             const latestCheck = bodyCheckResult.rows[totalBodyCheck - 1] || null; // 現在（最新）
