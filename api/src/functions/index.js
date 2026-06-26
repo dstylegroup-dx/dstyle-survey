@@ -1669,6 +1669,18 @@ function getPgPool() {
     return pgPool;
 }
 
+// PostgreSQL ウォームアップ: Functions 起動時にバックグラウンドで接続を確立しておく
+if (process.env.PG_HOST) {
+    setTimeout(() => {
+        getPgPool().connect()
+            .then(client => {
+                console.log('[PgPool] warmup complete');
+                client.release();
+            })
+            .catch(err => console.error('[PgPool] 㦩ォームアップ失敗:', err.message));
+    }, 0);
+}
+
 // ----------------------------------------------------
 // 👗 【Diana採寸データ取得】PostgreSQL連携
 // POST /api/diana-member
