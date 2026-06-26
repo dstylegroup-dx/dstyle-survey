@@ -1778,6 +1778,7 @@ app.http('diana-member', {
                         body_check_count,
                         last_body_check_date,
                         first_diagnosis_date,
+                        registration_date AS member_registration_date,
                         gp_club_type,
                         gp_club_generation,
                         gp_club_expiration_date
@@ -1821,12 +1822,14 @@ app.http('diana-member', {
             // サロン名（body_checkから取得）
             const salonName = latestCheck?.['サロン名'] || firstCheck?.['サロン名'] || null;
 
-            // ③ ダイアナ歴（registration_date から計算）
+            // ③ ダイアナ歴（member_tbl.registration_date = 実際の入会日 から計算）
+            // customer_master.registration_date はデータ移行日等で不正確なため member_tbl を優先
             let dianaYears = null;
-            if (cust.registration_date) {
-                const regDate = new Date(cust.registration_date);
+            const joinDate = member?.member_registration_date || cust.registration_date;
+            if (joinDate) {
+                const regDate = new Date(joinDate);
                 const now = new Date();
-                dianaYears = Math.floor((now - regDate) / (1000 * 60 * 60 * 24 * 365));
+                dianaYears = Math.floor((now - regDate) / (1000 * 60 * 60 * 24 * 365.25));
             }
 
             // 変化値を計算（現在 - 初回）
@@ -1850,7 +1853,7 @@ app.http('diana-member', {
                     b_day:             cust.birth_date,
                     diana_years:       dianaYears,
                     age:               cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
-                    registration_date: cust.registration_date,
+                    registration_date: member?.member_registration_date || cust.registration_date,
                     // member_tblから取得
                     total_body_check:  member?.body_check_count || totalBodyCheck,
                     last_body_check_date: member?.last_body_check_date || null,
