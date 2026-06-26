@@ -475,6 +475,7 @@
         <div class="modal-name" id="modalName">-</div>
         <div class="modal-kana" id="modalKana"></div>
       </div>
+      <button class="modal-csv-btn" onclick="printDetail()" title="この応募者の詳細を印刷">🖨️ 印刷</button>
       <button class="modal-csv-btn" onclick="downloadSingleCSV()" title="この応募者のデータをCSVでダウンロード">📥 CSV</button>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
@@ -1478,6 +1479,103 @@ function toggleLayout() {
   const btn = document.getElementById('layoutBtn');
   if (btn) btn.innerHTML = listView ? '▦ カード表示' : '▤ 一覧表示';
   renderGrid();
+}
+
+// ============================================================
+// 印刷（応募者 詳細1名分）
+// ============================================================
+function printDetail() {
+  const r = filteredResponses[currentDetailIndex];
+  if (!r) { alert('印刷するデータがありません'); return; }
+
+  const fmt = (v) => (v == null || v === '') ? '-' : esc(String(v));
+  const name = getAnswerByKey(r, ['応募者氏名','氏名','名前','お名前']) || '（氏名なし）';
+  const kana = getAnswerByKey(r, ['ふりがな','フリガナ','カナ','かな']);
+  const m = r.measure || {};
+
+  // 応募内容（画像・添付以外の回答）
+  const answerRows = getAnswerEntries(r)
+    .map(a => `<tr><th>${esc(a.key)}</th><td>${fmt(a.value)}</td></tr>`).join('');
+
+  // 会員情報
+  let memberHtml = '<p class="none">DB照合データなし</p>';
+  if (m && m.salon_code) {
+    const gp = m.gp_club_type == null ? 'なし' : (String(m.gp_club_type) === '001' ? 'あり' : 'なし');
+    const cells = [
+      ['ダイアナ歴', m.diana_years != null ? m.diana_years + '年' : '-'],
+      ['年齢', m.age != null ? m.age + '歳' : '-'],
+      ['登録日', fmtDate(m.registration_date) || '-'],
+      ['初回診断日', fmtDate(m.first_diagnosis_date) || '-'],
+      ['ボディチェック総回数', m.total_body_check != null ? m.total_body_check + '回' : '-'],
+      ['最終BC日', fmtDate(m.last_body_check_date) || '-'],
+      ['サロン名', fmt(m.salon_name)],
+      ['身長', (m.first_height || m.latest_height) ? (m.first_height || m.latest_height) + 'cm' : '-'],
+      ['GP倶楽部', gp],
+    ];
+    memberHtml = '<div class="info-grid">' + cells.map(c => `<div class="info-cell"><span class="lbl">${c[0]}</span><span class="val">${esc(String(c[1]))}</span></div>`).join('') + '</div>';
+  }
+
+  // 採寸データ表
+  let measureHtml = '<p class="none">採寸データなし</p>';
+  if (m && m.first_check_date) {
+    const mrow = (label, unit, ideal, first, latest, diff) =>
+      `<tr><th>${label}</th>
+        <td>${ideal != null ? ideal + unit : '-'}</td>
+        <td>${first != null ? first + unit : '-'}</td>
+        <td>${latest != null ? latest + unit : '-'}</td>
+        <td>${diff != null ? diff + unit : '-'}</td></tr>`;
+    measureHtml = `<table class="measure">
+      <thead><tr><th>項目</th><th>理想値</th><th>初回<br>${esc(fmtDate(m.first_check_date))}</th><th>現在<br>${esc(fmtDate(m.latest_check_date))}</th><th>変化</th></tr></thead>
+      <tbody>
+        ${mrow('身長','cm',null,m.first_height,m.latest_height,null)}
+        ${mrow('体重','kg',m.ideal_weight,m.first_weight,m.latest_weight,m.diff_weight)}
+        ${mrow('トップバスト','cm',m.ideal_top_bust,m.first_top_bust,m.latest_top_bust,m.diff_top_bust)}
+        ${mrow('アンダーバスト','cm',m.ideal_under_bust,m.first_under_bust,m.latest_under_bust,m.diff_under_bust)}
+        ${mrow('ウエスト','cm',m.ideal_waist,m.first_waist,m.latest_waist,m.diff_waist)}
+        ${mrow('ミドルヒップ','cm',m.ideal_mid_hip,m.first_mid_hip,m.latest_mid_hip,m.diff_mid_hip)}
+        ${mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,m.diff_hip)}
+        ${mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,m.diff_thigh_l)}
+        ${mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,m.diff_thigh_r)}
+        ${mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,m.diff_fat)}
+        ${mrow('BMI','',null,m.first_bmi,m.latest_bmi,m.diff_bmi)}
+        ${mrow('PI','',null,m.first_pi,m.latest_pi,m.diff_pi)}
+      </tbody></table>`;
+  }
+
+  const title = (currentContest ? currentContest.title + '　' : '') + name;
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <style>
+      body { font-family: 'Hiragino Kaku Gothic ProN','Meiryo',sans-serif; padding: 20px; color: #222; }
+      h1 { font-size: 20px; margin: 0 0 2px; }
+      .kana { font-size: 12px; color: #777; margin-bottom: 14px; }
+      h2 { font-size: 14px; color: #7B4F6E; border-bottom: 2px solid #e0c8d8; padding-bottom: 4px; margin: 18px 0 8px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 6px; }
+      th, td { border: 1px solid #bbb; padding: 5px 8px; text-align: left; vertical-align: top; }
+      table.kv th { background: #f5eef2; width: 200px; white-space: nowrap; }
+      .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .info-cell { border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; }
+      .info-cell .lbl { display: block; font-size: 10px; color: #888; }
+      .info-cell .val { font-size: 14px; font-weight: bold; color: #2e7d32; }
+      table.measure th { background: #f5eef2; text-align: center; }
+      table.measure td { text-align: center; }
+      .none { color: #999; font-size: 12px; }
+      @media print { @page { size: A4 portrait; margin: 12mm; } }
+    </style></head><body>
+    <h1>${esc(name)}</h1>
+    <div class="kana">${esc(kana)}　／　${esc(currentContest ? currentContest.title : '')}</div>
+    <h2>応募内容</h2>
+    <table class="kv">${answerRows}</table>
+    <h2>会員情報（DBから取得）</h2>
+    ${memberHtml}
+    <h2>初回採寸データ</h2>
+    ${measureHtml}
+    <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('ポップアップがブロックされました。印刷するにはポップアップを許可してください。'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 // ============================================================
