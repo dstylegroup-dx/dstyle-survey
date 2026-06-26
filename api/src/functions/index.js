@@ -1368,11 +1368,11 @@ app.timer('sendScheduledMails', {
 
 
 // ----------------------------------------------------
-// ⏱ 【PostgreSQL keepalive】4分おきにDB接続を維持
+// ⏱ 【PostgreSQL keepalive】3分おきにDB接続を維持（NATゲートウェイTCPタイムアウト10分対策）
 // NATゲートウェイのTCPセッション(4分タイムアウト)対策
 // ----------------------------------------------------
 app.timer('pgKeepAlive', {
-    schedule: '0 */4 * * * *',  // 4分おき
+    schedule: '0 */3 * * * *',  // 3分おき
     handler: async (myTimer, context) => {
         if (!process.env.PG_HOST) return;
         try {
