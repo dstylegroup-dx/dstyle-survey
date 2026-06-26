@@ -102,6 +102,8 @@
     .btn-primary:hover { background: #68435d; }
     .btn-success { background: #27ae60; color: white; }
     .btn-success:hover { background: #219a52; }
+    .btn-light { background: #fff; color: #7B4F6E; border: 1.5px solid #d8c0d0; }
+    .btn-light:hover { background: #f5eef2; }
     .btn-secondary { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
     .btn-secondary:hover { background: #eee; }
     .ml-auto { margin-left: auto; }
@@ -119,6 +121,14 @@
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 16px;
     }
+    /* リスト表示モード（1列・横長カード） */
+    .applicant-grid.list-view { grid-template-columns: 1fr; gap: 10px; }
+    .applicant-grid.list-view .applicant-card { display: grid; grid-template-columns: 200px 1fr auto; align-items: center; }
+    .applicant-grid.list-view .card-header { height: 100%; display: flex; flex-direction: column; justify-content: center; }
+    .applicant-grid.list-view .card-body { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 12px 16px; }
+    .applicant-grid.list-view .card-body .card-row { flex: 0 0 auto; min-width: 130px; }
+    .applicant-grid.list-view .img-thumb-row { width: 100%; }
+    .applicant-grid.list-view .card-footer { border-top: none; border-left: 1px solid #eee; flex-direction: column; align-items: flex-end; gap: 4px; }
     .applicant-card {
       background: white; border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.07);
@@ -146,6 +156,7 @@
     /* 画像サムネイル */
     .img-thumb-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
     .img-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; }
+    .file-thumb { display: flex; align-items: center; justify-content: center; font-size: 22px; background: #f5f0f8; color: #7B4F6E; }
 
     /* 空状態 */
     .empty-state { text-align: center; padding: 60px 20px; color: #aaa; background: white; border-radius: 12px; }
@@ -271,6 +282,9 @@
     .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
     .img-gallery-item { border-radius: 10px; overflow: hidden; border: 1px solid #ddd; cursor: pointer; position: relative; background: #f5f5f5; aspect-ratio: 4/3; }
     .img-gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .file-icon-box { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg,#f5f0f8,#ede4f2); }
+    .file-icon-emoji { font-size: 44px; }
+    .file-icon-kind { font-size: 12px; font-weight: bold; color: #7B4F6E; letter-spacing: 0.05em; }
     .no-image { color: #aaa; font-size: 13px; padding: 24px; text-align: center; }
 
     /* 画像ライトボックス */
@@ -388,6 +402,8 @@
       </div>
       <span class="contest-badge" id="contestBadge" style="display:none"></span>
       <div class="ml-auto" style="display:flex;gap:8px;">
+        <button class="btn btn-light" onclick="toggleLayout()" id="layoutBtn" style="display:none" title="カード表示と一覧表示を切り替え">▤ 表示切替</button>
+        <button class="btn btn-light" onclick="printList()" id="printBtn" style="display:none">🖨️ 印刷</button>
         <button class="btn btn-success" onclick="downloadCSV()" id="csvBtn" style="display:none">📥 CSV出力</button>
         <button class="btn btn-primary" onclick="loadResponses()" id="refreshBtn" style="display:none">🔄 更新</button>
       </div>
@@ -407,11 +423,6 @@
           <div class="lbl">総応募者数</div>
           <div class="val" id="totalCount">0</div>
           <div class="sub">名</div>
-        </div>
-        <div class="summary-card">
-          <div class="lbl">採寸データ取得済み</div>
-          <div class="val" id="matchedCount">0</div>
-          <div class="sub">名 / DB照合済み</div>
         </div>
         <div class="summary-card">
           <div class="lbl">最終更新</div>
@@ -508,6 +519,7 @@ let allResponses = [];
 let filteredResponses = [];
 let currentPage = 1;
 const PAGE_SIZE = 24;
+let listView = false; // false=カード表示, true=リスト（列並び）表示
 let dbConnected = true; // customer_master接続済み
 let currentDetailIndex = -1;
 let currentContest = null;
@@ -515,6 +527,19 @@ let currentContest = null;
 function esc(str) {
   if (str == null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// 日付を YYYY/MM/DD 形式に整形（時刻・タイムゾーンは除去）
+function fmtDate(val) {
+  if (!val) return '';
+  const s = String(val);
+  // "2001-04-07T00:00:00.000Z" や "2001-04-07 22:45:11" の先頭日付部分だけ取り出す
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) return `${m[1]}/${m[2].padStart(2,'0')}/${m[3].padStart(2,'0')}`;
+  // フォールバック：Dateとして解釈できれば日本ロケールで日付のみ
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toLocaleDateString('ja-JP');
+  return s;
 }
 
 // ============================================================
@@ -635,6 +660,8 @@ async function onContestChange() {
     document.getElementById('contestBadge').style.display = 'none';
     document.getElementById('csvBtn').style.display = 'none';
     document.getElementById('refreshBtn').style.display = 'none';
+    document.getElementById('printBtn').style.display = 'none';
+    document.getElementById('layoutBtn').style.display = 'none';
     currentContest = null;
     return;
   }
@@ -645,6 +672,8 @@ async function onContestChange() {
   badge.style.display = 'inline-block';
   document.getElementById('csvBtn').style.display = 'inline-block';
   document.getElementById('refreshBtn').style.display = 'inline-block';
+  document.getElementById('printBtn').style.display = 'inline-block';
+  document.getElementById('layoutBtn').style.display = 'inline-block';
   document.getElementById('noContestMsg').style.display = 'none';
   document.getElementById('dataArea').style.display = 'block';
   await loadResponses();
@@ -688,26 +717,44 @@ async function loadResponses() {
     updateSummary();
     buildFilterOptions();
     applyFilter();
+
+    // 全応募者のDB照合をバックグラウンドで実行（完了後にグリッド再描画）
+    enrichWithMeasure().then(() => {
+      updateSummary();
+      renderGrid();
+    });
   } catch (e) { showError('データ取得に失敗しました: ' + e.message); }
   btn.textContent = '🔄 更新';
   btn.disabled = false;
 }
 
-// customer_master照合（ダイアナ歴・年齢・氏名補完）- 並列処理
+// customer_master照合（全応募者）- 並列処理＋リトライ
 async function enrichWithMeasure() {
   await Promise.all(allResponses.map(async r => {
+    if (r.measure) return; // 取得済みはスキップ
     const salonCode = getAnswerByKey(r, ['サロンコード']);
     const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
     const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
     if (!salonCode && !dianaCode) return;
-    try {
-      const res = await fetch(BASE_URL + '/api/diana-member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
-        body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday })
-      });
-      if (res.ok) r.measure = await res.json();
-    } catch (e) { /* silent */ }
+    const MAX_RETRY = 3;
+    for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const res = await fetch(BASE_URL + '/api/diana-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
+          body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) { r.measure = await res.json(); break; }
+        if (res.status === 404) break; // データなし
+        if (attempt < MAX_RETRY) await new Promise(rs => setTimeout(rs, 2000));
+      } catch (e) {
+        if (attempt < MAX_RETRY) await new Promise(rs => setTimeout(rs, 2000));
+      }
+    }
   }));
 }
 
@@ -758,6 +805,26 @@ function isImagePath(v) {
   return /\.(png|jpg|jpeg|gif|webp|PNG|JPG|JPEG|GIF|WEBP)$/.test(v.split('?')[0]);
 }
 
+// ファイル種別を判定（'image' | 'pdf' | 'excel' | 'file'）
+function fileKind(name) {
+  if (typeof name !== 'string' || !name) return 'file';
+  const base = name.split('?')[0].toLowerCase();
+  if (/\.(png|jpg|jpeg|gif|webp)$/.test(base)) return 'image';
+  if (/\.pdf$/.test(base)) return 'pdf';
+  if (/\.(xlsx|xls|xlsm|csv)$/.test(base)) return 'excel';
+  if (/\.(docx?|pptx?)$/.test(base)) return 'doc';
+  return 'file';
+}
+
+// 種別に応じたアイコン絵文字
+function fileKindIcon(kind) {
+  return kind === 'pdf' ? '📄'
+       : kind === 'excel' ? '📊'
+       : kind === 'doc' ? '📝'
+       : kind === 'image' ? '🖼️'
+       : '📎';
+}
+
 // Blob StorageのパスからSAS URL取得（filedownloadエンドポイント使用）
 async function getBlobUrl(blobPath) {
   try {
@@ -769,7 +836,7 @@ async function getBlobUrl(blobPath) {
   return null;
 }
 
-// 画像URLリストを取得（Blobパス→SAS URL変換済み）
+// 添付ファイルリストを取得（Blobパス→SAS URL変換済み、種別付き）
 async function getImageUrls(r) {
   const answers = r.answers || {};
   const urls = [];
@@ -778,17 +845,14 @@ async function getImageUrls(r) {
     if (typeof v === 'string' && isBlobPath(v)) {
       // Blob相対パス → SAS URL取得
       const url = v.startsWith('https://') ? v : await getBlobUrl(v);
-      if (url) urls.push({ label, blobName: v, url });
-    } else if (typeof v === 'string' && isBlobPath(v) && isImagePath(v)) {
-      const url = await getBlobUrl(v);
-      if (url) urls.push({ label, blobName: v, url });
+      if (url) urls.push({ label, blobName: v, url, kind: fileKind(v) });
     } else if (typeof v === 'string' && v.startsWith('https://') && isImagePath(v)) {
-      urls.push({ label, blobName: null, url: v });
+      urls.push({ label, blobName: null, url: v, kind: fileKind(v) });
     } else if (typeof v === 'object' && v !== null && !Array.isArray(v) && v.url) {
-      urls.push({ label, blobName: null, url: v.url });
+      urls.push({ label, blobName: v.blobName || null, url: v.url, kind: fileKind(v.name || v.blobName || v.url) });
     } else if (Array.isArray(v)) {
       for (const item of v) {
-        if (item && item.url) urls.push({ label, blobName: null, url: item.url });
+        if (item && item.url) urls.push({ label, blobName: item.blobName || null, url: item.url, kind: fileKind(item.name || item.blobName || item.url) });
       }
     }
   }
@@ -895,6 +959,7 @@ function buildFilterOptions() {
 
 async function renderGrid() {
   const grid = document.getElementById('applicantGrid');
+  grid.classList.toggle('list-view', listView);
   if (filteredResponses.length === 0) {
     grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🔍</div><p>' + (allResponses.length === 0 ? '応募データがありません' : '検索結果がありません') + '</p></div>';
     document.getElementById('pagination').style.display = 'none';
@@ -931,7 +996,10 @@ async function renderGrid() {
         <div class="card-row"><span class="key">生年月日</span><span class="val">${bday || '-'}</span></div>
         ${dianaYears !== null && dianaYears !== undefined ? `<div class="card-row"><span class="key">ダイアナ歴</span><span class="val">${dianaYears}年</span></div>` : ''}
         ${age !== null && age !== undefined ? `<div class="card-row"><span class="key">年齢</span><span class="val">${age}歳</span></div>` : ''}
-        ${imgs.length > 0 ? `<div class="img-thumb-row">${imgs.slice(0,3).map(img => `<img class="img-thumb" src="${esc(img.url)}" alt="${esc(img.label)}" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">`).join('')}${imgs.length > 3 ? `<span style="font-size:11px;color:#aaa;align-self:center;">+${imgs.length-3}</span>` : ''}</div>` : ''}
+        ${imgs.length > 0 ? `<div class="img-thumb-row">${imgs.slice(0,3).map(img => img.kind === 'image'
+            ? `<img class="img-thumb" src="${esc(img.url)}" alt="${esc(img.label)}" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">`
+            : `<span class="img-thumb file-thumb" title="${esc(img.label)}" onclick="event.stopPropagation();downloadImage('${esc(img.blobName || '')}','${esc(img.label)}')">${fileKindIcon(img.kind)}</span>`
+          ).join('')}${imgs.length > 3 ? `<span style="font-size:11px;color:#aaa;align-self:center;">+${imgs.length-3}</span>` : ''}</div>` : ''}
       </div>
       <div class="card-footer">
         <span class="card-date">📅 ${date}</span>
@@ -973,7 +1041,6 @@ async function goPage(p) {
 // ============================================================
 function updateSummary() {
   document.getElementById('totalCount').textContent = allResponses.length;
-  document.getElementById('matchedCount').textContent = allResponses.filter(r => r.measure && r.measure.salon_code).length;
 }
 
 // ============================================================
@@ -1103,13 +1170,13 @@ async function renderModal() {
     <div class="measure-grid">
       ${mBlock('ダイアナ歴', m.diana_years !== null && m.diana_years !== undefined ? m.diana_years + '年' : null, '')}
       ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
-      ${mBlock('登録日', m.registration_date ? new Date(m.registration_date).toLocaleDateString('ja-JP') : null, '')}
-      ${mBlock('初回診断日', m.first_diagnosis_date ? new Date(m.first_diagnosis_date).toLocaleDateString('ja-JP') : null, '')}
+      ${mBlock('登録日', m.registration_date ? fmtDate(m.registration_date) : null, '')}
+      ${mBlock('初回診断日', m.first_diagnosis_date ? fmtDate(m.first_diagnosis_date) : null, '')}
       ${mBlock('ボディチェック総回数', m.total_body_check || null, '回')}
-      ${mBlock('最終BC日', m.last_body_check_date ? new Date(m.last_body_check_date).toLocaleDateString('ja-JP') : null, '')}
+      ${mBlock('最終BC日', m.last_body_check_date ? fmtDate(m.last_body_check_date) : null, '')}
       ${mBlock('サロン名', m.salon_name || null, '')}
       ${mBlock('身長', m.first_height || m.latest_height || null, 'cm')}
-      ${mBlock('GP倶楽部', m.gp_club_type ? (m.gp_club_type + (m.gp_club_generation ? ' 第' + m.gp_club_generation + '期' : '')) : null, '')}
+      ${mBlock('GP倶楽部', String(m.gp_club_type) === '001' ? 'あり' : 'なし', '')}
     </div>
   ` : '<div style="text-align:center;padding:12px;color:#aaa;font-size:13px;">DB照合データなし</div>';
 
@@ -1122,8 +1189,8 @@ async function renderModal() {
           <tr>
             <th style='background:#f5eaf2;color:#7B4F6E;padding:8px 12px;text-align:left;border-bottom:2px solid #e0c8d8;white-space:nowrap;'>項目</th>
             <th style='background:#f5eaf2;color:#7B4F6E;padding:8px 12px;text-align:center;border-bottom:2px solid #e0c8d8;white-space:nowrap;'>理想値</th>
-            <th style='background:#f0f9f5;color:#2e7d32;padding:8px 12px;text-align:center;border-bottom:2px solid #c8e6da;white-space:nowrap;'>初回<br><span style='font-size:11px;font-weight:normal;'>${esc(String(m.first_check_date||''))}</span></th>
-            <th style='background:#e8f4fd;color:#1565c0;padding:8px 12px;text-align:center;border-bottom:2px solid #b3d4f5;white-space:nowrap;'>現在<br><span style='font-size:11px;font-weight:normal;'>${esc(String(m.latest_check_date||''))}</span></th>
+            <th style='background:#f0f9f5;color:#2e7d32;padding:8px 12px;text-align:center;border-bottom:2px solid #c8e6da;white-space:nowrap;'>初回<br><span style='font-size:11px;font-weight:normal;'>${esc(fmtDate(m.first_check_date))}</span></th>
+            <th style='background:#e8f4fd;color:#1565c0;padding:8px 12px;text-align:center;border-bottom:2px solid #b3d4f5;white-space:nowrap;'>現在<br><span style='font-size:11px;font-weight:normal;'>${esc(fmtDate(m.latest_check_date))}</span></th>
             <th style='background:#fff8e1;color:#e65100;padding:8px 12px;text-align:center;border-bottom:2px solid #ffe082;white-space:nowrap;'>変化</th>
           </tr>
         </thead>
@@ -1158,13 +1225,13 @@ async function renderModal() {
   const idealHtml = '';
 
 
-  // 画像ギャラリー（ダウンロードボタン付き）
-  const galleryHtml = imgs.length > 0
-    ? '<div class="img-gallery">' + imgs.map(img => {
-        const safeUrl = esc(img.url);
-        const safeLabel = esc(img.label);
-        const safeBlobName = img.blobName ? esc(img.blobName) : '';
-        return `<div class="img-gallery-item">
+  // 添付ファイル1件のギャラリーアイテムHTMLを生成（画像はサムネ、それ以外はアイコン）
+  function galleryItemHtml(img) {
+    const safeUrl = esc(img.url);
+    const safeLabel = esc(img.label);
+    const safeBlobName = img.blobName ? esc(img.blobName) : '';
+    if (img.kind === 'image') {
+      return `<div class="img-gallery-item">
           <img src="${safeUrl}" alt="${safeLabel}" loading="lazy" onclick="openLightbox('${safeUrl}')">
           <div class="img-gallery-overlay">
             <div class="img-gallery-label">${safeLabel}</div>
@@ -1174,8 +1241,27 @@ async function renderModal() {
             </div>
           </div>
         </div>`;
-      }).join('') + '</div>'
-    : '<div class="no-image">添付画像なし</div>';
+    }
+    // 画像以外：アイコン＋ラベル＋DLボタン
+    const kindName = img.kind === 'pdf' ? 'PDF' : img.kind === 'excel' ? 'Excel' : img.kind === 'doc' ? '文書' : 'ファイル';
+    return `<div class="img-gallery-item file-item">
+        <div class="file-icon-box" onclick="downloadImage('${safeBlobName}','${safeLabel}')">
+          <div class="file-icon-emoji">${fileKindIcon(img.kind)}</div>
+          <div class="file-icon-kind">${kindName}</div>
+        </div>
+        <div class="img-gallery-overlay">
+          <div class="img-gallery-label">${safeLabel}</div>
+          <div class="img-action-row">
+            <button class="img-action-btn" onclick="event.stopPropagation();downloadImage('${safeBlobName}','${safeLabel}')">⬇️ DL</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // 画像ギャラリー（ダウンロードボタン付き）
+  const galleryHtml = imgs.length > 0
+    ? '<div class="img-gallery">' + imgs.map(galleryItemHtml).join('') + '</div>'
+    : '<div class="no-image">添付ファイルなし</div>';
 
   // 上部写真HTML
   const topPhotoHtml = topImgs.length > 0 ? `
@@ -1183,17 +1269,7 @@ async function renderModal() {
       <div class="detail-section-header">📸 応募写真（スタート前・現在）</div>
       <div class="detail-section-body">
         <div class="img-gallery" style="grid-template-columns:repeat(${Math.min(topImgs.length,3)},1fr);">
-          ${topImgs.map(img => `
-            <div class="img-gallery-item">
-              <img src="${esc(img.url)}" alt="${esc(img.label)}" loading="lazy" onclick="openLightbox('${esc(img.url)}')">
-              <div class="img-gallery-overlay">
-                <div class="img-gallery-label">${esc(img.label)}</div>
-                <div class="img-action-row">
-                  <button class="img-action-btn" onclick="event.stopPropagation();openLightbox('${esc(img.url)}')">🔍 拡大</button>
-                  <button class="img-action-btn" onclick="event.stopPropagation();downloadImage('${esc(img.blobName || '')}','${esc(img.label)}')">⬇️ DL</button>
-                </div>
-              </div>
-            </div>`).join('')}
+          ${topImgs.map(galleryItemHtml).join('')}
         </div>
       </div>
     </div>` : '';
@@ -1215,7 +1291,7 @@ async function renderModal() {
     </div>
 
     <div class="detail-section">
-      <div class="detail-section-header">🖼️ 応募写真</div>
+      <div class="detail-section-header">📄 出場申込書兼承諾書</div>
       <div class="detail-section-body">${galleryHtml}</div>
     </div>
   `;
@@ -1281,6 +1357,56 @@ function closeLightbox() { document.getElementById('lightbox').classList.remove(
 // CSV出力
 // ============================================================
 
+// DB会員・採寸データのCSVカラム定義（ヘッダー名 → 値の取り出し関数）
+const MEASURE_CSV_COLUMNS = [
+  ['ダイアナ歴(年)',        m => m.diana_years],
+  ['年齢',                  m => m.age],
+  ['登録日',                m => fmtDate(m.registration_date)],
+  ['初回診断日',            m => fmtDate(m.first_diagnosis_date)],
+  ['ボディチェック総回数',  m => m.total_body_check],
+  ['最終BC日',              m => fmtDate(m.last_body_check_date)],
+  ['サロン名',              m => m.salon_name],
+  ['GP倶楽部',              m => (m.gp_club_type == null ? '' : (String(m.gp_club_type) === '001' ? 'あり' : 'なし'))],
+  ['初回採寸日',            m => fmtDate(m.first_check_date)],
+  ['初回 身長(cm)',         m => m.first_height],
+  ['初回 体重(kg)',         m => m.first_weight],
+  ['初回 トップバスト(cm)', m => m.first_top_bust],
+  ['初回 アンダーバスト(cm)', m => m.first_under_bust],
+  ['初回 ウエスト(cm)',     m => m.first_waist],
+  ['初回 ミドルヒップ(cm)', m => m.first_mid_hip],
+  ['初回 ヒップ(cm)',       m => m.first_hip],
+  ['初回 太もも左(cm)',     m => m.first_thigh_l],
+  ['初回 太もも右(cm)',     m => m.first_thigh_r],
+  ['初回 体脂肪率(%)',      m => m.first_fat],
+  ['初回 BMI',              m => m.first_bmi],
+  ['初回 PI',               m => m.first_pi],
+  ['現在採寸日',            m => fmtDate(m.latest_check_date)],
+  ['現在 身長(cm)',         m => m.latest_height],
+  ['現在 体重(kg)',         m => m.latest_weight],
+  ['現在 トップバスト(cm)', m => m.latest_top_bust],
+  ['現在 アンダーバスト(cm)', m => m.latest_under_bust],
+  ['現在 ウエスト(cm)',     m => m.latest_waist],
+  ['現在 ミドルヒップ(cm)', m => m.latest_mid_hip],
+  ['現在 ヒップ(cm)',       m => m.latest_hip],
+  ['現在 太もも左(cm)',     m => m.latest_thigh_l],
+  ['現在 太もも右(cm)',     m => m.latest_thigh_r],
+  ['現在 体脂肪率(%)',      m => m.latest_fat],
+  ['現在 BMI',              m => m.latest_bmi],
+  ['現在 PI',               m => m.latest_pi],
+  ['理想 体重(kg)',         m => m.ideal_weight],
+  ['理想 トップバスト(cm)', m => m.ideal_top_bust],
+  ['理想 アンダーバスト(cm)', m => m.ideal_under_bust],
+  ['理想 ウエスト(cm)',     m => m.ideal_waist],
+  ['理想 ミドルヒップ(cm)', m => m.ideal_mid_hip],
+  ['理想 ヒップ(cm)',       m => m.ideal_hip],
+  ['理想 体脂肪率(%)',      m => m.ideal_fat],
+];
+
+// CSVセルのエスケープ
+function csvCell(v) {
+  return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+}
+
 // 個人CSV（モーダルで表示中の1名分）
 function downloadSingleCSV() {
   const r = filteredResponses[currentDetailIndex];
@@ -1290,37 +1416,21 @@ function downloadSingleCSV() {
   const answerLabels = answerKeys.map(k => questionLabelMap[k] || k);
   const m = r.measure || {};
 
-  const headers = [
-    'No.', '応募日時',
-    ...answerLabels,
-    '採寸日', '身長(cm)', '体重(kg)', 'トップバスト(cm)', 'アンダーバスト(cm)',
-    'ウエスト(cm)', '中ヒップ(cm)', 'ヒップ(cm)', '太もも左(cm)', '太もも右(cm)',
-    '体脂肪率(%)', 'BMI', 'PI', 'ブラサイズ', 'コルセットサイズ', 'ボディスーツサイズ',
-    'ダイアナ歴(年)', 'ボディチェック総回数',
-    '理想体重', '理想ウエスト', '理想ヒップ'
-  ];
-
+  const headers = ['No.', '応募日時', ...answerLabels, ...MEASURE_CSV_COLUMNS.map(c => c[0])];
   const row = [
     currentDetailIndex + 1,
     r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
     ...answerKeys.map(k => {
       const v = (r.answers||{})[k];
-      if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) return v.split('/').pop();
+      if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp|pdf|xlsx?|docx?)/i.test(v)) return v.split('/').pop();
       return typeof v === 'object' ? JSON.stringify(v) : String(v||'');
     }),
-    m.diag_dt||'', m.calc_height||'', m.weight||'',
-    m.top_bust||'', m.under_bust||'',
-    m.waist||'', m.mid_hip||'', m.hip||'',
-    m.left_thigh||'', m.right_thigh||'',
-    m.fat_pctg||'', m.bmi||'', m.pi||'',
-    m.bra_sz||'', m.corset_sz||'', m.body_suit_sz||'',
-    m.diana_years||'', m.total_body_check||'',
-    '', '', ''
+    ...MEASURE_CSV_COLUMNS.map(c => c[1](m)),
   ];
 
   const name = getAnswerByKey(r, ['応募者氏名', '氏名','名前','お名前']) || '応募者';
   const bom = '\uFEFF';
-  const csv = bom + [headers, row].map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const csv = bom + [headers, row].map(rr => rr.map(csvCell).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
   a.download = 'diana_' + name + '_' + new Date().toISOString().slice(0,10) + '.csv';
@@ -1332,54 +1442,104 @@ function downloadCSV() {
 
   // 全回答に存在するキーを収集（順序保持）
   const answerKeys = [...new Set(filteredResponses.flatMap(r => Object.keys(r.answers || {})))];
-
-  // questionLabelMapで日本語ラベルに変換（なければIDのまま）
   const answerLabels = answerKeys.map(k => questionLabelMap[k] || k);
 
-  // ヘッダー行（日本語）
-  const headers = [
-    'No.', '応募日時',
-    ...answerLabels,
-    '採寸日', '身長(cm)', '体重(kg)', 'トップバスト(cm)', 'アンダーバスト(cm)',
-    'ウエスト(cm)', '中ヒップ(cm)', 'ヒップ(cm)', '太もも左(cm)', '太もも右(cm)',
-    '体脂肪率(%)', 'BMI', 'PI', 'ブラサイズ', 'コルセットサイズ', 'ボディスーツサイズ',
-    'ダイアナ歴(年)', 'ボディチェック総回数',
-    '理想体重', '理想ウエスト', '理想ヒップ'
-  ];
+  const headers = ['No.', '応募日時', ...answerLabels, ...MEASURE_CSV_COLUMNS.map(c => c[0])];
 
   const rows = filteredResponses.map((r, i) => {
     const m = r.measure || {};
     return [
       i + 1,
       r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
-      // アンケート回答（画像パスは除外してファイル名だけ）
       ...answerKeys.map(k => {
         const v = (r.answers||{})[k];
-        if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) {
-          return v.split('/').pop(); // ファイル名のみ
+        if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp|pdf|xlsx?|docx?)/i.test(v)) {
+          return v.split('/').pop();
         }
         return typeof v === 'object' ? JSON.stringify(v) : String(v||'');
       }),
-      // 採寸データ
-      m.diag_dt||'', m.calc_height||'', m.weight||'',
-      m.top_bust||'', m.under_bust||'',
-      m.waist||'', m.mid_hip||'', m.hip||'',
-      m.left_thigh||'', m.right_thigh||'',
-      m.fat_pctg||'', m.bmi||'', m.pi||'',
-      m.bra_sz||'', m.corset_sz||'', m.body_suit_sz||'',
-      m.diana_years||'', m.total_body_check||'',
-      '', '', '' // 理想値（将来）
+      ...MEASURE_CSV_COLUMNS.map(c => c[1](m)),
     ];
   });
 
   const bom = '\uFEFF';
-  const csv = bom + [headers, ...rows]
-    .map(r => r.map(v => '"' + String(v||'').replace(/"/g, '""') + '"').join(','))
-    .join('\n');
+  const csv = bom + [headers, ...rows].map(rr => rr.map(csvCell).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
   a.download = 'diana_contest_' + (currentContest ? currentContest.title.replace(/\s/g,'_') : '') + '_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
+}
+
+// ============================================================
+// 表示切替（カード ⇔ リスト）
+// ============================================================
+function toggleLayout() {
+  listView = !listView;
+  const btn = document.getElementById('layoutBtn');
+  if (btn) btn.innerHTML = listView ? '▦ カード表示' : '▤ 一覧表示';
+  renderGrid();
+}
+
+// ============================================================
+// 印刷（応募者一覧）
+// ============================================================
+function printList() {
+  if (filteredResponses.length === 0) { alert('印刷するデータがありません'); return; }
+
+  const fmt = (v) => (v == null || v === '') ? '-' : esc(String(v));
+  const rows = filteredResponses.map((r, i) => {
+    const name  = getAnswerByKey(r, ['応募者氏名','氏名','名前','お名前']) || '（氏名なし）';
+    const kana  = getAnswerByKey(r, ['ふりがな','フリガナ','カナ','かな']);
+    const salon = getAnswerByKey(r, ['サロンコード']);
+    const diana = getAnswerByKey(r, ['応募者 ダイアナコード','ダイアナコード']);
+    const pref  = getAnswerByKey(r, ['応募者 都道府県','都道府県']);
+    const div   = getAnswerByKey(r, ['出場区分']);
+    const m = r.measure || {};
+    const gp = m.gp_club_type == null ? '-' : (String(m.gp_club_type) === '001' ? 'あり' : 'なし');
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${fmt(name)}<br><span class="kana">${fmt(kana)}</span></td>
+      <td>${fmt(div)}</td>
+      <td>${fmt(pref)}</td>
+      <td>${fmt(salon)}</td>
+      <td>${fmt(diana)}</td>
+      <td>${m.diana_years != null ? m.diana_years + '年' : '-'}</td>
+      <td>${m.age != null ? m.age + '歳' : '-'}</td>
+      <td>${fmt(m.salon_name)}</td>
+      <td>${m.total_body_check != null ? m.total_body_check : '-'}</td>
+      <td>${gp}</td>
+    </tr>`;
+  }).join('');
+
+  const title = currentContest ? currentContest.title : 'コンテスト応募者一覧';
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <style>
+      body { font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; padding: 20px; color: #222; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .meta { font-size: 12px; color: #666; margin-bottom: 14px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th, td { border: 1px solid #999; padding: 5px 7px; text-align: left; vertical-align: top; }
+      th { background: #7B4F6E; color: #fff; }
+      tr:nth-child(even) td { background: #f7f2f5; }
+      .kana { color: #888; font-size: 9px; }
+      @media print { @page { size: A4 landscape; margin: 10mm; } }
+    </style></head><body>
+    <h1>${esc(title)}</h1>
+    <div class="meta">応募者数：${filteredResponses.length}名　／　出力日：${new Date().toLocaleDateString('ja-JP')}</div>
+    <table>
+      <thead><tr>
+        <th>No.</th><th>氏名</th><th>出場区分</th><th>都道府県</th><th>サロンコード</th>
+        <th>ダイアナコード</th><th>ダイアナ歴</th><th>年齢</th><th>サロン名</th><th>BC回数</th><th>GP倶楽部</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('ポップアップがブロックされました。印刷するにはポップアップを許可してください。'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 // ============================================================
