@@ -1366,6 +1366,28 @@ app.timer('sendScheduledMails', {
     }
 });
 
+
+// ----------------------------------------------------
+// ⏱ 【PostgreSQL keepalive】4分おきにDB接続を維持
+// NATゲートウェイのTCPセッション(4分タイムアウト)対策
+// ----------------------------------------------------
+app.timer('pgKeepAlive', {
+    schedule: '0 */4 * * * *',  // 4分おき
+    handler: async (myTimer, context) => {
+        if (!process.env.PG_HOST) return;
+        try {
+            const pool = getPgPool();
+            const client = await pool.connect();
+            await client.query('SELECT 1');
+            client.release();
+            context.log('[pgKeepAlive] DB接続維持 OK');
+        } catch (e) {
+            context.log('[pgKeepAlive] DB接続維持 失敗: ' + e.message);
+            pgPool = null; // 次回リクエスト時に再生成
+        }
+    }
+});
+
 // ----------------------------------------------------
 // ⏰ 【タイマー】期限切れトークンの自動削除（毎日深夜2時）
 // ----------------------------------------------------
