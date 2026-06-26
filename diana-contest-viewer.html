@@ -992,33 +992,55 @@ async function showDetail(idx) {
     const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
     const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
     if (salonCode || dianaCode) {
-      try {
-        // ローディング表示
-        const customerSection = document.querySelector('#modalBody .detail-section:nth-child(2) .detail-section-body');
-        const measureSection  = document.querySelector('#modalBody .detail-section:nth-child(3) .detail-section-body');
-        if (customerSection) customerSection.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">⏳ DB照合中...</div>';
-        if (measureSection)  measureSection.innerHTML  = '<div style="text-align:center;padding:20px;color:#888;">⏳ 採寸データ取得中...</div>';
+      // ローディング表示
+      const customerSection = document.querySelector('#modalBody .detail-section:nth-child(2) .detail-section-body');
+      const measureSection  = document.querySelector('#modalBody .detail-section:nth-child(3) .detail-section-body');
+      if (customerSection) customerSection.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">⏳ DB照合中...</div>';
+      if (measureSection)  measureSection.innerHTML  = '<div style="text-align:center;padding:20px;color:#888;">⏳ 採寸データ取得中...</div>';
 
-      const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒でタイムアウト
-        const res = await fetch(BASE_URL + '/api/diana-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
-          body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          r.measure = await res.json();
-          // allResponsesにも反映
-          const origIdx = allResponses.findIndex(a => a.id === r.id);
-          if (origIdx > -1) allResponses[origIdx].measure = r.measure;
-          // モーダルを再描画
-          if (currentDetailIndex === idx) renderModal();
-          // カードのバッジも更新
-          await renderGrid();
+      // 最大3回リトライ（504/タイムアウト対策）
+      const MAX_RETRY = 3;
+      const RETRY_DELAY_MS = 2000;
+      for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒でタイムアウト
+          const res = await fetch(BASE_URL + '/api/diana-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
+            body: JSON.stringify({ salon_code: salonCode, dia_cd: dianaCode, b_day: bday }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            r.measure = await res.json();
+            // allResponsesにも反映
+            const origIdx = allResponses.findIndex(a => a.id === r.id);
+            if (origIdx > -1) allResponses[origIdx].measure = r.measure;
+            // モーダルを再描画
+            if (currentDetailIndex === idx) renderModal();
+            // カードのバッジも更新
+            await renderGrid();
+            break; // 成功したらリトライ終了
+          } else if (res.status === 404) {
+            // データなし → リトライ不要
+            break;
+          } else {
+            // 504等のエラー → リトライ
+            if (attempt < MAX_RETRY) {
+              if (customerSection) customerSection.innerHTML = `<div style="text-align:center;padding:20px;color:#888;">⏳ DB照合中... (再試行 ${attempt}/${MAX_RETRY})</div>`;
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            }
+          }
+        } catch (e) {
+          // タイムアウト等 → リトライ
+          if (attempt < MAX_RETRY) {
+            if (customerSection) customerSection.innerHTML = `<div style="text-align:center;padding:20px;color:#888;">⏳ DB照合中... (再試行 ${attempt}/${MAX_RETRY})</div>`;
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          }
         }
-      } catch (e) { /* silent */ }
+      }
     }
   }
 }
