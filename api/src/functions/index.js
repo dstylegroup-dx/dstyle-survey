@@ -1753,19 +1753,11 @@ app.http('diana-member', {
             `;
             const params = [];
 
+            // ダイアナコードで検索（コンテストフォームでは必須入力のため常にこちらを使用）
+            // サロンコードはフォームとDB側で一致しないケースがあるため使用しない
             if (dia_cd) {
                 params.push(String(dia_cd));
                 custQuery += ` AND diana_code::text = $${params.length}`;
-            }
-            if (sldsslcd) {
-                params.push(String(sldsslcd));
-                custQuery += ` AND salon_code::text = $${params.length}`;
-            }
-            if (b_day) {
-                // 生年月日の形式を正規化（YYYY-MM-DD）
-                const bdayNorm = b_day.replace(/\//g, '-');
-                params.push(bdayNorm);
-                custQuery += ` AND birth_date::text LIKE $${params.length} || '%'`;
             }
             custQuery += ' LIMIT 1';
 
