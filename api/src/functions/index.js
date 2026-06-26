@@ -1649,15 +1649,21 @@ let pgPool = null;
 function getPgPool() {
     if (!pgPool) {
         pgPool = new Pool({
-            host:     process.env.PG_HOST,
-            port:     parseInt(process.env.PG_PORT || '5432'),
-            database: process.env.PG_DB,
-            user:     process.env.PG_USER,
-            password: process.env.PG_PASS,
-            ssl:      process.env.PG_SSLMODE === 'require' ? { rejectUnauthorized: false } : false,
-            max: 5,
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 30000, // 30秒に延長
+            host:                    process.env.PG_HOST,
+            port:                    parseInt(process.env.PG_PORT || '5432'),
+            database:                process.env.PG_DB,
+            user:                    process.env.PG_USER,
+            password:                process.env.PG_PASS,
+            ssl:                     process.env.PG_SSLMODE === 'require' ? { rejectUnauthorized: false } : false,
+            max:                     5,
+            idleTimeoutMillis:       30000,
+            connectionTimeoutMillis: 30000,
+        });
+
+        // 接続エラーをプールレベルでキャッチしてクラッシュ防止
+        pgPool.on('error', (err) => {
+            console.error('[PgPool] 予期せぬエラー:', err.message);
+            pgPool = null; // 次回呼び出し時に再生成
         });
     }
     return pgPool;
@@ -1686,7 +1692,18 @@ app.http('diana-member', {
             }
 
             const schema = process.env.PG_SCHEMA || 'public';
+
+            // ⏱ どのステップで時間がかかっているか特定するためのログ
+            const t0 = Date.now();
+            context.log(`[diana-member] ▶ 開始`);
+
             const pool = getPgPool();
+            context.log(`[diana-member] Pool取得: ${Date.now() - t0}ms`);
+
+            // 実際に接続を確立してタイミングを計測
+            const pgClient = await pool.connect();
+            context.log(`[diana-member] DB接続確立: ${Date.now() - t0}ms`);
+            pgClient.release();
 
             // ① customer_master から顧客情報を取得
             // transfer_delete_flag = 0（移籍・削除なし）のみ対象
@@ -1718,7 +1735,9 @@ app.http('diana-member', {
             }
             custQuery += ' LIMIT 1';
 
+            context.log(`[diana-member] customer_masterクエリ開始: ${Date.now() - t0}ms`);
             const custResult = await pool.query(custQuery, params);
+            context.log(`[diana-member] customer_masterクエリ完了: ${Date.now() - t0}ms 件数=${custResult.rows.length}`);
             if (custResult.rows.length === 0) {
                 return { status: 404, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '顧客データが見つかりません' } };
             }
