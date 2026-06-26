@@ -1000,7 +1000,7 @@ async function showDetail(idx) {
         if (measureSection)  measureSection.innerHTML  = '<div style="text-align:center;padding:20px;color:#888;">⏳ 採寸データ取得中...</div>';
 
       const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒でタイムアウト
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒でタイムアウト
         const res = await fetch(BASE_URL + '/api/diana-member', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },

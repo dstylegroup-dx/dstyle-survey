@@ -1656,8 +1656,8 @@ function getPgPool() {
             password: process.env.PG_PASS,
             ssl:      process.env.PG_SSLMODE === 'require' ? { rejectUnauthorized: false } : false,
             max: 5,
-            idleTimeoutMillis: 10000,
-            connectionTimeoutMillis: 3000, // 3秒でタイムアウト
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 30000, // 30秒に延長
         });
     }
     return pgPool;
