@@ -1747,6 +1747,7 @@ app.http('diana-member', {
                     last_name_kanji, first_name_kanji,
                     last_name_kana, first_name_kana,
                     birth_date, registration_date,
+                    gender,
                     transfer_delete_flag
                 FROM ${schema}.customer_master
                 WHERE transfer_delete_flag::text = '0'
@@ -1851,6 +1852,7 @@ app.http('diana-member', {
                     name_kanji:        (cust.last_name_kanji || '') + ' ' + (cust.first_name_kanji || ''),
                     name_kana:         (cust.last_name_kana  || '') + ' ' + (cust.first_name_kana  || ''),
                     b_day:             cust.birth_date,
+                    gender:            cust.gender === '000' ? '女性' : cust.gender === '001' ? '男性' : null,
                     diana_years:       dianaYears,
                     age:               cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
                     registration_date: member?.member_registration_date || cust.registration_date,

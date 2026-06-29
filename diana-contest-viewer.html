@@ -450,6 +450,11 @@
           <select class="search-select" id="filterPref" onchange="applyFilter()">
             <option value="">都道府県（すべて）</option>
           </select>
+          <select class="search-select" id="filterGender" onchange="applyFilter()">
+            <option value="">性別（すべて）</option>
+            <option value="女性">女性</option>
+            <option value="男性">男性</option>
+          </select>
           <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
           <span id="filterCount" style="font-size:13px;color:#7B4F6E;font-weight:bold;white-space:nowrap;"></span>
         </div>
@@ -902,6 +907,7 @@ async function applyFilter() {
   const diana   = (document.getElementById('searchDiana')?.value || '').toLowerCase();
   const div     = document.getElementById('filterDivision')?.value || '';
   const pref    = document.getElementById('filterPref')?.value || '';
+  const gender  = document.getElementById('filterGender')?.value || '';
 
   filteredResponses = allResponses.filter(r => {
     const nameVal  = (getAnswerByKey(r, ['応募者氏名', '氏名', 'ふりがな']) || '').toLowerCase();
@@ -910,6 +916,7 @@ async function applyFilter() {
     const dianaVal = (getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']) || '').toLowerCase();
     const divVal   = getAnswerByKey(r, ['出場区分']) || '';
     const prefVal  = getAnswerByKey(r, ['応募者 都道府県', '都道府県']) || '';
+    const genderVal = r.measure?.gender || '';
 
     if (name   && !nameVal.includes(name) && !kanaVal.includes(name)) return false;
     if (salon  && !salonVal.includes(salon)) return false;
@@ -918,11 +925,12 @@ async function applyFilter() {
     if (diana  && !dianaVal.includes(diana)) return false;
     if (div    && divVal !== div) return false;
     if (pref   && prefVal !== pref) return false;
+    if (gender && genderVal !== gender) return false;
     return true;
   });
 
   currentPage = 1;
-  const hasFilter = name || salon || diana || div || pref;
+  const hasFilter = name || salon || diana || div || pref || gender;
   document.getElementById('filterCount').textContent = hasFilter ? filteredResponses.length + '件該当' : '';
   await renderGrid();
 }
@@ -932,7 +940,7 @@ function clearSearch() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['filterDivision','filterPref'].forEach(id => {
+  ['filterDivision','filterPref','filterGender'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1171,6 +1179,7 @@ async function renderModal() {
     <div class="measure-grid">
       ${mBlock('ダイアナ歴', m.diana_years !== null && m.diana_years !== undefined ? m.diana_years + '年' : null, '')}
       ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
+      ${mBlock('性別', m.gender || null, '')}
       ${mBlock('登録日', m.registration_date ? fmtDate(m.registration_date) : null, '')}
       ${mBlock('初回診断日', m.first_diagnosis_date ? fmtDate(m.first_diagnosis_date) : null, '')}
       ${mBlock('ボディチェック総回数', m.total_body_check || null, '回')}
@@ -1366,6 +1375,7 @@ function closeLightbox() { document.getElementById('lightbox').classList.remove(
 const MEASURE_CSV_COLUMNS = [
   ['ダイアナ歴(年)',        m => m.diana_years],
   ['年齢',                  m => m.age],
+  ['性別',                  m => m.gender || ''],
   ['登録日',                m => fmtDate(m.registration_date)],
   ['初回診断日',            m => fmtDate(m.first_diagnosis_date)],
   ['ボディチェック総回数',  m => m.total_body_check],
@@ -1520,6 +1530,7 @@ function printDetail() {
     const cells = [
       ['ダイアナ歴', m.diana_years != null ? m.diana_years + '年' : '-'],
       ['年齢', m.age != null ? m.age + '歳' : '-'],
+      ['性別', m.gender || '-'],
       ['登録日', fmtDate(m.registration_date) || '-'],
       ['初回診断日', fmtDate(m.first_diagnosis_date) || '-'],
       ['ボディチェック総回数', m.total_body_check != null ? m.total_body_check + '回' : '-'],
