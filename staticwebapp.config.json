@@ -1,56 +1,77 @@
 {
-  "globalHeaders": {
-    "X-Content-Type-Options": "nosniff",
-    "X-XSS-Protection": "1; mode=block",
-    "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://alcdn.msauth.net https://alcdn.msftauth.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stdstylesurveyfiles.blob.core.windows.net; connect-src 'self' https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net https://func-dstyle-survey.azurewebsites.net https://login.microsoftonline.com https://graph.microsoft.com https://stdstylesurveyfiles.blob.core.windows.net; frame-ancestors 'self' https://herbelle.jp;"
-  },
-  "routes": [
-    {
-      "route": "/api/*",
-      "allowedRoles": ["anonymous"]
+    "globalHeaders": {
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://alcdn.msauth.net https://alcdn.msftauth.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stdstylesurveyfiles.blob.core.windows.net; connect-src 'self' https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net https://login.microsoftonline.com https://graph.microsoft.com https://stdstylesurveyfiles.blob.core.windows.net; frame-ancestors 'self' https://herbelle.jp;",
+        "Strict-Transport-Security": "max-age=31536000"
     },
-    {
-      "route": "/dashboard-herbelle",
-      "rewrite": "/dashboard-herbelle.html"
-    },
-    {
-      "route": "/dashboard-diana",
-      "rewrite": "/dashboard-diana.html"
-    },
-    {
-      "route": "/dashboard-dstylehd",
-      "rewrite": "/dashboard-dstylehd.html"
-    },
-    {
-      "route": "/survey",
-      "rewrite": "/survey.html"
-    },
-    {
-      "route": "/diagnosis-herbelle",
-      "rewrite": "/diagnosis-herbelle.html"
-    },
-    {
-      "route": "/diana-contest-viewer",
-      "rewrite": "/diana-contest-viewer.html"
-    },
-    {
-      "route": "/diana-contest-viewer.html",
-      "redirect": "/diana-contest-viewer",
-      "statusCode": 301
+    "routes": [
+        {
+            "route": "/api/*",
+            "allowedRoles": [
+                "anonymous"
+            ]
+        },
+        {
+            "route": "/dashboard-herbelle",
+            "rewrite": "/dashboard-herbelle.html",
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/dashboard-diana",
+            "rewrite": "/dashboard-diana.html",
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/dashboard-dstylehd",
+            "rewrite": "/dashboard-dstylehd.html",
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/survey",
+            "rewrite": "/survey.html",
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/diagnosis-herbelle",
+            "rewrite": "/diagnosis-herbelle.html",
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/diana-contest-viewer",
+            "rewrite": "/diana-contest-viewer.html",
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/diana-contest-viewer.html",
+            "redirect": "/diana-contest-viewer",
+            "statusCode": 301
+        }
+    ],
+    "navigationFallback": {
+        "rewrite": "/index.html",
+        "exclude": [
+            "/api/*",
+            "*.html",
+            "*.js",
+            "*.css",
+            "*.png",
+            "*.jpg",
+            "*.svg"
+        ]
     }
-  ],
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": [
-      "/api/*",
-      "*.html",
-      "*.js",
-      "*.css",
-      "*.png",
-      "*.jpg",
-      "*.svg"
-    ]
-  }
 }
