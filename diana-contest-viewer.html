@@ -1297,8 +1297,8 @@ async function renderModal() {
 }
 
 // 採寸テーブルの行を性別に応じて組み立てる
-// 女性: 体重*・トップバスト*・アンダーバスト*・ウエスト*・ミドルヒップ*・ヒップ*・太もも左右*・ふくらはぎ左右*・アーム左右*
-// 男性: 体重*・肩周囲*・胸囲*・腹囲*・ヒップ*・太もも左右*・体脂肪率*
+// 女性: 体重*・トップバスト*・アンダーバスト*・ウエスト*・ミドルヒップ*・ヒップ*・太もも左右*・ふくらはぎ左右*・アーム左右*・体脂肪率*、末尾にPI/BMI
+// 男性: 体重*・肩周囲*・胸囲*・腹囲*・ヒップ*・太もも左右*・体脂肪率*、ふくらはぎ左右/アーム左右/BMIは必須でない（PIは不要）
 //   ※男性の肩周囲=トップバスト列, 胸囲=アンダーバスト列, 腹囲=ウエスト列（同一カラムを別ラベルで表示）
 function measureRows(m) {
   const rows = [];
@@ -1313,7 +1313,13 @@ function measureRows(m) {
     rows.push(measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
     rows.push(measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
     rows.push(measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
+    rows.push(measureRow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, false));
+    rows.push(measureRow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, false));
+    rows.push(measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, false));
+    rows.push(measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, false));
     rows.push(measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, true));
+    // 男性はBMIのみ末尾に表示（PIは不要）
+    rows.push(measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
   } else {
     // 女性（既定）
     rows.push(measureRow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
@@ -1328,10 +1334,11 @@ function measureRows(m) {
     rows.push(measureRow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, true));
     rows.push(measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, true));
     rows.push(measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, true));
+    rows.push(measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, false));
+    // 女性はPI・BMIを末尾に表示
+    rows.push(measureRow('PI', '', null, m.first_pi, m.latest_pi, false));
+    rows.push(measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
   }
-  // PI・BMIは性別共通で末尾に表示（必須対象外）
-  rows.push(measureRow('PI', '', null, m.first_pi, m.latest_pi, false));
-  rows.push(measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
   return rows.join('');
 }
 
@@ -1609,7 +1616,13 @@ function printDetail() {
         r.push(mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,true));
         r.push(mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,true));
         r.push(mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,true));
+        r.push(mrow('ふくらはぎ左','cm',m.ideal_calf_l,m.first_calf_l,m.latest_calf_l,false));
+        r.push(mrow('ふくらはぎ右','cm',m.ideal_calf_r,m.first_calf_r,m.latest_calf_r,false));
+        r.push(mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,false));
+        r.push(mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,false));
         r.push(mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,true));
+        // 男性はBMIのみ末尾（PIは不要）
+        r.push(mrow('BMI','',null,m.first_bmi,m.latest_bmi,false));
       } else {
         r.push(mrow('体重','kg',m.ideal_weight,m.first_weight,m.latest_weight,true));
         r.push(mrow('トップバスト','cm',m.ideal_top_bust,m.first_top_bust,m.latest_top_bust,true));
@@ -1623,9 +1636,11 @@ function printDetail() {
         r.push(mrow('ふくらはぎ右','cm',m.ideal_calf_r,m.first_calf_r,m.latest_calf_r,true));
         r.push(mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,true));
         r.push(mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,true));
+        r.push(mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,false));
+        // 女性はPI・BMIを末尾
+        r.push(mrow('PI','',null,m.first_pi,m.latest_pi,false));
+        r.push(mrow('BMI','',null,m.first_bmi,m.latest_bmi,false));
       }
-      r.push(mrow('PI','',null,m.first_pi,m.latest_pi,false));
-      r.push(mrow('BMI','',null,m.first_bmi,m.latest_bmi,false));
       return r.join('');
     };
     measureHtml = `<table class="measure">
