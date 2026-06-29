@@ -1201,26 +1201,11 @@ async function renderModal() {
             <th style='background:#f5eaf2;color:#7B4F6E;padding:8px 12px;text-align:center;border-bottom:2px solid #e0c8d8;white-space:nowrap;'>理想値</th>
             <th style='background:#f0f9f5;color:#2e7d32;padding:8px 12px;text-align:center;border-bottom:2px solid #c8e6da;white-space:nowrap;'>初回<br><span style='font-size:11px;font-weight:normal;'>${esc(fmtDate(m.first_check_date))}</span></th>
             <th style='background:#e8f4fd;color:#1565c0;padding:8px 12px;text-align:center;border-bottom:2px solid #b3d4f5;white-space:nowrap;'>現在<br><span style='font-size:11px;font-weight:normal;'>${esc(fmtDate(m.latest_check_date))}</span></th>
-            <th style='background:#fff8e1;color:#e65100;padding:8px 12px;text-align:center;border-bottom:2px solid #ffe082;white-space:nowrap;'>変化</th>
+            <th style='background:#fff8e1;color:#e65100;padding:8px 12px;text-align:center;border-bottom:2px solid #ffe082;white-space:nowrap;'>理想値との差</th>
           </tr>
         </thead>
         <tbody>
-          ${measureRow('身長', 'cm', null, m.first_height, m.latest_height, null)}
-          ${measureRow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, m.diff_weight)}
-          ${measureRow('トップバスト', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, m.diff_top_bust)}
-          ${measureRow('アンダーバスト', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, m.diff_under_bust)}
-          ${measureRow('ウエスト', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, m.diff_waist)}
-          ${measureRow('ミドルヒップ', 'cm', m.ideal_mid_hip, m.first_mid_hip, m.latest_mid_hip, m.diff_mid_hip)}
-          ${measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, m.diff_hip)}
-          ${measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, m.diff_thigh_l)}
-          ${measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, m.diff_thigh_r)}
-          ${measureRow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, m.diff_calf_l)}
-          ${measureRow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, m.diff_calf_r)}
-          ${measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, m.diff_arm_l)}
-          ${measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, m.diff_arm_r)}
-          ${measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, m.diff_fat)}
-          ${measureRow('PI', '', null, m.first_pi, m.latest_pi, m.diff_pi)}
-          ${measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, m.diff_bmi)}
+          ${measureRows(m)}
         </tbody>
       </table>
     </div>
@@ -1311,21 +1296,65 @@ async function renderModal() {
   `;
 }
 
-function measureRow(label, unit, ideal, first, latest, diff) {
+// 採寸テーブルの行を性別に応じて組み立てる
+// 女性: 体重*・トップバスト*・アンダーバスト*・ウエスト*・ミドルヒップ*・ヒップ*・太もも左右*・ふくらはぎ左右*・アーム左右*
+// 男性: 体重*・肩周囲*・胸囲*・腹囲*・ヒップ*・太もも左右*・体脂肪率*
+//   ※男性の肩周囲=トップバスト列, 胸囲=アンダーバスト列, 腹囲=ウエスト列（同一カラムを別ラベルで表示）
+function measureRows(m) {
+  const rows = [];
+  // 身長は性別共通で先頭に表示（必須対象外）
+  rows.push(measureRow('身長', 'cm', null, m.first_height, m.latest_height, false));
+
+  if (m.gender === '男性') {
+    rows.push(measureRow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
+    rows.push(measureRow('肩周囲', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, true));
+    rows.push(measureRow('胸囲', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, true));
+    rows.push(measureRow('腹囲', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, true));
+    rows.push(measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
+    rows.push(measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
+    rows.push(measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
+    rows.push(measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, true));
+  } else {
+    // 女性（既定）
+    rows.push(measureRow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
+    rows.push(measureRow('トップバスト', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, true));
+    rows.push(measureRow('アンダーバスト', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, true));
+    rows.push(measureRow('ウエスト', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, true));
+    rows.push(measureRow('ミドルヒップ', 'cm', m.ideal_mid_hip, m.first_mid_hip, m.latest_mid_hip, true));
+    rows.push(measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
+    rows.push(measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
+    rows.push(measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
+    rows.push(measureRow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, true));
+    rows.push(measureRow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, true));
+    rows.push(measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, true));
+    rows.push(measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, true));
+  }
+  // PI・BMIは性別共通で末尾に表示（必須対象外）
+  rows.push(measureRow('PI', '', null, m.first_pi, m.latest_pi, false));
+  rows.push(measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
+  return rows.join('');
+}
+
+// 1行を生成。required=trueなら項目名に*を付け、理想値との差（現在-理想値）を算出して表示
+function measureRow(label, unit, ideal, first, latest, required) {
   const fmt = (v) => v != null && v !== '' ? `<strong>${esc(String(v))}</strong><span style="font-size:11px;color:#888;">${unit}</span>` : '<span style="color:#ccc;">-</span>';
-  const fmtDiff = (v) => {
-    if (v == null) return '<span style="color:#ccc;">-</span>';
-    const n = parseFloat(v);
-    const color = n < 0 ? '#27ae60' : n > 0 ? '#e74c3c' : '#888';
-    const sign = n > 0 ? '+' : '';
-    return `<span style="color:${color};font-weight:bold;">${sign}${esc(String(v))}<span style="font-size:11px;">${unit}</span></span>`;
-  };
+  // 理想値との差（現在 - 理想値）
+  let diffStr = '<span style="color:#ccc;">-</span>';
+  if (latest != null && latest !== '' && ideal != null && ideal !== '') {
+    const d = Math.round((parseFloat(latest) - parseFloat(ideal)) * 10) / 10;
+    const color = d < 0 ? '#27ae60' : d > 0 ? '#e74c3c' : '#888';
+    const sign = d > 0 ? '+' : '';
+    diffStr = `<span style="color:${color};font-weight:bold;">${sign}${d}<span style="font-size:11px;">${unit}</span></span>`;
+  }
+  const labelHtml = required
+    ? `${esc(label)}<span style="color:#e53935;font-weight:bold;"> *</span>`
+    : esc(label);
   return `<tr style="border-bottom:1px solid #f5f0f3;">
-    <td style="padding:8px 12px;color:#555;white-space:nowrap;">${esc(label)}</td>
+    <td style="padding:8px 12px;color:#555;white-space:nowrap;">${labelHtml}</td>
     <td style="padding:8px 12px;text-align:center;background:#fdf8fb;">${fmt(ideal)}</td>
     <td style="padding:8px 12px;text-align:center;background:#f8fffe;">${fmt(first)}</td>
     <td style="padding:8px 12px;text-align:center;background:#f0f8ff;">${fmt(latest)}</td>
-    <td style="padding:8px 12px;text-align:center;background:#fffdf0;">${fmtDiff(diff)}</td>
+    <td style="padding:8px 12px;text-align:center;background:#fffdf0;">${diffStr}</td>
   </tr>`;
 }
 
@@ -1386,8 +1415,11 @@ const MEASURE_CSV_COLUMNS = [
   ['初回 身長(cm)',         m => m.first_height],
   ['初回 体重(kg)',         m => m.first_weight],
   ['初回 トップバスト(cm)', m => m.first_top_bust],
+  ['初回 肩周囲(男性)(cm)', m => m.first_top_bust],
   ['初回 アンダーバスト(cm)', m => m.first_under_bust],
+  ['初回 胸囲(男性)(cm)',   m => m.first_under_bust],
   ['初回 ウエスト(cm)',     m => m.first_waist],
+  ['初回 腹囲(男性)(cm)',   m => m.first_waist],
   ['初回 ミドルヒップ(cm)', m => m.first_mid_hip],
   ['初回 ヒップ(cm)',       m => m.first_hip],
   ['初回 太もも左(cm)',     m => m.first_thigh_l],
@@ -1403,8 +1435,11 @@ const MEASURE_CSV_COLUMNS = [
   ['現在 身長(cm)',         m => m.latest_height],
   ['現在 体重(kg)',         m => m.latest_weight],
   ['現在 トップバスト(cm)', m => m.latest_top_bust],
+  ['現在 肩周囲(男性)(cm)', m => m.latest_top_bust],
   ['現在 アンダーバスト(cm)', m => m.latest_under_bust],
+  ['現在 胸囲(男性)(cm)',   m => m.latest_under_bust],
   ['現在 ウエスト(cm)',     m => m.latest_waist],
+  ['現在 腹囲(男性)(cm)',   m => m.latest_waist],
   ['現在 ミドルヒップ(cm)', m => m.latest_mid_hip],
   ['現在 ヒップ(cm)',       m => m.latest_hip],
   ['現在 太もも左(cm)',     m => m.latest_thigh_l],
@@ -1418,8 +1453,11 @@ const MEASURE_CSV_COLUMNS = [
   ['現在 BMI',              m => m.latest_bmi],
   ['理想 体重(kg)',         m => m.ideal_weight],
   ['理想 トップバスト(cm)', m => m.ideal_top_bust],
+  ['理想 肩周囲(男性)(cm)', m => m.ideal_top_bust],
   ['理想 アンダーバスト(cm)', m => m.ideal_under_bust],
+  ['理想 胸囲(男性)(cm)',   m => m.ideal_under_bust],
   ['理想 ウエスト(cm)',     m => m.ideal_waist],
+  ['理想 腹囲(男性)(cm)',   m => m.ideal_waist],
   ['理想 ミドルヒップ(cm)', m => m.ideal_mid_hip],
   ['理想 ヒップ(cm)',       m => m.ideal_hip],
   ['理想 ふくらはぎ左(cm)', m => m.ideal_calf_l],
@@ -1545,31 +1583,55 @@ function printDetail() {
   // 採寸データ表
   let measureHtml = '<p class="none">採寸データなし</p>';
   if (m && m.first_check_date) {
-    const mrow = (label, unit, ideal, first, latest, diff) =>
-      `<tr><th>${label}</th>
+    // 1行生成（required=trueで*付与、理想値との差=現在-理想値）
+    const mrow = (label, unit, ideal, first, latest, required) => {
+      let diff = '-';
+      if (latest != null && latest !== '' && ideal != null && ideal !== '') {
+        const d = Math.round((parseFloat(latest) - parseFloat(ideal)) * 10) / 10;
+        diff = (d > 0 ? '+' : '') + d + unit;
+      }
+      const lbl = required ? label + ' *' : label;
+      return `<tr><th>${lbl}</th>
         <td>${ideal != null ? ideal + unit : '-'}</td>
         <td>${first != null ? first + unit : '-'}</td>
         <td>${latest != null ? latest + unit : '-'}</td>
-        <td>${diff != null ? diff + unit : '-'}</td></tr>`;
+        <td>${diff}</td></tr>`;
+    };
+    // 性別別に行を組み立て（画面の measureRows と同じ構成）
+    const mrows = (m) => {
+      const r = [];
+      r.push(mrow('身長','cm',null,m.first_height,m.latest_height,false));
+      if (m.gender === '男性') {
+        r.push(mrow('体重','kg',m.ideal_weight,m.first_weight,m.latest_weight,true));
+        r.push(mrow('肩周囲','cm',m.ideal_top_bust,m.first_top_bust,m.latest_top_bust,true));
+        r.push(mrow('胸囲','cm',m.ideal_under_bust,m.first_under_bust,m.latest_under_bust,true));
+        r.push(mrow('腹囲','cm',m.ideal_waist,m.first_waist,m.latest_waist,true));
+        r.push(mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,true));
+        r.push(mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,true));
+        r.push(mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,true));
+        r.push(mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,true));
+      } else {
+        r.push(mrow('体重','kg',m.ideal_weight,m.first_weight,m.latest_weight,true));
+        r.push(mrow('トップバスト','cm',m.ideal_top_bust,m.first_top_bust,m.latest_top_bust,true));
+        r.push(mrow('アンダーバスト','cm',m.ideal_under_bust,m.first_under_bust,m.latest_under_bust,true));
+        r.push(mrow('ウエスト','cm',m.ideal_waist,m.first_waist,m.latest_waist,true));
+        r.push(mrow('ミドルヒップ','cm',m.ideal_mid_hip,m.first_mid_hip,m.latest_mid_hip,true));
+        r.push(mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,true));
+        r.push(mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,true));
+        r.push(mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,true));
+        r.push(mrow('ふくらはぎ左','cm',m.ideal_calf_l,m.first_calf_l,m.latest_calf_l,true));
+        r.push(mrow('ふくらはぎ右','cm',m.ideal_calf_r,m.first_calf_r,m.latest_calf_r,true));
+        r.push(mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,true));
+        r.push(mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,true));
+      }
+      r.push(mrow('PI','',null,m.first_pi,m.latest_pi,false));
+      r.push(mrow('BMI','',null,m.first_bmi,m.latest_bmi,false));
+      return r.join('');
+    };
     measureHtml = `<table class="measure">
-      <thead><tr><th>項目</th><th>理想値</th><th>初回<br>${esc(fmtDate(m.first_check_date))}</th><th>現在<br>${esc(fmtDate(m.latest_check_date))}</th><th>変化</th></tr></thead>
+      <thead><tr><th>項目</th><th>理想値</th><th>初回<br>${esc(fmtDate(m.first_check_date))}</th><th>現在<br>${esc(fmtDate(m.latest_check_date))}</th><th>理想値との差</th></tr></thead>
       <tbody>
-        ${mrow('身長','cm',null,m.first_height,m.latest_height,null)}
-        ${mrow('体重','kg',m.ideal_weight,m.first_weight,m.latest_weight,m.diff_weight)}
-        ${mrow('トップバスト','cm',m.ideal_top_bust,m.first_top_bust,m.latest_top_bust,m.diff_top_bust)}
-        ${mrow('アンダーバスト','cm',m.ideal_under_bust,m.first_under_bust,m.latest_under_bust,m.diff_under_bust)}
-        ${mrow('ウエスト','cm',m.ideal_waist,m.first_waist,m.latest_waist,m.diff_waist)}
-        ${mrow('ミドルヒップ','cm',m.ideal_mid_hip,m.first_mid_hip,m.latest_mid_hip,m.diff_mid_hip)}
-        ${mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,m.diff_hip)}
-        ${mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,m.diff_thigh_l)}
-        ${mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,m.diff_thigh_r)}
-        ${mrow('ふくらはぎ左','cm',m.ideal_calf_l,m.first_calf_l,m.latest_calf_l,m.diff_calf_l)}
-        ${mrow('ふくらはぎ右','cm',m.ideal_calf_r,m.first_calf_r,m.latest_calf_r,m.diff_calf_r)}
-        ${mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,m.diff_arm_l)}
-        ${mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,m.diff_arm_r)}
-        ${mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,m.diff_fat)}
-        ${mrow('PI','',null,m.first_pi,m.latest_pi,m.diff_pi)}
-        ${mrow('BMI','',null,m.first_bmi,m.latest_bmi,m.diff_bmi)}
+        ${mrows(m)}
       </tbody></table>`;
   }
 
