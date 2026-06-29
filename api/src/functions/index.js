@@ -1854,8 +1854,8 @@ app.http('diana-member', {
                     diana_years:       dianaYears,
                     age:               cust.birth_date ? Math.floor((new Date() - new Date(cust.birth_date)) / (1000 * 60 * 60 * 24 * 365.25)) : null,
                     registration_date: member?.member_registration_date || cust.registration_date,
-                    // member_tblから取得
-                    total_body_check:  member?.body_check_count || totalBodyCheck,
+                    // member_tblから取得（body_check_countは集計が最新BCを含まない場合があるため実レコード数を優先）
+                    total_body_check:  totalBodyCheck || member?.body_check_count || null,
                     last_body_check_date: member?.last_body_check_date || null,
                     first_diagnosis_date: member?.first_diagnosis_date || null,
                     gp_club_type:      member?.gp_club_type || null,
@@ -1908,6 +1908,10 @@ app.http('diana-member', {
                     diff_hip:          calcDiff('ヒップ'),
                     diff_thigh_l:      calcDiff('太もも左'),
                     diff_thigh_r:      calcDiff('太もも右'),
+                    diff_calf_l:       calcDiff('ふくらはぎ左'),
+                    diff_calf_r:       calcDiff('ふくらはぎ右'),
+                    diff_arm_l:        calcDiff('アーム左'),
+                    diff_arm_r:        calcDiff('アーム右'),
                     diff_fat:          calcDiff('体脂肪率'),
                     diff_bmi:          calcDiff('BMI'),
                     diff_pi:           calcDiff('PI'),
@@ -1922,6 +1926,8 @@ app.http('diana-member', {
                     ideal_thigh_r:     latestCheck?.['理想値_太もも右'] || null,
                     ideal_calf_l:      latestCheck?.['理想値_ふくらはぎ左'] || null,
                     ideal_calf_r:      latestCheck?.['理想値_ふくらはぎ右'] || null,
+                    ideal_arm_l:       latestCheck?.['理想値_アーム左'] || null,
+                    ideal_arm_r:       latestCheck?.['理想値_アーム右'] || null,
                     ideal_fat:         latestCheck?.['理想値_体脂肪率'] || null,
                 }
             };

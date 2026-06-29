@@ -1205,6 +1205,10 @@ async function renderModal() {
           ${measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, m.diff_hip)}
           ${measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, m.diff_thigh_l)}
           ${measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, m.diff_thigh_r)}
+          ${measureRow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, m.diff_calf_l)}
+          ${measureRow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, m.diff_calf_r)}
+          ${measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, m.diff_arm_l)}
+          ${measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, m.diff_arm_r)}
           ${measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, m.diff_fat)}
           ${measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, m.diff_bmi)}
           ${measureRow('PI', '', null, m.first_pi, m.latest_pi, m.diff_pi)}
@@ -1378,6 +1382,10 @@ const MEASURE_CSV_COLUMNS = [
   ['初回 ヒップ(cm)',       m => m.first_hip],
   ['初回 太もも左(cm)',     m => m.first_thigh_l],
   ['初回 太もも右(cm)',     m => m.first_thigh_r],
+  ['初回 ふくらはぎ左(cm)', m => m.first_calf_l],
+  ['初回 ふくらはぎ右(cm)', m => m.first_calf_r],
+  ['初回 アーム左(cm)',     m => m.first_arm_l],
+  ['初回 アーム右(cm)',     m => m.first_arm_r],
   ['初回 体脂肪率(%)',      m => m.first_fat],
   ['初回 BMI',              m => m.first_bmi],
   ['初回 PI',               m => m.first_pi],
@@ -1391,6 +1399,10 @@ const MEASURE_CSV_COLUMNS = [
   ['現在 ヒップ(cm)',       m => m.latest_hip],
   ['現在 太もも左(cm)',     m => m.latest_thigh_l],
   ['現在 太もも右(cm)',     m => m.latest_thigh_r],
+  ['現在 ふくらはぎ左(cm)', m => m.latest_calf_l],
+  ['現在 ふくらはぎ右(cm)', m => m.latest_calf_r],
+  ['現在 アーム左(cm)',     m => m.latest_arm_l],
+  ['現在 アーム右(cm)',     m => m.latest_arm_r],
   ['現在 体脂肪率(%)',      m => m.latest_fat],
   ['現在 BMI',              m => m.latest_bmi],
   ['現在 PI',               m => m.latest_pi],
@@ -1400,6 +1412,10 @@ const MEASURE_CSV_COLUMNS = [
   ['理想 ウエスト(cm)',     m => m.ideal_waist],
   ['理想 ミドルヒップ(cm)', m => m.ideal_mid_hip],
   ['理想 ヒップ(cm)',       m => m.ideal_hip],
+  ['理想 ふくらはぎ左(cm)', m => m.ideal_calf_l],
+  ['理想 ふくらはぎ右(cm)', m => m.ideal_calf_r],
+  ['理想 アーム左(cm)',     m => m.ideal_arm_l],
+  ['理想 アーム右(cm)',     m => m.ideal_arm_r],
   ['理想 体脂肪率(%)',      m => m.ideal_fat],
 ];
 
@@ -1536,6 +1552,10 @@ function printDetail() {
         ${mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,m.diff_hip)}
         ${mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,m.diff_thigh_l)}
         ${mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,m.diff_thigh_r)}
+        ${mrow('ふくらはぎ左','cm',m.ideal_calf_l,m.first_calf_l,m.latest_calf_l,m.diff_calf_l)}
+        ${mrow('ふくらはぎ右','cm',m.ideal_calf_r,m.first_calf_r,m.latest_calf_r,m.diff_calf_r)}
+        ${mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,m.diff_arm_l)}
+        ${mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,m.diff_arm_r)}
         ${mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,m.diff_fat)}
         ${mrow('BMI','',null,m.first_bmi,m.latest_bmi,m.diff_bmi)}
         ${mrow('PI','',null,m.first_pi,m.latest_pi,m.diff_pi)}
