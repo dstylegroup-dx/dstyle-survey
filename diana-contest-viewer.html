@@ -1210,8 +1210,8 @@ async function renderModal() {
           ${measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, m.diff_arm_l)}
           ${measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, m.diff_arm_r)}
           ${measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, m.diff_fat)}
-          ${measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, m.diff_bmi)}
           ${measureRow('PI', '', null, m.first_pi, m.latest_pi, m.diff_pi)}
+          ${measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, m.diff_bmi)}
         </tbody>
       </table>
     </div>
@@ -1387,8 +1387,8 @@ const MEASURE_CSV_COLUMNS = [
   ['初回 アーム左(cm)',     m => m.first_arm_l],
   ['初回 アーム右(cm)',     m => m.first_arm_r],
   ['初回 体脂肪率(%)',      m => m.first_fat],
-  ['初回 BMI',              m => m.first_bmi],
   ['初回 PI',               m => m.first_pi],
+  ['初回 BMI',              m => m.first_bmi],
   ['現在採寸日',            m => fmtDate(m.latest_check_date)],
   ['現在 身長(cm)',         m => m.latest_height],
   ['現在 体重(kg)',         m => m.latest_weight],
@@ -1404,8 +1404,8 @@ const MEASURE_CSV_COLUMNS = [
   ['現在 アーム左(cm)',     m => m.latest_arm_l],
   ['現在 アーム右(cm)',     m => m.latest_arm_r],
   ['現在 体脂肪率(%)',      m => m.latest_fat],
-  ['現在 BMI',              m => m.latest_bmi],
   ['現在 PI',               m => m.latest_pi],
+  ['現在 BMI',              m => m.latest_bmi],
   ['理想 体重(kg)',         m => m.ideal_weight],
   ['理想 トップバスト(cm)', m => m.ideal_top_bust],
   ['理想 アンダーバスト(cm)', m => m.ideal_under_bust],
@@ -1557,8 +1557,8 @@ function printDetail() {
         ${mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,m.diff_arm_l)}
         ${mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,m.diff_arm_r)}
         ${mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,m.diff_fat)}
-        ${mrow('BMI','',null,m.first_bmi,m.latest_bmi,m.diff_bmi)}
         ${mrow('PI','',null,m.first_pi,m.latest_pi,m.diff_pi)}
+        ${mrow('BMI','',null,m.first_bmi,m.latest_bmi,m.diff_bmi)}
       </tbody></table>`;
   }
 
