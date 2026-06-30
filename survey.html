@@ -74,18 +74,26 @@ input[type="number"]::-webkit-inner-spin-button,
     .thanks-title { font-size: 24px; font-weight: bold; color: #4A5D4E; margin-bottom: 16px; }
     .thanks-message { font-size: 16px; color: #555; line-height: 1.8; margin-bottom: 24px; }
     .thanks-sub { font-size: 14px; color: #888; line-height: 1.7; padding: 16px; background: #f5f7f5; border-radius: 8px; }
-    /* AI提案表示 */
-    .ai-suggestion-wrap { margin: 0 0 24px; text-align: left; }
+    /* AI提案表示（雑誌メニュー風デザイン） */
+    .ai-suggestion-wrap { margin: 0 0 28px; text-align: left; }
     .ai-suggestion-loading { text-align: center; color: #888; font-size: 14px; padding: 20px 0; }
     .ai-suggestion-loading .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #ddd; border-top-color: #4A5D4E; border-radius: 50%; animation: aiSpin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
     @keyframes aiSpin { to { transform: rotate(360deg); } }
-    .ai-suggestion-title { font-size: 15px; font-weight: bold; color: #4A5D4E; margin-bottom: 12px; text-align: center; }
-    .ai-text-box { background: #f0f4f0; border-left: 4px solid #4A5D4E; border-radius: 0 8px 8px 0; padding: 18px 20px; font-size: 15px; color: #444; line-height: 1.8; white-space: pre-wrap; }
-    .ai-cards { display: flex; flex-direction: column; gap: 12px; }
-    .ai-card { background: #f9faf9; border: 1px solid #dde5dd; border-radius: 10px; padding: 16px 18px; }
-    .ai-card-label { font-size: 13px; font-weight: bold; color: #4A5D4E; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-    .ai-card-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #4A5D4E; display: inline-block; }
-    .ai-card-text { font-size: 14px; color: #444; line-height: 1.7; white-space: pre-wrap; }
+
+    .ai-suggestion-header { text-align: center; margin-bottom: 22px; position: relative; padding: 0 0 16px; }
+    .ai-suggestion-eyebrow { font-size: 11px; letter-spacing: 3px; color: #8aa28e; font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
+    .ai-suggestion-title { font-family: 'Georgia', 'Hiragino Mincho ProN', serif; font-size: 22px; font-weight: bold; color: #3a4d3e; letter-spacing: 1px; margin-bottom: 10px; }
+    .ai-suggestion-divider { width: 56px; height: 2px; background: linear-gradient(90deg, #4A5D4E, #8aa28e); margin: 0 auto; border-radius: 2px; }
+
+    .ai-text-box { position: relative; background: linear-gradient(135deg, #f6f9f6 0%, #eef3ee 100%); border: 1px solid #dbe5db; border-radius: 16px; padding: 28px 26px 24px; font-size: 15px; color: #4a544a; line-height: 1.9; white-space: pre-wrap; box-shadow: 0 6px 20px rgba(74,93,78,0.08); }
+    .ai-text-box::before { content: '🌿'; position: absolute; top: -14px; left: 22px; font-size: 22px; background: #fff; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+    .ai-cards { display: flex; flex-direction: column; gap: 14px; }
+    .ai-card { position: relative; background: #fff; border: 1px solid #e4ebe4; border-radius: 14px; padding: 20px 20px 18px 22px; box-shadow: 0 4px 14px rgba(74,93,78,0.07); overflow: hidden; }
+    .ai-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #4A5D4E, #8aa28e); }
+    .ai-card-label { font-family: 'Georgia', 'Hiragino Mincho ProN', serif; font-size: 14px; font-weight: bold; color: #3a4d3e; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
+    .ai-card-icon { font-size: 16px; flex-shrink: 0; }
+    .ai-card-text { font-size: 14px; color: #555; line-height: 1.8; white-space: pre-wrap; padding-left: 24px; }
     .divider { border: none; border-top: 1px solid #eee; margin: 8px 0 28px; }
     .section[data-hidden="true"] { display: none; }
     .field-error input, .field-error textarea, .field-error select { border-color: #e74c3c !important; background: #fff8f8 !important; }
@@ -147,13 +155,35 @@ input[type="number"]::-webkit-inner-spin-button,
       .replace(/'/g, '&#039;');
   }
 
+  // ラベルの文言から雰囲気の合うアイコンを推定（なければ既定アイコン）
+  function pickAiIcon(label) {
+    var l = String(label || '');
+    var map = [
+      [/コース|プラン|メニュー/, '🌿'],
+      [/理由|ポイント|根拠/, '💡'],
+      [/注意|気をつけ|caution/i, '⚠️'],
+      [/効果|効能|期待/, '✨'],
+      [/香り|アロマ|薬草/, '🍃'],
+      [/頻度|周期|タイミング/, '🗓️'],
+      [/価格|料金|費用/, '💰'],
+      [/おすすめ|オススメ/, '🌸']
+    ];
+    for (var i = 0; i < map.length; i++) { if (map[i][0].test(l)) return map[i][1]; }
+    return '🌾';
+  }
+
   function renderAiSuggestion(suggestion) {
     var wrap = document.getElementById('aiSuggestionWrap');
     if (!suggestion) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
-    var html = '<div class="ai-suggestion-title">✨ あなたへのおすすめ</div>';
+    var header = '<div class="ai-suggestion-header">' +
+        '<div class="ai-suggestion-eyebrow">Herbelle Recommend</div>' +
+        '<div class="ai-suggestion-title">✨ あなたへのおすすめ</div>' +
+        '<div class="ai-suggestion-divider"></div>' +
+      '</div>';
+    var html = header;
     if (suggestion.format === 'structured' && suggestion.sections && typeof suggestion.sections === 'object') {
       html += '<div class="ai-cards">' + Object.keys(suggestion.sections).map(function(label) {
-        return '<div class="ai-card"><div class="ai-card-label">' + esc(label) + '</div><div class="ai-card-text">' + esc(suggestion.sections[label]).replace(/\n/g, '<br>') + '</div></div>';
+        return '<div class="ai-card"><div class="ai-card-label"><span class="ai-card-icon">' + pickAiIcon(label) + '</span>' + esc(label) + '</div><div class="ai-card-text">' + esc(suggestion.sections[label]).replace(/\n/g, '<br>') + '</div></div>';
       }).join('') + '</div>';
     } else if (suggestion.text) {
       html += '<div class="ai-text-box">' + esc(suggestion.text).replace(/\n/g, '<br>') + '</div>';
