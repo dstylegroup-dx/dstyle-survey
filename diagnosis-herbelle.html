@@ -36,38 +36,55 @@
         .result-screen { display: none; text-align: center; }
 
         /* 診断結果レポート風デザイン */
-        .result-report { position: relative; background: #ffffff; border: 1px solid #e2e5e2; border-radius: 10px; padding: 0; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        .result-report { position: relative; background: #ffffff; border: 1px solid #e2e5e2; border-radius: 8px; padding: 0; overflow: hidden; box-shadow: 0 8px 28px rgba(0,0,0,0.09); }
 
         /* 文書ヘッダー（白基調・ビジネス文書風） */
-        .result-report-top { background: #ffffff; padding: 28px 28px 20px; border-bottom: 3px solid #4A5D4E; }
-        .result-doc-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .result-report-top { background: #ffffff; padding: 34px 32px 24px; border-bottom: 3px solid #4A5D4E; }
+        .result-doc-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .result-eyebrow { font-size: 10px; letter-spacing: 3px; color: #4A5D4E; font-weight: bold; text-transform: uppercase; }
         .result-doc-no { font-size: 10px; color: #aaa; letter-spacing: 0.5px; }
+        .result-to-line { font-size: 12px; color: #888; margin-bottom: 6px; letter-spacing: 0.5px; }
         .result-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
         .result-badge { display: inline-block; background: #4A5D4E; color: #fff; padding: 4px 12px; border-radius: 3px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
-        .result-title { font-family: 'Hiragino Mincho ProN', 'Georgia', serif; font-size: 22px; font-weight: bold; color: #1f2a23; letter-spacing: 0.5px; }
+        .result-title { font-family: 'Hiragino Mincho ProN', 'Georgia', serif; font-size: 23px; font-weight: bold; color: #1f2a23; letter-spacing: 0.5px; }
 
-        .result-report-body { padding: 24px 28px 26px; text-align: left; }
-        .result-image { width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e5e2; }
+        .result-report-body { padding: 30px 32px 30px; text-align: left; }
+        .result-image { width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px; margin-bottom: 24px; border: 1px solid #e2e5e2; }
+
+        /* エグゼクティブサマリー */
+        .result-summary { background: #f7f8f6; border: 1px solid #e2e5e2; border-left: 3px solid #4A5D4E; border-radius: 0 6px 6px 0; padding: 16px 20px; margin-bottom: 28px; }
+        .result-summary-label { font-size: 10px; color: #4A5D4E; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+        .result-summary-text { font-size: 13px; color: #3a4038; line-height: 1.8; }
 
         /* セクション共通（現状診断・提案） */
-        .result-doc-section { margin-bottom: 22px; }
-        .result-doc-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .result-doc-section { margin-bottom: 28px; }
+        .result-doc-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eef1ee; }
         .result-doc-section-num { width: 22px; height: 22px; border-radius: 50%; background: #4A5D4E; color: #fff; font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .result-doc-section-title { font-size: 13px; font-weight: bold; color: #4A5D4E; letter-spacing: 1px; }
         .result-doc-section-sub { font-size: 9px; color: #aab3a8; letter-spacing: 1px; margin-left: auto; text-transform: uppercase; }
-        .result-doc-section-body { font-size: 14px; color: #3a4038; line-height: 1.9; padding-left: 32px; border-left: 2px solid #eef1ee; margin-left: 10px; }
+        .result-doc-section-body { font-size: 14px; color: #3a4038; line-height: 2; padding-left: 32px; margin-left: 10px; }
 
-        .result-course { position: relative; background: #f7f8f6; border: 1px solid #e2e5e2; border-radius: 6px; padding: 14px 16px 12px 18px; margin-top: 4px; }
+        .result-course { position: relative; background: #f7f8f6; border: 1px solid #e2e5e2; border-radius: 6px; padding: 14px 16px 12px 18px; margin-top: 12px; }
         .result-course::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #4A5D4E; border-radius: 3px 0 0 3px; }
         .result-course .label { font-size: 10px; color: #8aa28e; font-weight: bold; letter-spacing: 1px; margin-bottom: 3px; text-transform: uppercase; }
         .result-course .value { font-family: 'Hiragino Mincho ProN', 'Georgia', serif; font-size: 16px; font-weight: bold; color: #1f2a23; }
 
-        .result-report-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; padding-top: 14px; border-top: 1px solid #eef1ee; }
+        .result-report-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 28px; padding-top: 16px; border-top: 1px solid #eef1ee; }
         .result-report-brand { font-size: 11px; color: #888; letter-spacing: 0.5px; }
         .result-report-date { font-size: 10px; color: #aaa; }
 
         .result-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .btn-pdf { display: block; padding: 13px; background: #fff; color: #4A5D4E; border: 1.5px solid #4A5D4E; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .btn-pdf:hover { background: #f7f8f6; }
+
+        /* 印刷用スタイル */
+        @media print {
+            body { background: #fff !important; padding: 0 !important; }
+            .diag-header, .progress-wrap, .result-actions { display: none !important; }
+            .diag-wrap { max-width: 100% !important; }
+            .diag-body { box-shadow: none !important; padding: 0 !important; background: #fff !important; }
+            .result-report { box-shadow: none !important; border: none !important; }
+        }
         .btn-booking { display: block; padding: 16px; background: #4A5D4E; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; transition: background 0.2s; }
         .btn-booking:hover { background: #3a4d3e; }
         .btn-retry { display: block; padding: 14px; background: white; color: #4A5D4E; border: 2px solid #4A5D4E; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s; }
@@ -106,12 +123,13 @@
 
         <!-- 結果画面 -->
         <div class="result-screen" id="resultScreen">
-            <div class="result-report">
+            <div class="result-report" id="resultReportSheet">
                 <div class="result-report-top">
                     <div class="result-doc-meta">
                         <div class="result-eyebrow">DIAGNOSIS REPORT</div>
                         <div class="result-doc-no" id="resultDocNo"></div>
                     </div>
+                    <div class="result-to-line">お客様各位</div>
                     <div class="result-title-row">
                         <span class="result-badge">体質タイプ</span>
                         <span class="result-title" id="resultTitle"></span>
@@ -119,6 +137,11 @@
                 </div>
                 <div class="result-report-body">
                     <img class="result-image" id="resultImage" src="" alt="" style="display:none">
+
+                    <div class="result-summary">
+                        <div class="result-summary-label">Executive Summary</div>
+                        <div class="result-summary-text" id="resultSummary"></div>
+                    </div>
 
                     <div class="result-doc-section">
                         <div class="result-doc-section-head">
@@ -152,6 +175,7 @@
             </div>
             <div class="result-actions">
                 <a class="btn-booking" id="bookingBtn" href="#" target="_blank" style="display:none">📅 予約はこちら</a>
+                <button class="btn-pdf" onclick="printResult()">🖨️ この提案書を印刷・PDF保存</button>
                 <button class="btn-retry" onclick="startDiagnosis()">🔄 もう一度診断する</button>
             </div>
         </div>
@@ -225,6 +249,10 @@
         document.getElementById('progressWrap').style.display = 'block';
         document.querySelector('.diag-body').classList.remove('is-result');
         showQuestion();
+    }
+
+    function printResult() {
+        window.print();
     }
 
     // ============================================================
@@ -302,6 +330,13 @@
         // 現状診断セクション：タイプ名を簡潔な説明文として表示
         document.getElementById('resultAssessment').textContent =
             result.title ? ('診断の結果、あなたは「' + result.title + '」の傾向が見られます。') : '';
+
+        // エグゼクティブサマリー：タイプ名とおすすめコースを一言でまとめる
+        var summaryParts = [];
+        if (result.title) summaryParts.push('体質タイプは「' + result.title + '」');
+        if (result.course) summaryParts.push('おすすめは「' + result.course + '」');
+        document.getElementById('resultSummary').textContent =
+            summaryParts.length ? (summaryParts.join('、') + 'です。詳細は本書1.現状診断・2.ご提案をご確認ください。') : '';
 
         // 文書番号・日付
         var today = new Date();
