@@ -1313,11 +1313,11 @@ function measureRows(m) {
     rows.push(measureRow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
     rows.push(measureRow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
     rows.push(measureRow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
-    rows.push(measureRow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, false));
-    rows.push(measureRow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, false));
-    rows.push(measureRow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, false));
-    rows.push(measureRow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, false));
-    rows.push(measureRow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, true));
+    rows.push(measureRow('ふくらはぎ左', 'cm', null, m.first_calf_l, m.latest_calf_l, false));
+    rows.push(measureRow('ふくらはぎ右', 'cm', null, m.first_calf_r, m.latest_calf_r, false));
+    rows.push(measureRow('アーム左', 'cm', null, m.first_arm_l, m.latest_arm_l, false));
+    rows.push(measureRow('アーム右', 'cm', null, m.first_arm_r, m.latest_arm_r, false));
+    rows.push(measureRow('体脂肪率', '%', null, m.first_fat, m.latest_fat, true));
     // 男性はBMIのみ末尾に表示（PIは不要）
     rows.push(measureRow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
   } else {
@@ -1616,11 +1616,11 @@ function printDetail() {
         r.push(mrow('ヒップ','cm',m.ideal_hip,m.first_hip,m.latest_hip,true));
         r.push(mrow('太もも左','cm',m.ideal_thigh_l,m.first_thigh_l,m.latest_thigh_l,true));
         r.push(mrow('太もも右','cm',m.ideal_thigh_r,m.first_thigh_r,m.latest_thigh_r,true));
-        r.push(mrow('ふくらはぎ左','cm',m.ideal_calf_l,m.first_calf_l,m.latest_calf_l,false));
-        r.push(mrow('ふくらはぎ右','cm',m.ideal_calf_r,m.first_calf_r,m.latest_calf_r,false));
-        r.push(mrow('アーム左','cm',m.ideal_arm_l,m.first_arm_l,m.latest_arm_l,false));
-        r.push(mrow('アーム右','cm',m.ideal_arm_r,m.first_arm_r,m.latest_arm_r,false));
-        r.push(mrow('体脂肪率','%',m.ideal_fat,m.first_fat,m.latest_fat,true));
+        r.push(mrow('ふくらはぎ左','cm',null,m.first_calf_l,m.latest_calf_l,false));
+        r.push(mrow('ふくらはぎ右','cm',null,m.first_calf_r,m.latest_calf_r,false));
+        r.push(mrow('アーム左','cm',null,m.first_arm_l,m.latest_arm_l,false));
+        r.push(mrow('アーム右','cm',null,m.first_arm_r,m.latest_arm_r,false));
+        r.push(mrow('体脂肪率','%',null,m.first_fat,m.latest_fat,true));
         // 男性はBMIのみ末尾（PIは不要）
         r.push(mrow('BMI','',null,m.first_bmi,m.latest_bmi,false));
       } else {
