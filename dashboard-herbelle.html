@@ -187,6 +187,40 @@
     .file-modal-status.error { color: #e74c3c; }
     .btn-has-files { position: relative; }
     .file-badge { display: inline-block; background: #27ae60; color: white; border-radius: 8px; font-size: 10px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; font-weight: bold; }
+
+    /* ✨ 提案書プレビュー（診断結果・AI提案 共通フォーマット） */
+    .report-sheet { position: relative; background: #ffffff; border: 1px solid #e2e5e2; border-radius: 8px; padding: 0; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .report-sheet-top { background: #ffffff; padding: 28px 28px 18px; border-bottom: 3px solid #4A5D4E; }
+    .report-doc-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .report-eyebrow { font-size: 10px; letter-spacing: 3px; color: #4A5D4E; font-weight: bold; text-transform: uppercase; }
+    .report-doc-no { font-size: 10px; color: #aaa; letter-spacing: 0.5px; }
+    .report-to-line { font-size: 12px; color: #888; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .report-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .report-badge { display: inline-block; background: #4A5D4E; color: #fff; padding: 4px 12px; border-radius: 3px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
+    .report-title { font-family: 'Hiragino Mincho ProN', 'Georgia', serif; font-size: 20px; font-weight: bold; color: #1f2a23; letter-spacing: 0.5px; }
+    .report-sheet-body { padding: 24px 28px 24px; text-align: left; }
+    .report-image { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 18px; border: 1px solid #e2e5e2; }
+    .report-summary { background: #f7f8f6; border: 1px solid #e2e5e2; border-left: 3px solid #4A5D4E; border-radius: 0 6px 6px 0; padding: 14px 18px; margin-bottom: 22px; }
+    .report-summary-label { font-size: 10px; color: #4A5D4E; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
+    .report-summary-text { font-size: 13px; color: #3a4038; line-height: 1.8; }
+    .report-section { margin-bottom: 22px; }
+    .report-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #eef1ee; }
+    .report-section-num { width: 20px; height: 20px; border-radius: 50%; background: #4A5D4E; color: #fff; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .report-section-title { font-size: 12px; font-weight: bold; color: #4A5D4E; letter-spacing: 1px; }
+    .report-section-sub { font-size: 9px; color: #aab3a8; letter-spacing: 1px; margin-left: auto; text-transform: uppercase; }
+    .report-section-body { font-size: 13px; color: #3a4038; line-height: 1.9; padding-left: 28px; margin-left: 8px; }
+    .report-course { position: relative; background: #f7f8f6; border: 1px solid #e2e5e2; border-radius: 6px; padding: 12px 14px 10px 16px; margin-top: 10px; }
+    .report-course::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #4A5D4E; border-radius: 3px 0 0 3px; }
+    .report-course .label { font-size: 10px; color: #8aa28e; font-weight: bold; letter-spacing: 1px; margin-bottom: 3px; text-transform: uppercase; }
+    .report-course .value { font-family: 'Hiragino Mincho ProN', 'Georgia', serif; font-size: 15px; font-weight: bold; color: #1f2a23; }
+    .report-ai-cards { display: flex; flex-direction: column; gap: 10px; }
+    .report-ai-card { position: relative; background: #f9faf9; border: 1px solid #e4ebe4; border-radius: 8px; padding: 12px 14px 10px 16px; }
+    .report-ai-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #4A5D4E; }
+    .report-ai-card-label { font-size: 11px; font-weight: bold; color: #3a4d3e; margin-bottom: 4px; }
+    .report-ai-card-text { font-size: 12px; color: #555; line-height: 1.7; white-space: pre-wrap; }
+    .report-sheet-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; padding-top: 14px; border-top: 1px solid #eef1ee; }
+    .report-sheet-brand { font-size: 11px; color: #888; letter-spacing: 0.5px; }
+    .report-sheet-date { font-size: 10px; color: #aaa; }
   </style>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
   <script>
@@ -612,8 +646,8 @@
         <div class="table-wrap">
           <div class="table-scroll">
             <table>
-              <thead><tr><th>日時</th><th>診断名</th><th>結果タイプ</th><th>AI提案</th></tr></thead>
-              <tbody id="diagLogAllBody"><tr><td colspan="4" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
+              <thead><tr><th>日時</th><th>診断名</th><th>結果タイプ</th><th>AI提案</th><th>提案書</th></tr></thead>
+              <tbody id="diagLogAllBody"><tr><td colspan="5" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1831,7 +1865,8 @@
       var chkCol = selectMode ? '<td><input type="checkbox" class="row-check" data-email="' + esc(emailVal) + '" data-id="' + r.id + '" ' + (emailVal ? '' : 'disabled title="メールアドレスなし"') + ' style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:' + (emailVal ? 'pointer' : 'not-allowed') + '" onchange="updateSelectedCount()"></td>' : '';
       var rowStyle = '';
       var aiBtn = r.aiSuggestion ? '<button class="btn-file-icon" onclick="openAiSuggestionModal(\'' + r.id + '\')" title="AI提案を見る" style="background:none;border:1px solid #4A5D4E;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✨提案</button>' : '';
-      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td>' + aiBtn + '<button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
+      var reportBtn = '<button class="btn-file-icon" onclick="openResponseReportPreview(\'' + r.id + '\')" title="提案書を見る" style="background:none;border:1px solid #888;color:#555;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">📄</button>';
+      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td>' + aiBtn + reportBtn + '<button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
     }).join('');
   }
 
@@ -2315,7 +2350,7 @@
 
   async function loadAllDiagLogs() {
     var tbody = document.getElementById('diagLogAllBody');
-    tbody.innerHTML = '<tr><td colspan="4" class="loading">読み込み中...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">読み込み中...</td></tr>';
     try {
       var res = await apiFetch(BASE_URL + '/api/diagnosislog?tenant=' + TENANT);
       if (!res.ok) throw new Error('取得失敗');
@@ -2332,7 +2367,7 @@
 
       filterDiagLogs();
     } catch(e) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty">❌ ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">❌ ' + e.message + '</td></tr>';
     }
   }
 
@@ -2352,15 +2387,17 @@
 
     // テーブル
     var tbody = document.getElementById('diagLogAllBody');
-    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">ログがありません</td></tr>'; return; }
+    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">ログがありません</td></tr>'; return; }
     tbody.innerHTML = filtered.map(function(l) {
       var date = new Date(l.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
       var aiBtn = l.aiSuggestion ? '<button class="btn-file-icon" onclick="openDiagAiModal(\'' + l.id + '\')" title="AI提案を見る" style="background:none;border:1px solid #4A5D4E;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px">✨提案</button>' : '<span style="color:#ccc;font-size:11px">—</span>';
+      var reportBtn = '<button class="btn-file-icon" onclick="openDiagReportPreview(\'' + l.id + '\')" title="提案書を見る" style="background:none;border:1px solid #888;color:#555;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px">📄 提案書</button>';
       return '<tr>' +
         '<td style="color:#888;white-space:nowrap;font-size:12px">' + date + '</td>' +
         '<td style="font-size:13px">' + esc(l.diagTitle || '—') + '</td>' +
         '<td><span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold">' + esc(l.resultTitle || '—') + '</span></td>' +
         '<td>' + aiBtn + '</td>' +
+        '<td>' + reportBtn + '</td>' +
       '</tr>';
     }).join('');
   }
@@ -3512,6 +3549,17 @@
       </div>
     </div>
 
+    <!-- ★ 提案書プレビューモーダル -->
+    <div id="reportPreviewModal" class="modal-overlay" style="display:none">
+      <div class="modal" style="max-width:620px;background:#f0f2f0">
+        <div id="reportPreviewBody"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
+          <button class="btn btn-secondary" onclick="printReportPreview()">🖨️ 印刷・PDF保存</button>
+          <button class="btn btn-secondary" onclick="closeReportPreviewModal()">閉じる</button>
+        </div>
+      </div>
+    </div>
+
 
     <script>
     // ============================================================
@@ -3550,6 +3598,164 @@
       document.getElementById('aiSuggestionModalMeta').textContent = (l.diagTitle ? l.diagTitle + '　|　' : '') + '結果：' + (l.resultTitle || '—') + '　|　' + date;
       document.getElementById('aiSuggestionModalBody').innerHTML = buildAiSuggestionHtml(l.aiSuggestion);
       document.getElementById('aiSuggestionModal').style.display = 'flex';
+    }
+
+    // ============================================================
+    // 📄 提案書プレビュー（診断結果・AI提案 共通フォーマット）
+    // ============================================================
+    function fmtReportDate(d) {
+      var dt = new Date(d);
+      return dt.getFullYear() + '.' + String(dt.getMonth()+1).padStart(2,'0') + '.' + String(dt.getDate()).padStart(2,'0');
+    }
+
+    function buildAiBlockHtml(suggestion) {
+      if (!suggestion) return '';
+      var body = '';
+      if (suggestion.format === 'structured' && suggestion.sections && typeof suggestion.sections === 'object') {
+        body = '<div class="report-ai-cards">' + Object.keys(suggestion.sections).map(function(label) {
+          return '<div class="report-ai-card"><div class="report-ai-card-label">' + esc(label) + '</div><div class="report-ai-card-text">' + esc(suggestion.sections[label]).replace(/\n/g, '<br>') + '</div></div>';
+        }).join('') + '</div>';
+      } else if (suggestion.text) {
+        body = '<div class="report-section-body" style="padding-left:0;margin-left:0">' + esc(suggestion.text).replace(/\n/g, '<br>') + '</div>';
+      } else {
+        return '';
+      }
+      return '<div class="report-section" style="margin-bottom:0">' +
+          '<div class="report-section-head">' +
+            '<div class="report-section-num">✨</div>' +
+            '<div class="report-section-title">AIアドバイザーコメント</div>' +
+            '<div class="report-section-sub">AI Insight</div>' +
+          '</div>' +
+          body +
+        '</div>';
+    }
+
+    // ---- 診断結果の提案書 ----
+    function openDiagReportPreview(logId) {
+      var l = allDiagLogs.find(function(x) { return x.id === logId; });
+      if (!l) { alert('診断ログが見つかりません'); return; }
+      var snap = l.resultSnapshot || {};
+      var docNo = 'No. ' + fmtReportDate(l.createdAt).replace(/\./g, '') + '-' + String(l.id || '').slice(0, 3).toUpperCase();
+
+      var summaryParts = [];
+      if (l.resultTitle) summaryParts.push('体質タイプは「' + l.resultTitle + '」');
+      if (snap.course) summaryParts.push('おすすめは「' + snap.course + '」');
+      var summaryText = summaryParts.length ? (summaryParts.join('、') + 'です。詳細は本書1.現状診断・2.ご提案をご確認ください。') : '';
+
+      var assessmentText = l.resultTitle ? ('診断の結果、お客様は「' + l.resultTitle + '」の傾向が見られます。') : '';
+
+      var html =
+        '<div class="report-sheet">' +
+          '<div class="report-sheet-top">' +
+            '<div class="report-doc-meta"><div class="report-eyebrow">DIAGNOSIS REPORT</div><div class="report-doc-no">' + esc(docNo) + '</div></div>' +
+            '<div class="report-to-line">お客様各位</div>' +
+            '<div class="report-title-row"><span class="report-badge">体質タイプ</span><span class="report-title">' + esc(l.resultTitle || '—') + '</span></div>' +
+          '</div>' +
+          '<div class="report-sheet-body">' +
+            (snap.imageBase64 ? '<img class="report-image" src="' + snap.imageBase64 + '">' : '') +
+            (summaryText ? '<div class="report-summary"><div class="report-summary-label">Executive Summary</div><div class="report-summary-text">' + esc(summaryText) + '</div></div>' : '') +
+            '<div class="report-section"><div class="report-section-head"><div class="report-section-num">1</div><div class="report-section-title">現状診断</div><div class="report-section-sub">Assessment</div></div><div class="report-section-body">' + esc(assessmentText) + '</div></div>' +
+            '<div class="report-section"><div class="report-section-head"><div class="report-section-num">2</div><div class="report-section-title">ご提案</div><div class="report-section-sub">Proposal</div></div><div class="report-section-body">' +
+              (snap.description ? esc(snap.description).replace(/\n/g, '<br>') : '') +
+              (snap.course ? '<div class="report-course"><div class="label">Recommended Course</div><div class="value">' + esc(snap.course) + '</div></div>' : '') +
+            '</div></div>' +
+            (l.aiSuggestion ? buildAiBlockHtml(l.aiSuggestion) : '') +
+            '<div class="report-sheet-footer"><div class="report-sheet-brand">' + esc(l.diagTitle || 'Herbelle よもぎ蒸しサロン') + '</div><div class="report-sheet-date">' + fmtReportDate(l.createdAt) + '</div></div>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('reportPreviewBody').innerHTML = html;
+      document.getElementById('reportPreviewModal').style.display = 'flex';
+    }
+
+    // ---- アンケート回答の提案書 ----
+    function openResponseReportPreview(responseId) {
+      var r = allResponses.find(function(x) { return x.id === responseId; })
+           || allAiSuggestionResponses.find(function(x) { return x.id === responseId; });
+      if (!r) { alert('回答データが見つかりません'); return; }
+      var docNo = 'No. ' + fmtReportDate(r.createdAt).replace(/\./g, '') + '-' + String(r.id || '').slice(0, 3).toUpperCase();
+      var surveyTitle = (currentSurvey && currentSurvey.id === r.surveyId) ? currentSurvey.title : (r._surveyTitle || 'アンケート回答');
+      var questions = (currentSurvey && currentSurvey.id === r.surveyId) ? (currentSurvey.questions || []) : [];
+
+      var answersHtml = '';
+      if (questions.length) {
+        answersHtml = questions.map(function(q) {
+          var val = r.answers ? r.answers[q.id] : undefined;
+          if (val === undefined || val === null || val === '') return '';
+          return '<div style="margin-bottom:10px"><div style="font-size:11px;color:#8aa28e;font-weight:bold;margin-bottom:2px">' + esc(q.label) + '</div><div style="font-size:13px;color:#3a4038">' + esc(val) + '</div></div>';
+        }).join('');
+      } else if (r.answers) {
+        answersHtml = Object.keys(r.answers).map(function(k) {
+          var val = r.answers[k];
+          if (val === undefined || val === null || val === '') return '';
+          return '<div style="margin-bottom:10px"><div style="font-size:13px;color:#3a4038">' + esc(val) + '</div></div>';
+        }).join('');
+      }
+
+      var html =
+        '<div class="report-sheet">' +
+          '<div class="report-sheet-top">' +
+            '<div class="report-doc-meta"><div class="report-eyebrow">PERSONAL REPORT</div><div class="report-doc-no">' + esc(docNo) + '</div></div>' +
+            '<div class="report-to-line">お客様各位</div>' +
+            '<div class="report-title-row"><span class="report-badge">あなた専用のご提案</span><span class="report-title">✨ あなたへのおすすめ</span></div>' +
+          '</div>' +
+          '<div class="report-sheet-body">' +
+            (answersHtml ? '<div class="report-section"><div class="report-section-head"><div class="report-section-num">1</div><div class="report-section-title">ご回答内容</div><div class="report-section-sub">Your Answers</div></div><div class="report-section-body" style="padding-left:0;margin-left:0">' + answersHtml + '</div></div>' : '') +
+            (r.aiSuggestion ? buildAiBlockHtml(r.aiSuggestion) : '<div style="color:#888;font-size:13px;text-align:center;padding:20px">AI提案データがありません</div>') +
+            '<div class="report-sheet-footer"><div class="report-sheet-brand">' + esc(surveyTitle) + '</div><div class="report-sheet-date">' + fmtReportDate(r.createdAt) + '</div></div>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('reportPreviewBody').innerHTML = html;
+      document.getElementById('reportPreviewModal').style.display = 'flex';
+    }
+
+    function closeReportPreviewModal() {
+      document.getElementById('reportPreviewModal').style.display = 'none';
+    }
+
+    function printReportPreview() {
+      var bodyHtml = document.getElementById('reportPreviewBody').innerHTML;
+      var win = window.open('', '_blank', 'width=700,height=900');
+      win.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>提案書</title>' +
+        '<style>' +
+        'body{font-family:"Hiragino Sans","Helvetica Neue",Arial,sans-serif;background:#fff;padding:24px}' +
+        '.report-sheet{background:#fff;border:none}' +
+        '.report-sheet-top{background:#fff;padding:0 0 18px;border-bottom:3px solid #4A5D4E}' +
+        '.report-doc-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}' +
+        '.report-eyebrow{font-size:10px;letter-spacing:3px;color:#4A5D4E;font-weight:bold;text-transform:uppercase}' +
+        '.report-doc-no{font-size:10px;color:#aaa;letter-spacing:0.5px}' +
+        '.report-to-line{font-size:12px;color:#888;margin-bottom:6px;letter-spacing:0.5px}' +
+        '.report-title-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}' +
+        '.report-badge{display:inline-block;background:#4A5D4E;color:#fff;padding:4px 12px;border-radius:3px;font-size:11px;font-weight:bold;letter-spacing:0.5px}' +
+        '.report-title{font-family:"Hiragino Mincho ProN",Georgia,serif;font-size:20px;font-weight:bold;color:#1f2a23;letter-spacing:0.5px}' +
+        '.report-sheet-body{padding:20px 0 0;text-align:left}' +
+        '.report-image{width:100%;max-height:160px;object-fit:cover;border-radius:6px;margin-bottom:18px;border:1px solid #e2e5e2}' +
+        '.report-summary{background:#f7f8f6;border:1px solid #e2e5e2;border-left:3px solid #4A5D4E;border-radius:0 6px 6px 0;padding:14px 18px;margin-bottom:22px}' +
+        '.report-summary-label{font-size:10px;color:#4A5D4E;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}' +
+        '.report-summary-text{font-size:13px;color:#3a4038;line-height:1.8}' +
+        '.report-section{margin-bottom:22px}' +
+        '.report-section-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #eef1ee}' +
+        '.report-section-num{width:20px;height:20px;border-radius:50%;background:#4A5D4E;color:#fff;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
+        '.report-section-title{font-size:12px;font-weight:bold;color:#4A5D4E;letter-spacing:1px}' +
+        '.report-section-sub{font-size:9px;color:#aab3a8;letter-spacing:1px;margin-left:auto;text-transform:uppercase}' +
+        '.report-section-body{font-size:13px;color:#3a4038;line-height:1.9;padding-left:28px;margin-left:8px}' +
+        '.report-course{position:relative;background:#f7f8f6;border:1px solid #e2e5e2;border-radius:6px;padding:12px 14px 10px 16px;margin-top:10px}' +
+        '.report-course .label{font-size:10px;color:#8aa28e;font-weight:bold;letter-spacing:1px;margin-bottom:3px;text-transform:uppercase}' +
+        '.report-course .value{font-family:"Hiragino Mincho ProN",Georgia,serif;font-size:15px;font-weight:bold;color:#1f2a23}' +
+        '.report-ai-cards{display:flex;flex-direction:column;gap:10px}' +
+        '.report-ai-card{background:#f9faf9;border:1px solid #e4ebe4;border-radius:8px;padding:12px 14px 10px 16px}' +
+        '.report-ai-card-label{font-size:11px;font-weight:bold;color:#3a4d3e;margin-bottom:4px}' +
+        '.report-ai-card-text{font-size:12px;color:#555;line-height:1.7;white-space:pre-wrap}' +
+        '.report-sheet-footer{display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:14px;border-top:1px solid #eef1ee}' +
+        '.report-sheet-brand{font-size:11px;color:#888;letter-spacing:0.5px}' +
+        '.report-sheet-date{font-size:10px;color:#aaa}' +
+        '@media print{button{display:none}}' +
+        '</style></head><body>' +
+        bodyHtml +
+        '<script>window.onload=function(){window.print();}<\/script>' +
+        '</body></html>');
+      win.document.close();
     }
 
     // ============================================================
@@ -3622,6 +3828,7 @@
               '<div style="font-size:13px;color:#888">' + date + (nameAnswer ? '　|　' + esc(nameAnswer) : '') + '</div>' +
             '</div>' +
             '<div style="display:flex;gap:8px">' +
+              '<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="openResponseReportPreview(\'' + r.id + '\')">📄 提案書</button>' +
               '<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="openAiSuggestionModal(\'' + r.id + '\')">🔍 詳細・印刷</button>' +
             '</div>' +
           '</div>' +

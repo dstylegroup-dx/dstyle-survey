@@ -832,13 +832,25 @@ app.http('diagnosislog', {
                 const { tenant, resultKey, resultTitle, diagTitle, diagId: logDiagId, answers } = body;
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
 
-                // AI提案生成（診断設定でONの場合のみ）
+                // AI提案生成（診断設定でONの場合のみ）＋ 結果内容のスナップショット保存
                 let aiSuggestion = null;
+                let resultSnapshot = null;
                 if (logDiagId) {
                     try {
                         const { resource: diagDef } = await container.item(logDiagId, tenant).read();
-                        if (diagDef && diagDef.aiSuggestionEnabled) {
-                            aiSuggestion = await generateDiagnosisAiSuggestion(diagDef, resultTitle, answers);
+                        if (diagDef) {
+                            const r = (diagDef.results || {})[resultKey];
+                            if (r) {
+                                resultSnapshot = {
+                                    title: r.title || resultTitle || '',
+                                    course: r.course || '',
+                                    description: r.description || '',
+                                    imageBase64: r.imageBase64 || ''
+                                };
+                            }
+                            if (diagDef.aiSuggestionEnabled) {
+                                aiSuggestion = await generateDiagnosisAiSuggestion(diagDef, resultTitle, answers);
+                            }
                         }
                     } catch (e) {
                         context.log(`[診断AI提案エラー] tenant=${tenant} diagId=${logDiagId} error=${e.message}`);
@@ -854,6 +866,7 @@ app.http('diagnosislog', {
                     answers: answers || [],
                     createdAt: new Date().toISOString()
                 };
+                if (resultSnapshot) logDoc.resultSnapshot = resultSnapshot;
                 if (aiSuggestion) logDoc.aiSuggestion = aiSuggestion;
 
                 await container.items.create(logDoc);
