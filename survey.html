@@ -358,7 +358,7 @@ input[type="number"]::-webkit-inner-spin-button,
     privacyHtml += '<div style="color:' + privacyTextColor + '">' + privacyContent + '</div>';
     privacyHtml += '</div>';
     html += privacyHtml;
-    html += '<button type="submit" class="submit-btn" id="submitBtn" style="background:' + color + ';box-shadow:0 4px 12px rgba(0,0,0,0.2)">アンケートを送信する 📩</button>';
+    html += '<button type="submit" class="submit-btn" id="submitBtn" style="background:' + color + ';box-shadow:0 4px 12px rgba(0,0,0,0.2)">送信する 📩</button>';
     form.innerHTML = html;
 
     document.querySelectorAll('.radio-group').forEach(function(group) {
@@ -472,7 +472,7 @@ input[type="number"]::-webkit-inner-spin-button,
         var firstError = document.querySelector('.field-error');
         if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
         btn.disabled = false;
-        btn.textContent = 'アンケートを送信する 📩';
+        btn.textContent = '送信する 📩';
         return;
       }
 
@@ -520,7 +520,7 @@ input[type="number"]::-webkit-inner-spin-button,
         errorMsg.textContent = '❌ エラー: ' + err.message;
         errorMsg.style.display = 'block';
         btn.disabled = false;
-        btn.textContent = 'アンケートを送信する 📩';
+        btn.textContent = '送信する 📩';
       }
     });
   }
