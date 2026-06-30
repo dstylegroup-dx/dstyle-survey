@@ -359,7 +359,7 @@
               <!-- シンプルテキスト用 -->
               <div id="aiFormatTextArea" class="form-group">
                 <label>AIへの指示（プロンプト）</label>
-                <textarea id="aiPromptText" placeholder="例）回答内容を踏まえて、お客様に最適なよもぎ蒸しコースと、その理由をやさしい口調で提案してください。"></textarea>
+                <textarea id="aiPromptText" placeholder="例）回答内容を踏まえて、お客様に最適なよもぎ蒸しコースと、その理由をやさしい口調で提案してください。" style="width:100%;min-height:140px;line-height:1.7;font-size:14px;box-sizing:border-box"></textarea>
               </div>
 
               <!-- 構造化用 -->
@@ -1251,7 +1251,7 @@
           '<input type="text" placeholder="見出し（例：おすすめコース）" value="' + esc(s.label) + '" oninput="updateAiSection(' + i + ',\'label\',this.value)" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px">' +
           '<button type="button" onclick="removeAiSection(' + i + ')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">削除</button>' +
         '</div>' +
-        '<textarea placeholder="この項目へのAI指示（例：回答内容から最適なコースを1つ提案してください）" oninput="updateAiSection(' + i + ',\'instruction\',this.value)" style="width:100%;min-height:50px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical">' + esc(s.instruction) + '</textarea>' +
+        '<textarea placeholder="この項目へのAI指示（例：回答内容から最適なコースを1つ提案してください）" oninput="updateAiSection(' + i + ',\'instruction\',this.value)" style="width:100%;min-height:90px;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:13px;line-height:1.6;resize:vertical;box-sizing:border-box">' + esc(s.instruction) + '</textarea>' +
       '</div>';
     }).join('');
   }
