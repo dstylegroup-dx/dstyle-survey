@@ -63,37 +63,12 @@ function secureJson(body, status = 200) {
 // ----------------------------------------------------
 // 🤖 AI提案生成（Azure OpenAI）
 // ----------------------------------------------------
-async function generateAiSuggestion(survey, answers) {
+async function callAzureOpenAI(systemPrompt, userPrompt, expectJson) {
     const endpoint = process.env.AOAI_ENDPOINT;
     const apiKey = process.env.AOAI_API_KEY;
     const deployment = process.env.AOAI_DEPLOYMENT || 'gpt-4o-mini';
     const apiVersion = process.env.AOAI_API_VERSION || '2025-01-01-preview';
     if (!endpoint || !apiKey) return null;
-
-    // 質問ラベルと回答を整形してAIに渡す
-    const questions = survey.questions || [];
-    const answerLines = questions.map(q => {
-        const val = answers[q.id];
-        if (val === undefined || val === null || val === '') return null;
-        return `${q.label}: ${val}`;
-    }).filter(Boolean).join('\n');
-
-    const format = survey.aiOutputFormat || 'text';
-
-    let systemPrompt, userPrompt, expectJson = false;
-
-    if (format === 'structured') {
-        const sections = survey.aiSections || [];
-        if (sections.length === 0) return null;
-        expectJson = true;
-        const sectionDesc = sections.map(s => `- "${s.label}": ${s.instruction || '回答内容に基づいて提案してください'}`).join('\n');
-        systemPrompt = 'あなたはアンケート回答に基づいてお客様への提案を行うアシスタントです。必ず指定されたJSON形式のみで出力し、それ以外の文章は一切含めないでください。';
-        userPrompt = `以下はお客様のアンケート回答です。\n\n【回答内容】\n${answerLines}\n\n【出力する項目とその指示】\n${sectionDesc}\n\n上記の項目それぞれについて、回答内容を踏まえた提案文を作成し、必ず次のJSON形式のみで出力してください（説明文・前置き・コードブロックは不要です）:\n{\n${sections.map(s => `  "${s.label}": "（ここに提案文）"`).join(',\n')}\n}`;
-    } else {
-        systemPrompt = 'あなたはアンケート回答に基づいてお客様への提案を行うアシスタントです。';
-        const customInstruction = survey.aiPrompt || '回答内容を踏まえて、お客様へのおすすめや提案を作成してください。';
-        userPrompt = `以下はお客様のアンケート回答です。\n\n【回答内容】\n${answerLines}\n\n【指示】\n${customInstruction}\n\n300文字程度で、お客様に向けた丁寧な文章で出力してください。`;
-    }
 
     try {
         const url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
@@ -127,6 +102,58 @@ async function generateAiSuggestion(survey, answers) {
     } catch (e) {
         return null;
     }
+}
+
+async function generateAiSuggestion(survey, answers) {
+    // 質問ラベルと回答を整形してAIに渡す
+    const questions = survey.questions || [];
+    const answerLines = questions.map(q => {
+        const val = answers[q.id];
+        if (val === undefined || val === null || val === '') return null;
+        return `${q.label}: ${val}`;
+    }).filter(Boolean).join('\n');
+
+    const format = survey.aiOutputFormat || 'text';
+    let systemPrompt, userPrompt, expectJson = false;
+
+    if (format === 'structured') {
+        const sections = survey.aiSections || [];
+        if (sections.length === 0) return null;
+        expectJson = true;
+        const sectionDesc = sections.map(s => `- "${s.label}": ${s.instruction || '回答内容に基づいて提案してください'}`).join('\n');
+        systemPrompt = 'あなたはアンケート回答に基づいてお客様への提案を行うアシスタントです。必ず指定されたJSON形式のみで出力し、それ以外の文章は一切含めないでください。';
+        userPrompt = `以下はお客様のアンケート回答です。\n\n【回答内容】\n${answerLines}\n\n【出力する項目とその指示】\n${sectionDesc}\n\n上記の項目それぞれについて、回答内容を踏まえた提案文を作成し、必ず次のJSON形式のみで出力してください（説明文・前置き・コードブロックは不要です）:\n{\n${sections.map(s => `  "${s.label}": "（ここに提案文）"`).join(',\n')}\n}`;
+    } else {
+        systemPrompt = 'あなたはアンケート回答に基づいてお客様への提案を行うアシスタントです。';
+        const customInstruction = survey.aiPrompt || '回答内容を踏まえて、お客様へのおすすめや提案を作成してください。';
+        userPrompt = `以下はお客様のアンケート回答です。\n\n【回答内容】\n${answerLines}\n\n【指示】\n${customInstruction}\n\n300文字程度で、お客様に向けた丁寧な文章で出力してください。`;
+    }
+
+    return callAzureOpenAI(systemPrompt, userPrompt, expectJson);
+}
+
+// 体質診断用のAI提案生成（質問・選択肢の回答配列から生成）
+async function generateDiagnosisAiSuggestion(diagnosis, resultTitle, answeredChoices) {
+    const answerLines = (answeredChoices || []).map(a => `${a.question}: ${a.answer}`).join('\n');
+    if (!answerLines) return null;
+
+    const format = diagnosis.aiOutputFormat || 'text';
+    let systemPrompt, userPrompt, expectJson = false;
+
+    if (format === 'structured') {
+        const sections = diagnosis.aiSections || [];
+        if (sections.length === 0) return null;
+        expectJson = true;
+        const sectionDesc = sections.map(s => `- "${s.label}": ${s.instruction || '回答内容に基づいてコメントしてください'}`).join('\n');
+        systemPrompt = 'あなたは体質診断の結果に基づいてお客様へアドバイスを行うアシスタントです。必ず指定されたJSON形式のみで出力し、それ以外の文章は一切含めないでください。';
+        userPrompt = `以下はお客様の体質診断の回答と結果です。\n\n【診断結果タイプ】\n${resultTitle || ''}\n\n【質問への回答】\n${answerLines}\n\n【出力する項目とその指示】\n${sectionDesc}\n\n上記の項目それぞれについて、診断結果と回答内容を踏まえたコメントを作成し、必ず次のJSON形式のみで出力してください（説明文・前置き・コードブロックは不要です）:\n{\n${sections.map(s => `  "${s.label}": "（ここにコメント）"`).join(',\n')}\n}`;
+    } else {
+        systemPrompt = 'あなたは体質診断の結果に基づいてお客様へアドバイスを行うアシスタントです。';
+        const customInstruction = diagnosis.aiPrompt || '診断結果と回答内容を踏まえて、お客様へのアドバイスやおすすめを作成してください。';
+        userPrompt = `以下はお客様の体質診断の回答と結果です。\n\n【診断結果タイプ】\n${resultTitle || ''}\n\n【質問への回答】\n${answerLines}\n\n【指示】\n${customInstruction}\n\n250文字程度で、お客様に向けた丁寧な文章で出力してください。`;
+    }
+
+    return callAzureOpenAI(systemPrompt, userPrompt, expectJson);
 }
 
 // ----------------------------------------------------
@@ -802,17 +829,35 @@ app.http('diagnosislog', {
             const container = await getContainer();
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, resultKey, resultTitle, diagTitle, diagId: logDiagId } = body;
+                const { tenant, resultKey, resultTitle, diagTitle, diagId: logDiagId, answers } = body;
                 if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
-                await container.items.create({
+
+                // AI提案生成（診断設定でONの場合のみ）
+                let aiSuggestion = null;
+                if (logDiagId) {
+                    try {
+                        const { resource: diagDef } = await container.item(logDiagId, tenant).read();
+                        if (diagDef && diagDef.aiSuggestionEnabled) {
+                            aiSuggestion = await generateDiagnosisAiSuggestion(diagDef, resultTitle, answers);
+                        }
+                    } catch (e) {
+                        context.log(`[診断AI提案エラー] tenant=${tenant} diagId=${logDiagId} error=${e.message}`);
+                    }
+                }
+
+                const logDoc = {
                     id: crypto.randomUUID(),
                     docType: 'diagnosis_log',
                     tenant, resultKey, resultTitle,
                     diagTitle: diagTitle || '',
                     diagId: logDiagId || '',
+                    answers: answers || [],
                     createdAt: new Date().toISOString()
-                });
-                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok' } };
+                };
+                if (aiSuggestion) logDoc.aiSuggestion = aiSuggestion;
+
+                await container.items.create(logDoc);
+                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok', aiSuggestion: aiSuggestion || null } };
             }
             if (request.method === 'GET') {
                 const token = request.headers.get('x-admin-token');

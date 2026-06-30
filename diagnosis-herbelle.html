@@ -167,6 +167,8 @@
                         </div>
                     </div>
 
+                    <div id="aiCommentWrap" style="display:none;margin-bottom:0"></div>
+
                     <div class="result-report-footer">
                         <div class="result-report-brand" id="resultBrand">Herbelle よもぎ蒸しサロン</div>
                         <div class="result-report-date" id="resultDate"></div>
@@ -204,6 +206,7 @@
     var diagData = null;
     var currentQIndex = 0;
     var scores = {};
+    var answeredChoices = [];
 
     // ============================================================
     // 初期化
@@ -243,6 +246,7 @@
     function startDiagnosis() {
         currentQIndex = 0;
         scores = {};
+        answeredChoices = [];
         Object.keys(diagData.results || {}).forEach(function(k) { scores[k] = 0; });
         document.getElementById('resultScreen').style.display = 'none';
         document.getElementById('errorScreen').style.display = 'none';
@@ -290,10 +294,14 @@
         });
 
         // スコア加算
-        var choice = diagData.questions[currentQIndex].choices[choiceIdx];
+        var q = diagData.questions[currentQIndex];
+        var choice = q.choices[choiceIdx];
         Object.keys(choice.scores || {}).forEach(function(k) {
             scores[k] = (scores[k] || 0) + (choice.scores[k] || 0);
         });
+
+        // 回答内容を記録（AI提案用）
+        answeredChoices.push({ question: q.text || '', answer: choice.label || '' });
 
         // 次へ（少し遅延してから）
         setTimeout(function() {
@@ -375,12 +383,40 @@
             document.getElementById('bookingBtn').style.display = 'none';
         }
 
-        // ログ送信
+        // ログ送信（回答内容を含めてAI提案を取得）
+        document.getElementById('aiCommentWrap').style.display = 'none';
         fetch(BASE_URL + '/api/diagnosislog', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tenant: TENANT, resultKey: maxKey, resultTitle: result.title, diagTitle: diagData.title || '', diagId: diagData.diagId || diagData.id || '' })
-        }).catch(function() {});
+            body: JSON.stringify({ tenant: TENANT, resultKey: maxKey, resultTitle: result.title, diagTitle: diagData.title || '', diagId: diagData.diagId || diagData.id || '', answers: answeredChoices })
+        }).then(function(res) { return res.ok ? res.json() : null; })
+          .then(function(data) { renderAiComment(data && data.aiSuggestion); })
+          .catch(function() {});
+    }
+
+    function renderAiComment(suggestion) {
+        var wrap = document.getElementById('aiCommentWrap');
+        if (!suggestion) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+        var body = '';
+        if (suggestion.format === 'structured' && suggestion.sections && typeof suggestion.sections === 'object') {
+            body = Object.keys(suggestion.sections).map(function(label) {
+                return '<div class="result-doc-section" style="margin-bottom:14px"><div class="result-doc-section-head" style="border-bottom:none;margin-bottom:4px"><div class="result-doc-section-sub" style="margin-left:0;font-weight:bold;color:#4A5D4E">' + escHtml(label) + '</div></div><div class="result-doc-section-body" style="padding-left:0;margin-left:0">' + escHtml(suggestion.sections[label]).replace(/\n/g, '<br>') + '</div></div>';
+            }).join('');
+        } else if (suggestion.text) {
+            body = '<div class="result-doc-section-body" style="padding-left:0;margin-left:0">' + escHtml(suggestion.text).replace(/\n/g, '<br>') + '</div>';
+        } else {
+            wrap.style.display = 'none'; wrap.innerHTML = ''; return;
+        }
+        wrap.innerHTML =
+            '<div class="result-doc-section" style="margin-bottom:0">' +
+              '<div class="result-doc-section-head">' +
+                '<div class="result-doc-section-num">✨</div>' +
+                '<div class="result-doc-section-title">AIアドバイザーコメント</div>' +
+                '<div class="result-doc-section-sub">AI Insight</div>' +
+              '</div>' +
+              body +
+            '</div>';
+        wrap.style.display = 'block';
     }
 
     function showError(msg) {

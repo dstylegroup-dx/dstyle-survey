@@ -612,8 +612,8 @@
         <div class="table-wrap">
           <div class="table-scroll">
             <table>
-              <thead><tr><th>日時</th><th>診断名</th><th>結果タイプ</th></tr></thead>
-              <tbody id="diagLogAllBody"><tr><td colspan="3" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
+              <thead><tr><th>日時</th><th>診断名</th><th>結果タイプ</th><th>AI提案</th></tr></thead>
+              <tbody id="diagLogAllBody"><tr><td colspan="4" class="loading">更新ボタンを押すと読み込みます</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -739,6 +739,47 @@
             <div style="display:flex;gap:10px;align-items:center">
               <button class="btn btn-primary" onclick="saveDiagBasic()">💾 基本情報を保存</button>
               <div class="status-msg" id="diagBasicStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ AI提案設定 -->
+        <div class="panel">
+          <h2>✨ AI提案設定</h2>
+          <div class="builder-form">
+            <div class="form-group" style="display:flex;align-items:center;gap:10px">
+              <label style="margin:0"><input type="checkbox" id="diagAiSuggestionEnabled" onchange="toggleDiagAiSuggestionUI()" style="width:18px;height:18px;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer;vertical-align:middle"> AI提案を有効にする</label>
+            </div>
+            <div id="diagAiSuggestionDetail" style="display:none;margin-top:14px">
+              <div class="form-group">
+                <label>出力形式</label>
+                <div style="display:flex;gap:18px;margin-top:6px">
+                  <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="radio" name="diagAiOutputFormat" value="text" checked onchange="switchDiagAiFormat('text')" style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> シンプルテキスト
+                  </label>
+                  <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="radio" name="diagAiOutputFormat" value="structured" onchange="switchDiagAiFormat('structured')" style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> 構造化（カード形式）
+                  </label>
+                </div>
+              </div>
+
+              <!-- シンプルテキスト用 -->
+              <div id="diagAiFormatTextArea" class="form-group">
+                <label>AIへの指示（プロンプト）</label>
+                <textarea id="diagAiPromptText" placeholder="例）診断結果と回答内容を踏まえて、お客様に合ったよもぎ蒸しの楽しみ方をやさしい口調でアドバイスしてください。" style="width:100%;min-height:140px;line-height:1.7;font-size:14px;box-sizing:border-box"></textarea>
+              </div>
+
+              <!-- 構造化用 -->
+              <div id="diagAiFormatStructuredArea" style="display:none">
+                <label style="display:block;margin-bottom:8px;font-weight:bold;color:#444;font-size:14px">表示項目（カードごとに見出しとAIへの指示を設定）</label>
+                <div id="diagAiSectionsList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+                <button type="button" class="btn btn-secondary" onclick="addDiagAiSection()" style="font-size:13px;padding:6px 14px">＋ 項目を追加</button>
+              </div>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+                <button class="btn btn-primary" onclick="saveDiagAiSuggestionSettings()">💾 AI提案設定を保存</button>
+                <div class="status-msg" id="diagAiSuggestionStatus"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -2156,6 +2197,7 @@
     document.getElementById('diagEditTitle').textContent = currentDiag.title || '無題の診断';
     document.getElementById('diagTitle').value = currentDiag.title || '';
     document.getElementById('diagDescription').value = currentDiag.description || '';
+    loadDiagAiSuggestionUI();
     renderDiagResults();
     renderDiagQuestions();
   }
@@ -2273,7 +2315,7 @@
 
   async function loadAllDiagLogs() {
     var tbody = document.getElementById('diagLogAllBody');
-    tbody.innerHTML = '<tr><td colspan="3" class="loading">読み込み中...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="loading">読み込み中...</td></tr>';
     try {
       var res = await apiFetch(BASE_URL + '/api/diagnosislog?tenant=' + TENANT);
       if (!res.ok) throw new Error('取得失敗');
@@ -2290,7 +2332,7 @@
 
       filterDiagLogs();
     } catch(e) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty">❌ ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">❌ ' + e.message + '</td></tr>';
     }
   }
 
@@ -2310,13 +2352,15 @@
 
     // テーブル
     var tbody = document.getElementById('diagLogAllBody');
-    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">ログがありません</td></tr>'; return; }
+    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">ログがありません</td></tr>'; return; }
     tbody.innerHTML = filtered.map(function(l) {
       var date = new Date(l.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      var aiBtn = l.aiSuggestion ? '<button class="btn-file-icon" onclick="openDiagAiModal(\'' + l.id + '\')" title="AI提案を見る" style="background:none;border:1px solid #4A5D4E;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px">✨提案</button>' : '<span style="color:#ccc;font-size:11px">—</span>';
       return '<tr>' +
         '<td style="color:#888;white-space:nowrap;font-size:12px">' + date + '</td>' +
         '<td style="font-size:13px">' + esc(l.diagTitle || '—') + '</td>' +
         '<td><span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold">' + esc(l.resultTitle || '—') + '</span></td>' +
+        '<td>' + aiBtn + '</td>' +
       '</tr>';
     }).join('');
   }
@@ -2325,6 +2369,77 @@
   async function saveDiagnosis() {
     currentDiag.title = document.getElementById('diagTitle').value.trim() || currentDiag.title;
     await saveDiagToDB('diagStatus');
+  }
+
+  // ============================================================
+  // ✨ AI提案設定（診断）
+  // ============================================================
+  function loadDiagAiSuggestionUI() {
+    if (!currentDiag) return;
+    var enabled = !!currentDiag.aiSuggestionEnabled;
+    var format = currentDiag.aiOutputFormat || 'text';
+    document.getElementById('diagAiSuggestionEnabled').checked = enabled;
+    document.getElementById('diagAiSuggestionDetail').style.display = enabled ? 'block' : 'none';
+    document.querySelector('input[name="diagAiOutputFormat"][value="' + format + '"]').checked = true;
+    switchDiagAiFormat(format);
+    document.getElementById('diagAiPromptText').value = currentDiag.aiPrompt || '';
+    diagAiSections = (currentDiag.aiSections || []).map(function(s) { return { id: s.id || ('sec_' + Math.random().toString(36).slice(2)), label: s.label || '', instruction: s.instruction || '' }; });
+    renderDiagAiSections();
+  }
+
+  function toggleDiagAiSuggestionUI() {
+    var enabled = document.getElementById('diagAiSuggestionEnabled').checked;
+    document.getElementById('diagAiSuggestionDetail').style.display = enabled ? 'block' : 'none';
+  }
+
+  function switchDiagAiFormat(format) {
+    document.getElementById('diagAiFormatTextArea').style.display = format === 'text' ? 'block' : 'none';
+    document.getElementById('diagAiFormatStructuredArea').style.display = format === 'structured' ? 'block' : 'none';
+  }
+
+  var diagAiSections = [];
+
+  function renderDiagAiSections() {
+    var list = document.getElementById('diagAiSectionsList');
+    if (diagAiSections.length === 0) { list.innerHTML = '<div class="empty" style="font-size:13px">項目がありません。「＋ 項目を追加」から追加してください。</div>'; return; }
+    list.innerHTML = diagAiSections.map(function(s, i) {
+      return '<div style="border:1px solid #e0e0e0;border-radius:8px;padding:12px;background:#fafafa">' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+          '<input type="text" placeholder="見出し（例：おすすめの過ごし方）" value="' + esc(s.label) + '" oninput="updateDiagAiSection(' + i + ',\'label\',this.value)" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px">' +
+          '<button type="button" onclick="removeDiagAiSection(' + i + ')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">削除</button>' +
+        '</div>' +
+        '<textarea placeholder="この項目へのAI指示（例：診断結果を踏まえたおすすめの過ごし方を提案してください）" oninput="updateDiagAiSection(' + i + ',\'instruction\',this.value)" style="width:100%;min-height:90px;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:13px;line-height:1.6;resize:vertical;box-sizing:border-box">' + esc(s.instruction) + '</textarea>' +
+      '</div>';
+    }).join('');
+  }
+
+  function addDiagAiSection() {
+    diagAiSections.push({ id: 'sec_' + Math.random().toString(36).slice(2), label: '', instruction: '' });
+    renderDiagAiSections();
+  }
+
+  function removeDiagAiSection(i) {
+    diagAiSections.splice(i, 1);
+    renderDiagAiSections();
+  }
+
+  function updateDiagAiSection(i, field, value) {
+    diagAiSections[i][field] = value;
+  }
+
+  async function saveDiagAiSuggestionSettings() {
+    if (!currentDiag) return;
+    var enabled = document.getElementById('diagAiSuggestionEnabled').checked;
+    var format = document.querySelector('input[name="diagAiOutputFormat"]:checked').value;
+    var promptText = document.getElementById('diagAiPromptText').value.trim();
+    if (enabled && format === 'structured' && diagAiSections.filter(function(s){return s.label.trim();}).length === 0) {
+      alert('構造化形式の場合は、最低1つ項目を設定してください'); return;
+    }
+    currentDiag.aiSuggestionEnabled = enabled;
+    currentDiag.aiOutputFormat = format;
+    currentDiag.aiPrompt = promptText;
+    currentDiag.aiSections = diagAiSections.filter(function(s){ return s.label.trim(); });
+    await saveDiagToDB('diagAiSuggestionStatus');
   }
 
   async function saveDiagToDB(statusId) {
@@ -3428,6 +3543,15 @@
       document.getElementById('aiSuggestionModal').style.display = 'flex';
     }
 
+    function openDiagAiModal(logId) {
+      var l = allDiagLogs.find(function(x) { return x.id === logId; });
+      if (!l || !l.aiSuggestion) { alert('AI提案データが見つかりません'); return; }
+      var date = new Date(l.createdAt).toLocaleString('ja-JP');
+      document.getElementById('aiSuggestionModalMeta').textContent = (l.diagTitle ? l.diagTitle + '　|　' : '') + '結果：' + (l.resultTitle || '—') + '　|　' + date;
+      document.getElementById('aiSuggestionModalBody').innerHTML = buildAiSuggestionHtml(l.aiSuggestion);
+      document.getElementById('aiSuggestionModal').style.display = 'flex';
+    }
+
     // ============================================================
     // ✨ AI提案一覧タブ（接客用）
     // ============================================================
@@ -3513,13 +3637,12 @@
     function printAiSuggestion() {
       var bodyHtml = document.getElementById('aiSuggestionModalBody').innerHTML;
       var metaText = document.getElementById('aiSuggestionModalMeta').textContent;
-      var surveyTitle = currentSurvey ? currentSurvey.title : '';
       var win = window.open('', '_blank', 'width=700,height=900');
       win.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>AI提案内容</title>' +
         '<style>body{font-family:"Helvetica Neue",Arial,sans-serif;padding:32px;color:#333}' +
         'h1{font-size:18px;color:#4A5D4E;margin-bottom:6px}.meta{font-size:13px;color:#888;margin-bottom:20px}' +
         '@media print{button{display:none}}</style></head><body>' +
-        '<h1>✨ AI提案内容（' + esc(surveyTitle) + '）</h1>' +
+        '<h1>✨ AI提案内容</h1>' +
         '<div class="meta">' + esc(metaText) + '</div>' +
         bodyHtml +
         '<script>window.onload=function(){window.print();}<\/script>' +
