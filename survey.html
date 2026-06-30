@@ -80,20 +80,29 @@ input[type="number"]::-webkit-inner-spin-button,
     .ai-suggestion-loading .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #ddd; border-top-color: #4A5D4E; border-radius: 50%; animation: aiSpin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
     @keyframes aiSpin { to { transform: rotate(360deg); } }
 
-    .ai-suggestion-header { text-align: center; margin-bottom: 22px; position: relative; padding: 0 0 16px; }
+    /* 提案資料 台紙 */
+    .ai-sheet { position: relative; background: #fffdf9; border: 1px solid #e0e6df; border-radius: 18px; padding: 30px 26px 24px; box-shadow: 0 10px 30px rgba(74,93,78,0.12); overflow: hidden; }
+    .ai-sheet::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #4A5D4E, #8aa28e, #c9d9c0); }
+    .ai-sheet::after { content: ''; position: absolute; inset: 8px; border: 1px solid #e8ede7; border-radius: 12px; pointer-events: none; }
+
+    .ai-suggestion-header { text-align: center; margin-bottom: 22px; position: relative; padding: 4px 0 16px; }
     .ai-suggestion-eyebrow { font-size: 11px; letter-spacing: 3px; color: #8aa28e; font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
-    .ai-suggestion-title { font-family: 'Georgia', 'Hiragino Mincho ProN', serif; font-size: 22px; font-weight: bold; color: #3a4d3e; letter-spacing: 1px; margin-bottom: 10px; }
+    .ai-suggestion-title { font-family: 'Georgia', 'Hiragino Mincho ProN', serif; font-size: 23px; font-weight: bold; color: #3a4d3e; letter-spacing: 1px; margin-bottom: 10px; }
     .ai-suggestion-divider { width: 56px; height: 2px; background: linear-gradient(90deg, #4A5D4E, #8aa28e); margin: 0 auto; border-radius: 2px; }
 
-    .ai-text-box { position: relative; background: linear-gradient(135deg, #f6f9f6 0%, #eef3ee 100%); border: 1px solid #dbe5db; border-radius: 16px; padding: 28px 26px 24px; font-size: 15px; color: #4a544a; line-height: 1.9; white-space: pre-wrap; box-shadow: 0 6px 20px rgba(74,93,78,0.08); }
+    .ai-text-box { position: relative; background: linear-gradient(135deg, #f6f9f6 0%, #eef3ee 100%); border: 1px solid #dbe5db; border-radius: 16px; padding: 28px 26px 24px; font-size: 15px; color: #4a544a; line-height: 1.9; white-space: pre-wrap; box-shadow: 0 4px 14px rgba(74,93,78,0.06); }
     .ai-text-box::before { content: '🌿'; position: absolute; top: -14px; left: 22px; font-size: 22px; background: #fff; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 
     .ai-cards { display: flex; flex-direction: column; gap: 14px; }
-    .ai-card { position: relative; background: #fff; border: 1px solid #e4ebe4; border-radius: 14px; padding: 20px 20px 18px 22px; box-shadow: 0 4px 14px rgba(74,93,78,0.07); overflow: hidden; }
+    .ai-card { position: relative; background: #fff; border: 1px solid #e4ebe4; border-radius: 14px; padding: 20px 20px 18px 22px; box-shadow: 0 3px 10px rgba(74,93,78,0.06); overflow: hidden; }
     .ai-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #4A5D4E, #8aa28e); }
     .ai-card-label { font-family: 'Georgia', 'Hiragino Mincho ProN', serif; font-size: 14px; font-weight: bold; color: #3a4d3e; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
     .ai-card-icon { font-size: 16px; flex-shrink: 0; }
     .ai-card-text { font-size: 14px; color: #555; line-height: 1.8; white-space: pre-wrap; padding-left: 24px; }
+
+    .ai-sheet-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; padding-top: 16px; border-top: 1px dashed #d8e0d6; }
+    .ai-sheet-brand { font-family: 'Georgia', 'Hiragino Mincho ProN', serif; font-size: 12px; color: #8aa28e; letter-spacing: 1px; }
+    .ai-sheet-date { font-size: 11px; color: #aab3a8; }
     .divider { border: none; border-top: 1px solid #eee; margin: 8px 0 28px; }
     .section[data-hidden="true"] { display: none; }
     .field-error input, .field-error textarea, .field-error select { border-color: #e74c3c !important; background: #fff8f8 !important; }
@@ -180,17 +189,23 @@ input[type="number"]::-webkit-inner-spin-button,
         '<div class="ai-suggestion-title">✨ あなたへのおすすめ</div>' +
         '<div class="ai-suggestion-divider"></div>' +
       '</div>';
-    var html = header;
+    var body = '';
     if (suggestion.format === 'structured' && suggestion.sections && typeof suggestion.sections === 'object') {
-      html += '<div class="ai-cards">' + Object.keys(suggestion.sections).map(function(label) {
+      body = '<div class="ai-cards">' + Object.keys(suggestion.sections).map(function(label) {
         return '<div class="ai-card"><div class="ai-card-label"><span class="ai-card-icon">' + pickAiIcon(label) + '</span>' + esc(label) + '</div><div class="ai-card-text">' + esc(suggestion.sections[label]).replace(/\n/g, '<br>') + '</div></div>';
       }).join('') + '</div>';
     } else if (suggestion.text) {
-      html += '<div class="ai-text-box">' + esc(suggestion.text).replace(/\n/g, '<br>') + '</div>';
+      body = '<div class="ai-text-box">' + esc(suggestion.text).replace(/\n/g, '<br>') + '</div>';
     } else {
       wrap.style.display = 'none'; wrap.innerHTML = ''; return;
     }
-    wrap.innerHTML = html;
+    var today = new Date();
+    var dateStr = today.getFullYear() + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + String(today.getDate()).padStart(2,'0');
+    var footer = '<div class="ai-sheet-footer">' +
+        '<div class="ai-sheet-brand">Herbelle よもぎ蒸しサロン</div>' +
+        '<div class="ai-sheet-date">' + dateStr + '</div>' +
+      '</div>';
+    wrap.innerHTML = '<div class="ai-sheet">' + header + body + footer + '</div>';
     wrap.style.display = 'block';
   }
 
