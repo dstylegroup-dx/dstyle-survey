@@ -74,6 +74,18 @@ input[type="number"]::-webkit-inner-spin-button,
     .thanks-title { font-size: 24px; font-weight: bold; color: #4A5D4E; margin-bottom: 16px; }
     .thanks-message { font-size: 16px; color: #555; line-height: 1.8; margin-bottom: 24px; }
     .thanks-sub { font-size: 14px; color: #888; line-height: 1.7; padding: 16px; background: #f5f7f5; border-radius: 8px; }
+    /* AI提案表示 */
+    .ai-suggestion-wrap { margin: 0 0 24px; text-align: left; }
+    .ai-suggestion-loading { text-align: center; color: #888; font-size: 14px; padding: 20px 0; }
+    .ai-suggestion-loading .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #ddd; border-top-color: #4A5D4E; border-radius: 50%; animation: aiSpin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes aiSpin { to { transform: rotate(360deg); } }
+    .ai-suggestion-title { font-size: 15px; font-weight: bold; color: #4A5D4E; margin-bottom: 12px; text-align: center; }
+    .ai-text-box { background: #f0f4f0; border-left: 4px solid #4A5D4E; border-radius: 0 8px 8px 0; padding: 18px 20px; font-size: 15px; color: #444; line-height: 1.8; white-space: pre-wrap; }
+    .ai-cards { display: flex; flex-direction: column; gap: 12px; }
+    .ai-card { background: #f9faf9; border: 1px solid #dde5dd; border-radius: 10px; padding: 16px 18px; }
+    .ai-card-label { font-size: 13px; font-weight: bold; color: #4A5D4E; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .ai-card-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #4A5D4E; display: inline-block; }
+    .ai-card-text { font-size: 14px; color: #444; line-height: 1.7; white-space: pre-wrap; }
     .divider { border: none; border-top: 1px solid #eee; margin: 8px 0 28px; }
     .section[data-hidden="true"] { display: none; }
     .field-error input, .field-error textarea, .field-error select { border-color: #e74c3c !important; background: #fff8f8 !important; }
@@ -118,6 +130,7 @@ input[type="number"]::-webkit-inner-spin-button,
     <div class="thanks-icon">✅</div>
     <div class="thanks-title">ありがとうございました！</div>
     <div class="thanks-message">アンケートへのご協力、誠にありがとうございます。<br>皆様のご意見を今後のサービス向上に活かしてまいります。</div>
+    <div class="ai-suggestion-wrap" id="aiSuggestionWrap" style="display:none"></div>
   </div>
 </div>
 
@@ -132,6 +145,23 @@ input[type="number"]::-webkit-inner-spin-button,
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function renderAiSuggestion(suggestion) {
+    var wrap = document.getElementById('aiSuggestionWrap');
+    if (!suggestion) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+    var html = '<div class="ai-suggestion-title">✨ あなたへのおすすめ</div>';
+    if (suggestion.format === 'structured' && suggestion.sections && typeof suggestion.sections === 'object') {
+      html += '<div class="ai-cards">' + Object.keys(suggestion.sections).map(function(label) {
+        return '<div class="ai-card"><div class="ai-card-label">' + esc(label) + '</div><div class="ai-card-text">' + esc(suggestion.sections[label]).replace(/\n/g, '<br>') + '</div></div>';
+      }).join('') + '</div>';
+    } else if (suggestion.text) {
+      html += '<div class="ai-text-box">' + esc(suggestion.text).replace(/\n/g, '<br>') + '</div>';
+    } else {
+      wrap.style.display = 'none'; wrap.innerHTML = ''; return;
+    }
+    wrap.innerHTML = html;
+    wrap.style.display = 'block';
   }
 
   var params = new URLSearchParams(location.search);
@@ -447,8 +477,10 @@ input[type="number"]::-webkit-inner-spin-button,
           body: JSON.stringify({ surveyId: SURVEY_ID, tenant: TENANT, answers: answers, responseId: surveyResponseId || undefined })
         });
         if (res.ok) {
+          var resData = await res.json().catch(function() { return {}; });
           document.getElementById('formArea').style.display = 'none';
           document.getElementById('thanksScreen').style.display = 'block';
+          renderAiSuggestion(resData.aiSuggestion);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           var err = await res.json().catch(function() { return {}; });

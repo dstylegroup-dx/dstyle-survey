@@ -61,6 +61,75 @@ function secureJson(body, status = 200) {
 }
 
 // ----------------------------------------------------
+// 🤖 AI提案生成（Azure OpenAI）
+// ----------------------------------------------------
+async function generateAiSuggestion(survey, answers) {
+    const endpoint = process.env.AOAI_ENDPOINT;
+    const apiKey = process.env.AOAI_API_KEY;
+    const deployment = process.env.AOAI_DEPLOYMENT || 'gpt-4o-mini';
+    const apiVersion = process.env.AOAI_API_VERSION || '2025-01-01-preview';
+    if (!endpoint || !apiKey) return null;
+
+    // 質問ラベルと回答を整形してAIに渡す
+    const questions = survey.questions || [];
+    const answerLines = questions.map(q => {
+        const val = answers[q.id];
+        if (val === undefined || val === null || val === '') return null;
+        return `${q.label}: ${val}`;
+    }).filter(Boolean).join('\n');
+
+    const format = survey.aiOutputFormat || 'text';
+
+    let systemPrompt, userPrompt, expectJson = false;
+
+    if (format === 'structured') {
+        const sections = survey.aiSections || [];
+        if (sections.length === 0) return null;
+        expectJson = true;
+        const sectionDesc = sections.map(s => `- "${s.label}": ${s.instruction || '回答内容に基づいて提案してください'}`).join('\n');
+        systemPrompt = 'あなたはアンケート回答に基づいてお客様への提案を行うアシスタントです。必ず指定されたJSON形式のみで出力し、それ以外の文章は一切含めないでください。';
+        userPrompt = `以下はお客様のアンケート回答です。\n\n【回答内容】\n${answerLines}\n\n【出力する項目とその指示】\n${sectionDesc}\n\n上記の項目それぞれについて、回答内容を踏まえた提案文を作成し、必ず次のJSON形式のみで出力してください（説明文・前置き・コードブロックは不要です）:\n{\n${sections.map(s => `  "${s.label}": "（ここに提案文）"`).join(',\n')}\n}`;
+    } else {
+        systemPrompt = 'あなたはアンケート回答に基づいてお客様への提案を行うアシスタントです。';
+        const customInstruction = survey.aiPrompt || '回答内容を踏まえて、お客様へのおすすめや提案を作成してください。';
+        userPrompt = `以下はお客様のアンケート回答です。\n\n【回答内容】\n${answerLines}\n\n【指示】\n${customInstruction}\n\n300文字程度で、お客様に向けた丁寧な文章で出力してください。`;
+    }
+
+    try {
+        const url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 800,
+                response_format: expectJson ? { type: 'json_object' } : undefined
+            })
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (!content) return null;
+
+        if (expectJson) {
+            try {
+                const parsed = JSON.parse(content);
+                return { format: 'structured', sections: parsed };
+            } catch (e) {
+                return null;
+            }
+        }
+        return { format: 'text', text: content.trim() };
+    } catch (e) {
+        return null;
+    }
+}
+
+// ----------------------------------------------------
 // 🔑 トークン管理（Cosmos DB永続化）
 // ----------------------------------------------------
 async function getContainer() {
@@ -289,7 +358,7 @@ app.http('surveys', {
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, title, description, questions, active, thanksMessage } = body;
+                const { tenant, title, description, questions, active, thanksMessage, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!tenant || !title) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と title は必須です' } };
                 const newSurvey = {
                     id: 'survey_' + crypto.randomUUID(),
@@ -299,6 +368,10 @@ app.http('surveys', {
                     questions: questions || [],
                     active: active !== undefined ? active : true,
                     thanksMessage: thanksMessage || '',
+                    aiSuggestionEnabled: aiSuggestionEnabled || false,
+                    aiOutputFormat: aiOutputFormat || 'text',
+                    aiPrompt: aiPrompt || '',
+                    aiSections: aiSections || [],
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
@@ -308,7 +381,7 @@ app.http('surveys', {
 
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
-                const { id, tenant, title, description, questions, active, thanksMessage, isContest } = body;
+                const { id, tenant, title, description, questions, active, thanksMessage, isContest, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
@@ -319,6 +392,10 @@ app.http('surveys', {
                     active: active !== undefined ? active : existing.active,
                     thanksMessage: thanksMessage !== undefined ? thanksMessage : (existing.thanksMessage || ''),
                     isContest: isContest !== undefined ? isContest : (existing.isContest || false),
+                    aiSuggestionEnabled: aiSuggestionEnabled !== undefined ? aiSuggestionEnabled : (existing.aiSuggestionEnabled || false),
+                    aiOutputFormat: aiOutputFormat !== undefined ? aiOutputFormat : (existing.aiOutputFormat || 'text'),
+                    aiPrompt: aiPrompt !== undefined ? aiPrompt : (existing.aiPrompt || ''),
+                    aiSections: aiSections !== undefined ? aiSections : (existing.aiSections || []),
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
@@ -400,13 +477,27 @@ app.http('response', {
                 // ────────────────────────────────────────────────────────
 
                 // 回答を保存（2回目以降も保存する）
-                await container.items.create({
+                const responseDoc = {
                     id: responseId || crypto.randomUUID(),
                     docType: 'survey_response',
                     surveyId, tenant, answers,
                     emailAddress: emailAnswer ? emailAnswer.trim().toLowerCase() : null,
                     createdAt: new Date().toISOString()
-                });
+                };
+
+                // AI提案生成（アンケート設定でONの場合のみ）
+                let aiSuggestion = null;
+                try {
+                    const { resource: surveyDef } = await container.item(surveyId, tenant).read();
+                    if (surveyDef && surveyDef.aiSuggestionEnabled) {
+                        aiSuggestion = await generateAiSuggestion(surveyDef, answers);
+                    }
+                } catch (e) {
+                    context.log(`[AI提案エラー] tenant=${tenant} surveyId=${surveyId} error=${e.message}`);
+                }
+                if (aiSuggestion) responseDoc.aiSuggestion = aiSuggestion;
+
+                await container.items.create(responseDoc);
 
                 // メール送信（本日初回のみ）
                 if (emailAnswer && !emailAlreadySentToday) {
@@ -451,7 +542,7 @@ app.http('response', {
                     }
                 }
 
-                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok' } };
+                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok', aiSuggestion: aiSuggestion || null } };
             }
 
             if (request.method === 'GET') {

@@ -336,6 +336,47 @@
           </div>
         </div>
 
+        <!-- ★ AI提案設定 -->
+        <div class="panel">
+          <h2>✨ AI提案設定</h2>
+          <div class="builder-form">
+            <div class="form-group" style="display:flex;align-items:center;gap:10px">
+              <label style="margin:0"><input type="checkbox" id="aiSuggestionEnabled" onchange="toggleAiSuggestionUI()" style="width:18px;height:18px;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer;vertical-align:middle"> AI提案を有効にする</label>
+            </div>
+            <div id="aiSuggestionDetail" style="display:none;margin-top:14px">
+              <div class="form-group">
+                <label>出力形式</label>
+                <div style="display:flex;gap:18px;margin-top:6px">
+                  <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="radio" name="aiOutputFormat" value="text" checked onchange="switchAiFormat('text')" style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> シンプルテキスト
+                  </label>
+                  <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="radio" name="aiOutputFormat" value="structured" onchange="switchAiFormat('structured')" style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> 構造化（カード形式）
+                  </label>
+                </div>
+              </div>
+
+              <!-- シンプルテキスト用 -->
+              <div id="aiFormatTextArea" class="form-group">
+                <label>AIへの指示（プロンプト）</label>
+                <textarea id="aiPromptText" placeholder="例）回答内容を踏まえて、お客様に最適なよもぎ蒸しコースと、その理由をやさしい口調で提案してください。"></textarea>
+              </div>
+
+              <!-- 構造化用 -->
+              <div id="aiFormatStructuredArea" style="display:none">
+                <label style="display:block;margin-bottom:8px;font-weight:bold;color:#444;font-size:14px">表示項目（カードごとに見出しとAIへの指示を設定）</label>
+                <div id="aiSectionsList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+                <button type="button" class="btn btn-secondary" onclick="addAiSection()" style="font-size:13px;padding:6px 14px">＋ 項目を追加</button>
+              </div>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+                <button class="btn btn-primary" onclick="saveAiSuggestionSettings()">💾 AI提案設定を保存</button>
+                <div class="status-msg" id="aiSuggestionStatus"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ★ デザイン設定 -->
         <div class="panel">
           <h2>🎨 デザイン設定</h2>
@@ -1166,11 +1207,97 @@
     document.getElementById('surveyTitle').value = currentSurvey.title || '';
     document.getElementById('surveyDescription').value = currentSurvey.description || '';
     document.getElementById('surveyThanksMessage').value = currentSurvey.thanksMessage || '';
+    loadAiSuggestionUI();
     renderQuestions();
     updateSurveyUrl();
     document.getElementById('qrArea').style.display = 'none';
     if (qrInstance) { document.getElementById('qrcode').innerHTML = ''; qrInstance = null; }
   }
+
+  // ============================================================
+  // ✨ AI提案設定
+  // ============================================================
+  function loadAiSuggestionUI() {
+    if (!currentSurvey) return;
+    var enabled = !!currentSurvey.aiSuggestionEnabled;
+    var format = currentSurvey.aiOutputFormat || 'text';
+    document.getElementById('aiSuggestionEnabled').checked = enabled;
+    document.getElementById('aiSuggestionDetail').style.display = enabled ? 'block' : 'none';
+    document.querySelector('input[name="aiOutputFormat"][value="' + format + '"]').checked = true;
+    switchAiFormat(format);
+    document.getElementById('aiPromptText').value = currentSurvey.aiPrompt || '';
+    aiSections = (currentSurvey.aiSections || []).map(function(s) { return { id: s.id || ('sec_' + Math.random().toString(36).slice(2)), label: s.label || '', instruction: s.instruction || '' }; });
+    renderAiSections();
+  }
+
+  function toggleAiSuggestionUI() {
+    var enabled = document.getElementById('aiSuggestionEnabled').checked;
+    document.getElementById('aiSuggestionDetail').style.display = enabled ? 'block' : 'none';
+  }
+
+  function switchAiFormat(format) {
+    document.getElementById('aiFormatTextArea').style.display = format === 'text' ? 'block' : 'none';
+    document.getElementById('aiFormatStructuredArea').style.display = format === 'structured' ? 'block' : 'none';
+  }
+
+  var aiSections = [];
+
+  function renderAiSections() {
+    var list = document.getElementById('aiSectionsList');
+    if (aiSections.length === 0) { list.innerHTML = '<div class="empty" style="font-size:13px">項目がありません。「＋ 項目を追加」から追加してください。</div>'; return; }
+    list.innerHTML = aiSections.map(function(s, i) {
+      return '<div style="border:1px solid #e0e0e0;border-radius:8px;padding:12px;background:#fafafa">' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+          '<input type="text" placeholder="見出し（例：おすすめコース）" value="' + esc(s.label) + '" oninput="updateAiSection(' + i + ',\'label\',this.value)" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px">' +
+          '<button type="button" onclick="removeAiSection(' + i + ')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">削除</button>' +
+        '</div>' +
+        '<textarea placeholder="この項目へのAI指示（例：回答内容から最適なコースを1つ提案してください）" oninput="updateAiSection(' + i + ',\'instruction\',this.value)" style="width:100%;min-height:50px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical">' + esc(s.instruction) + '</textarea>' +
+      '</div>';
+    }).join('');
+  }
+
+  function addAiSection() {
+    aiSections.push({ id: 'sec_' + Math.random().toString(36).slice(2), label: '', instruction: '' });
+    renderAiSections();
+  }
+
+  function removeAiSection(i) {
+    aiSections.splice(i, 1);
+    renderAiSections();
+  }
+
+  function updateAiSection(i, field, value) {
+    aiSections[i][field] = value;
+  }
+
+  async function saveAiSuggestionSettings() {
+    if (!currentSurvey) return;
+    var enabled = document.getElementById('aiSuggestionEnabled').checked;
+    var format = document.querySelector('input[name="aiOutputFormat"]:checked').value;
+    var promptText = document.getElementById('aiPromptText').value.trim();
+    if (enabled && format === 'structured' && aiSections.filter(function(s){return s.label.trim();}).length === 0) {
+      alert('構造化形式の場合は、最低1つ項目を設定してください'); return;
+    }
+    try {
+      var payload = {
+        id: currentSurvey.id, tenant: TENANT,
+        aiSuggestionEnabled: enabled,
+        aiOutputFormat: format,
+        aiPrompt: promptText,
+        aiSections: aiSections.filter(function(s){ return s.label.trim(); })
+      };
+      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.ok) {
+        currentSurvey.aiSuggestionEnabled = enabled;
+        currentSurvey.aiOutputFormat = format;
+        currentSurvey.aiPrompt = promptText;
+        currentSurvey.aiSections = payload.aiSections;
+        showStatus('aiSuggestionStatus', '✅ 保存しました', 'success');
+        loadSurveys();
+      } else { showStatus('aiSuggestionStatus', '❌ 保存失敗', 'error'); }
+    } catch (e) { showStatus('aiSuggestionStatus', '❌ エラー: ' + e.message, 'error'); }
+  }
+
 
   function updateSurveyUrl() {
     if (!currentSurvey) return;
@@ -1639,7 +1766,8 @@
       var emailVal = r.emailAddress || (r.answers ? Object.values(r.answers).find(function(v) { return typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()); }) : null) || '';
       var chkCol = selectMode ? '<td><input type="checkbox" class="row-check" data-email="' + esc(emailVal) + '" data-id="' + r.id + '" ' + (emailVal ? '' : 'disabled title="メールアドレスなし"') + ' style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:' + (emailVal ? 'pointer' : 'not-allowed') + '" onchange="updateSelectedCount()"></td>' : '';
       var rowStyle = '';
-      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
+      var aiBtn = r.aiSuggestion ? '<button class="btn-file-icon" onclick="openAiSuggestionModal(\'' + r.id + '\')" title="AI提案を見る" style="background:none;border:1px solid #4A5D4E;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✨提案</button>' : '';
+      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td>' + aiBtn + '<button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
     }).join('');
   }
 
@@ -3233,7 +3361,70 @@
       </div>
     </div>
 
+    <!-- ★ AI提案モーダル -->
+    <div id="aiSuggestionModal" class="modal-overlay" style="display:none">
+      <div class="modal" style="max-width:560px">
+        <h2>✨ AI提案内容</h2>
+        <div id="aiSuggestionModalMeta" style="font-size:13px;color:#888;margin-bottom:14px"></div>
+        <div id="aiSuggestionModalBody"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
+          <button class="btn btn-secondary" onclick="printAiSuggestion()">🖨️ 印刷</button>
+          <button class="btn btn-secondary" onclick="closeAiSuggestionModal()">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+
     <script>
+    // ============================================================
+    // ✨ AI提案モーダル
+    // ============================================================
+    function buildAiSuggestionHtml(suggestion) {
+      if (!suggestion) return '<div style="color:#888;font-size:14px">AI提案データがありません</div>';
+      if (suggestion.format === 'structured' && suggestion.sections && typeof suggestion.sections === 'object') {
+        return '<div style="display:flex;flex-direction:column;gap:12px">' + Object.keys(suggestion.sections).map(function(label) {
+          return '<div style="background:#f9faf9;border:1px solid #dde5dd;border-radius:10px;padding:14px 16px">' +
+            '<div style="font-size:13px;font-weight:bold;color:#4A5D4E;margin-bottom:6px">● ' + esc(label) + '</div>' +
+            '<div style="font-size:14px;color:#444;line-height:1.7;white-space:pre-wrap">' + esc(suggestion.sections[label]) + '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+      }
+      if (suggestion.text) {
+        return '<div style="background:#f0f4f0;border-left:4px solid #4A5D4E;border-radius:0 8px 8px 0;padding:16px 18px;font-size:14px;color:#444;line-height:1.8;white-space:pre-wrap">' + esc(suggestion.text) + '</div>';
+      }
+      return '<div style="color:#888;font-size:14px">AI提案データがありません</div>';
+    }
+
+    function openAiSuggestionModal(responseId) {
+      var r = allResponses.find(function(x) { return x.id === responseId; });
+      if (!r || !r.aiSuggestion) { alert('AI提案データが見つかりません'); return; }
+      var date = new Date(r.createdAt).toLocaleString('ja-JP');
+      document.getElementById('aiSuggestionModalMeta').textContent = '回答日時：' + date;
+      document.getElementById('aiSuggestionModalBody').innerHTML = buildAiSuggestionHtml(r.aiSuggestion);
+      document.getElementById('aiSuggestionModal').style.display = 'flex';
+    }
+
+    function closeAiSuggestionModal() {
+      document.getElementById('aiSuggestionModal').style.display = 'none';
+    }
+
+    function printAiSuggestion() {
+      var bodyHtml = document.getElementById('aiSuggestionModalBody').innerHTML;
+      var metaText = document.getElementById('aiSuggestionModalMeta').textContent;
+      var surveyTitle = currentSurvey ? currentSurvey.title : '';
+      var win = window.open('', '_blank', 'width=700,height=900');
+      win.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>AI提案内容</title>' +
+        '<style>body{font-family:"Helvetica Neue",Arial,sans-serif;padding:32px;color:#333}' +
+        'h1{font-size:18px;color:#4A5D4E;margin-bottom:6px}.meta{font-size:13px;color:#888;margin-bottom:20px}' +
+        '@media print{button{display:none}}</style></head><body>' +
+        '<h1>✨ AI提案内容（' + esc(surveyTitle) + '）</h1>' +
+        '<div class="meta">' + esc(metaText) + '</div>' +
+        bodyHtml +
+        '<script>window.onload=function(){window.print();}<\/script>' +
+        '</body></html>');
+      win.document.close();
+    }
+
     // ============================================================
     // ファイル管理
     // ============================================================
