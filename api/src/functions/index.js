@@ -53,7 +53,8 @@ const SECURITY_HEADERS = {
     'Content-Type': 'application/json',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
-    'Cache-Control': 'no-store'
+    'Cache-Control': 'no-store',
+    'Strict-Transport-Security': 'max-age=31536000'
 };
 
 function secureJson(body, status = 200) {
@@ -232,11 +233,11 @@ app.http('auth', {
     handler: async (request, context) => {
         try {
             const { password, tenant } = await request.json();
-            if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+            if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
 
             const envKey = 'ADMIN_PASSWORD_' + tenant.toUpperCase().replace(/-/g, '_');
             const correctPW = process.env[envKey];
-            if (!correctPW) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'このテナントは設定されていません' } };
+            if (!correctPW) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: 'このテナントは設定されていません' } };
 
             const container = await getContainer();
 
@@ -262,7 +263,7 @@ app.http('auth', {
             }).catch(() => {});
             return secureJson({ error: 'パスワードが違います' }, 401);
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -283,27 +284,27 @@ app.http('period', {
                 const surveyId = url.searchParams.get('surveyId');
                 const id = surveyId ? 'period_survey_' + surveyId : 'period_' + tenant;
                 const pk = surveyId ? 'survey_period' : tenant;
-                if (!tenant && !surveyId) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant または surveyId は必須です' } };
+                if (!tenant && !surveyId) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant または surveyId は必須です' } };
                 try {
                     const { resource } = await container.item(id, pk).read();
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { startDate: resource ? resource.startDate : null, endDate: resource ? resource.endDate : null } };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: { startDate: resource ? resource.startDate : null, endDate: resource ? resource.endDate : null } };
                 } catch (e) {
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { startDate: null, endDate: null } };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: { startDate: null, endDate: null } };
                 }
             }
 
             if (request.method === 'POST') {
                 const token = request.headers.get('x-admin-token');
-                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
                 const body = await request.json().catch(() => ({}));
                 const { tenant, surveyId, startDate, endDate } = body;
                 const id = surveyId ? 'period_survey_' + surveyId : 'period_' + tenant;
                 const pk = surveyId ? 'survey_period' : tenant;
                 await container.items.upsert({ id, tenant: pk, startDate: startDate || null, endDate: endDate || null, updatedAt: new Date().toISOString() });
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok', startDate, endDate } };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'ok', startDate, endDate } };
             }
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -318,7 +319,7 @@ app.http('log', {
         try {
             if (request.method === 'GET' || request.method === 'DELETE') {
                 const token = request.headers.get('x-admin-token');
-                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             }
             const container = await getContainer();
 
@@ -326,30 +327,30 @@ app.http('log', {
                 const url = new URL(request.url);
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
-                if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
+                if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 await container.item(id, tenant).delete();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
             if (request.method === 'GET') {
                 const url = new URL(request.url);
                 const tenant = url.searchParams.get('tenant');
                 const type = url.searchParams.get('type');
-                if (!tenant || !type) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と type の指定は必須です' } };
+                if (!tenant || !type) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と type の指定は必須です' } };
                 const { resources } = await container.items.query({
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.type = @type",
                     parameters: [{ name: "@tenant", value: tenant }, { name: "@type", value: type }]
                 }).fetchAll();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
             }
 
             const body = await request.json() || {};
             const { tenant, type, data } = body;
-            if (!tenant || !type) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と type は必須です' } };
+            if (!tenant || !type) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と type は必須です' } };
             await container.items.create({ id: crypto.randomUUID(), tenant, type, ...data, createdAt: new Date().toISOString() });
-            return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok' } };
+            return { status: 201, headers: SECURITY_HEADERS, jsonBody: { status: 'ok' } };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -368,25 +369,25 @@ app.http('surveys', {
             if (request.method === 'GET') {
                 const tenant = url.searchParams.get('tenant');
                 const id = url.searchParams.get('id');
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
                 if (id) {
                     const { resource } = await container.item(id, tenant).read();
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: resource };
                 }
                 const { resources } = await container.items.query({
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: tenant }]
                 }).fetchAll();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
             }
 
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
                 const { tenant, title, description, questions, active, thanksMessage, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
-                if (!tenant || !title) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と title は必須です' } };
+                if (!tenant || !title) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と title は必須です' } };
                 const newSurvey = {
                     id: 'survey_' + crypto.randomUUID(),
                     docType: 'survey_definition',
@@ -403,13 +404,13 @@ app.http('surveys', {
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.create(newSurvey);
-                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: newSurvey };
+                return { status: 201, headers: SECURITY_HEADERS, jsonBody: newSurvey };
             }
 
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
                 const { id, tenant, title, description, questions, active, thanksMessage, isContest, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
-                if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
+                if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
                     ...existing,
@@ -426,19 +427,19 @@ app.http('surveys', {
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: updated };
             }
 
             if (request.method === 'DELETE') {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
-                if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
+                if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 await container.item(id, tenant).delete();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -456,13 +457,13 @@ app.http('response', {
 
             if (request.method === 'GET' || request.method === 'DELETE') {
                 const token = request.headers.get('x-admin-token');
-                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             }
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
                 const { surveyId, tenant, answers, responseId } = body;
-                if (!surveyId || !tenant || !answers) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
+                if (!surveyId || !tenant || !answers) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
 
                 // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
                 const emailAnswer = Object.values(answers).find(v =>
@@ -569,30 +570,30 @@ app.http('response', {
                     }
                 }
 
-                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok', aiSuggestion: aiSuggestion || null } };
+                return { status: 201, headers: SECURITY_HEADERS, jsonBody: { status: 'ok', aiSuggestion: aiSuggestion || null } };
             }
 
             if (request.method === 'GET') {
                 const surveyId = url.searchParams.get('surveyId');
                 const tenant = url.searchParams.get('tenant');
-                if (!surveyId || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'surveyId と tenant は必須です' } };
+                if (!surveyId || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'surveyId と tenant は必須です' } };
                 const { resources } = await container.items.query({
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: tenant }, { name: "@surveyId", value: surveyId }]
                 }).fetchAll();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
             }
 
             if (request.method === 'DELETE') {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
-                if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
+                if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 await container.item(id, tenant).delete();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -606,7 +607,7 @@ app.http('accesslog', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
 
             const container = await getContainer();
             const url = new URL(request.url);
@@ -619,9 +620,9 @@ app.http('accesslog', {
                 parameters = [{ name: "@tenant", value: tenant }];
             }
             const { resources } = await container.items.query({ query, parameters }).fetchAll();
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -635,11 +636,11 @@ app.http('responsecounts', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
 
             const body = await request.json().catch(() => ({}));
             const { tenant, surveyIds } = body;
-            if (!tenant || !surveyIds || !surveyIds.length) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant と surveyIds は必須です' } };
+            if (!tenant || !surveyIds || !surveyIds.length) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と surveyIds は必須です' } };
 
             const container = await getContainer();
             const counts = {};
@@ -654,9 +655,9 @@ app.http('responsecounts', {
                 if (counts[r.surveyId] !== undefined) counts[r.surveyId]++;
             });
 
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: counts };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: counts };
         } catch (e) {
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: {} };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: {} };
         }
     }
 });
@@ -675,27 +676,27 @@ app.http('tenantsettings', {
             if (request.method === 'GET') {
                 const tenant = url.searchParams.get('tenant');
                 const surveyId = url.searchParams.get('surveyId');
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
                 if (surveyId) {
                     try {
                         const { resource } = await container.item('design_' + surveyId, tenant).read();
-                        if (resource) return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { ...resource, _source: 'survey' } };
+                        if (resource) return { status: 200, headers: SECURITY_HEADERS, jsonBody: { ...resource, _source: 'survey' } };
                     } catch (e) {}
                 }
                 try {
                     const { resource } = await container.item('settings_' + tenant, tenant).read();
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { ...(resource || {}), _source: 'tenant' } };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: { ...(resource || {}), _source: 'tenant' } };
                 } catch (e) {
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { _source: 'none' } };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: { _source: 'none' } };
                 }
             }
 
             if (request.method === 'POST') {
                 const token = request.headers.get('x-admin-token');
-                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
                 const body = await request.json().catch(() => ({}));
                 const { tenant, surveyId, logoBase64, logoName, headerColor, bgColor, bgType, privacyText, privacyLinkText, privacyLinkUrl, privacyTextColor, privacyBgColor } = body;
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
 
                 const id = surveyId ? 'design_' + surveyId : 'settings_' + tenant;
                 const existing = await container.item(id, tenant).read().then(r => r.resource || {}).catch(() => ({}));
@@ -717,10 +718,10 @@ app.http('tenantsettings', {
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: updated };
             }
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -734,18 +735,18 @@ app.http('diagnosislist', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             const url = new URL(request.url);
             const tenant = url.searchParams.get('tenant');
-            if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+            if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
             const container = await getContainer();
             const { resources } = await container.items.query({
                 query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC",
                 parameters: [{ name: "@tenant", value: tenant }]
             }).fetchAll();
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -761,13 +762,13 @@ app.http('diagnosis', {
             if (request.method === 'GET') {
                 const tenant = url.searchParams.get('tenant');
                 const diagId = url.searchParams.get('diagId') || url.searchParams.get('id');
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
                 if (diagId) {
                     try {
                         const { resource } = await container.item(diagId, tenant).read();
-                        return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resource || {} };
+                        return { status: 200, headers: SECURITY_HEADERS, jsonBody: resource || {} };
                     } catch (e) {
-                        return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: {} };
+                        return { status: 200, headers: SECURITY_HEADERS, jsonBody: {} };
                     }
                 }
                 try {
@@ -775,19 +776,19 @@ app.http('diagnosis', {
                         query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC OFFSET 0 LIMIT 1",
                         parameters: [{ name: "@tenant", value: tenant }]
                     }).fetchAll();
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources[0] || { questions: [], results: {} } };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources[0] || { questions: [], results: {} } };
                 } catch (e) {
-                    return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { questions: [], results: {} } };
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: { questions: [], results: {} } };
                 }
             }
 
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
                 const { tenant, diagId, questions, results, title, description } = body;
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
                 const id = diagId || ('diag_' + crypto.randomUUID());
                 const updated = {
                     ...body,
@@ -801,19 +802,19 @@ app.http('diagnosis', {
                     updatedAt: new Date().toISOString()
                 };
                 await container.items.upsert(updated);
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: updated };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: updated };
             }
 
             if (request.method === 'DELETE') {
                 const id = url.searchParams.get('id') || url.searchParams.get('diagId');
                 const tenant = url.searchParams.get('tenant');
-                if (!id || !tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'id と tenant は必須です' } };
+                if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 await container.item(id, tenant).delete();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -830,7 +831,7 @@ app.http('diagnosislog', {
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
                 const { tenant, resultKey, resultTitle, diagTitle, diagId: logDiagId, answers } = body;
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
 
                 // AI提案生成（診断設定でONの場合のみ）＋ 結果内容のスナップショット保存
                 let aiSuggestion = null;
@@ -870,22 +871,22 @@ app.http('diagnosislog', {
                 if (aiSuggestion) logDoc.aiSuggestion = aiSuggestion;
 
                 await container.items.create(logDoc);
-                return { status: 201, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'ok', aiSuggestion: aiSuggestion || null } };
+                return { status: 201, headers: SECURITY_HEADERS, jsonBody: { status: 'ok', aiSuggestion: aiSuggestion || null } };
             }
             if (request.method === 'GET') {
                 const token = request.headers.get('x-admin-token');
-                if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
                 const url = new URL(request.url);
                 const tenant = url.searchParams.get('tenant');
-                if (!tenant) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant は必須です' } };
+                if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
                 const { resources } = await container.items.query({
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis_log' ORDER BY c.createdAt DESC OFFSET 0 LIMIT 500",
                     parameters: [{ name: "@tenant", value: tenant }]
                 }).fetchAll();
-                return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: resources };
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
             }
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1572,11 +1573,11 @@ app.http('msalauth', {
             const reqBody = await request.json();
             const { idToken, tenant, accessToken } = reqBody;
             if (!idToken || !tenant) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'idToken と tenant は必須です' } };
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'idToken と tenant は必須です' } };
             }
             const parts = idToken.split('.');
             if (parts.length !== 3) {
-                return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '無効なトークン形式' } };
+                return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '無効なトークン形式' } };
             }
             const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
             const TENANT_ID = '2648ac1f-8786-40fb-80f8-14bd84511449';
@@ -1602,7 +1603,7 @@ app.http('msalauth', {
                         createdAt: new Date().toISOString()
                     }).catch(() => {});
                 } catch(e) {}
-                return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'トークンの検証に失敗しました' } };
+                return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: 'トークンの検証に失敗しました' } };
             }
             // ===== Graph APIでグループ取得してアクセス制御 =====
             const GROUP_DELIGHT    = '6e4af16e-cfe1-49a6-968e-05b8cef847d8'; // ディライトテクノロジーズ事業部
@@ -1613,7 +1614,7 @@ app.http('msalauth', {
             const ALLOWED_GROUPS = {
                 portal:    [GROUP_DELIGHT],
                 herbelle:  [GROUP_DELIGHT, GROUP_DSTYLE_LAB],
-                diana:     [GROUP_DELIGHT, GROUP_DIANA],
+                diana:     [GROUP_DELIGHT, GROUP_DIANA, GROUP_ZENSYA],
                 dstylehd:  [GROUP_DELIGHT, GROUP_ZENSYA],
             };
 
@@ -1648,7 +1649,7 @@ app.http('msalauth', {
                     userEmail: payload.preferred_username || 'unknown',
                     createdAt: new Date().toISOString()
                 }).catch(() => {});
-                return { status: 403, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'このダッシュボードへのアクセス権限がありません' } };
+                return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'このダッシュボードへのアクセス権限がありません' } };
             }
 
             const token = await issueToken('auth_token');
@@ -1665,9 +1666,9 @@ app.http('msalauth', {
                 userEmail,
                 createdAt: new Date().toISOString()
             }).catch(() => {});
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { token } };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: { token } };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1685,15 +1686,15 @@ app.http('fileupload', {
             const body = await request.json().catch(() => ({}));
             const { tenant, surveyId, responseId, fileName, contentType } = body;
             if (!tenant || !surveyId || !responseId || !fileName) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
             }
             // ファイル名をサニタイズ
             const safeName = fileName.replace(/[^a-zA-Z0-9.\-_\u3040-\u9FFF\uFF00-\uFFEF]/g, '_');
             const blobName = `${tenant}/${surveyId}/${responseId}/${Date.now()}_${safeName}`;
             const uploadUrl = generateSasUrl(blobName, 'cw', 30); // create + write, 30分
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { uploadUrl, blobName } };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: { uploadUrl, blobName } };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1710,18 +1711,18 @@ app.http('staffupload', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             const body = await request.json().catch(() => ({}));
             const { tenant, surveyId, responseId, fileName } = body;
             if (!tenant || !surveyId || !responseId || !fileName) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
             }
             const safeName = fileName.replace(/[^a-zA-Z0-9.\-_\u3040-\u9FFF\uFF00-\uFFEF]/g, '_');
             const blobName = `${tenant}/${surveyId}/${responseId}/staff_${Date.now()}_${safeName}`;
             const uploadUrl = generateSasUrl(blobName, 'cw', 30);
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { uploadUrl, blobName } };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: { uploadUrl, blobName } };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1737,14 +1738,14 @@ app.http('filedownload', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             const url = new URL(request.url);
             const blobName = url.searchParams.get('blobName');
-            if (!blobName) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'blobName は必須です' } };
+            if (!blobName) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'blobName は必須です' } };
             const downloadUrl = generateSasUrl(blobName, 'r', 60); // read, 60分
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { downloadUrl } };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: { downloadUrl } };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1760,13 +1761,13 @@ app.http('filelist', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             const url = new URL(request.url);
             const tenant = url.searchParams.get('tenant');
             const surveyId = url.searchParams.get('surveyId');
             const responseId = url.searchParams.get('responseId');
             if (!tenant || !surveyId || !responseId) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'tenant, surveyId, responseId は必須です' } };
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, surveyId, responseId は必須です' } };
             }
             const prefix = `${tenant}/${surveyId}/${responseId}/`;
             const blobServiceClient = getBlobServiceClient();
@@ -1782,9 +1783,9 @@ app.http('filelist', {
                     isStaffUpload: blob.name.includes('/staff_')
                 });
             }
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: files };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: files };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1799,16 +1800,16 @@ app.http('filedelete', {
     handler: async (request, context) => {
         try {
             const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+            if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             const url = new URL(request.url);
             const blobName = url.searchParams.get('blobName');
-            if (!blobName) return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'blobName は必須です' } };
+            if (!blobName) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'blobName は必須です' } };
             const blobServiceClient = getBlobServiceClient();
             const containerClient = blobServiceClient.getContainerClient(process.env.BLOB_CONTAINER_NAME || 'survey-files');
             await containerClient.deleteBlob(blobName);
-            return { status: 200, headers: { 'Content-Type': 'application/json' }, jsonBody: { status: 'deleted' } };
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
         } catch (e) {
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
@@ -1864,14 +1865,14 @@ app.http('diana-member', {
         try {
             const token = request.headers.get('x-admin-token');
             if (!await verifyToken(token)) {
-                return { status: 401, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '認証が必要です' } };
+                return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             }
 
             const body = await request.json().catch(() => ({}));
             const { sldsslcd, dia_cd, b_day } = body;
 
             if (!sldsslcd && !dia_cd) {
-                return { status: 400, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: 'sldsslcd または dia_cd は必須です' } };
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'sldsslcd または dia_cd は必須です' } };
             }
 
             const schema = process.env.PG_SCHEMA || 'public';
@@ -1915,7 +1916,7 @@ app.http('diana-member', {
             const custResult = await pool.query(custQuery, params);
             context.log(`[diana-member] customer_masterクエリ完了: ${Date.now() - t0}ms 件数=${custResult.rows.length}`);
             if (custResult.rows.length === 0) {
-                return { status: 404, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: '顧客データが見つかりません' } };
+                return { status: 404, headers: SECURITY_HEADERS, jsonBody: { error: '顧客データが見つかりません' } };
             }
             const cust = custResult.rows[0];
 
@@ -1992,7 +1993,7 @@ app.http('diana-member', {
 
             return {
                 status: 200,
-                headers: { 'Content-Type': 'application/json' },
+                headers: SECURITY_HEADERS,
                 jsonBody: {
                     // 顧客情報（customer_masterから取得）
                     salon_code:        cust.salon_code,
@@ -2085,7 +2086,7 @@ app.http('diana-member', {
 
         } catch (e) {
             context.log(`[diana-member] エラー: ${e.message}`);
-            return { status: 500, headers: { 'Content-Type': 'application/json' }, jsonBody: { error: e.message } };
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
         }
     }
 });
