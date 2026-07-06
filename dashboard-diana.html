@@ -1492,7 +1492,7 @@
       var emailVal = r.emailAddress || (r.answers ? Object.values(r.answers).find(function(v) { return typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()); }) : null) || '';
       var chkCol = selectMode ? '<td><input type="checkbox" class="row-check" data-email="' + esc(emailVal) + '" data-id="' + r.id + '" ' + (emailVal ? '' : 'disabled title="メールアドレスなし"') + ' style="width:16px;height:16px;-webkit-appearance:checkbox;appearance:checkbox;cursor:' + (emailVal ? 'pointer' : 'not-allowed') + '" onchange="updateSelectedCount()"></td>' : '';
       var rowStyle = '';
-      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
+      return '<tr' + rowStyle + '>' + chkCol + '<td style="white-space:nowrap;color:#888">' + date + '</td>' + cells + '<td><button class="btn-file-icon" onclick="openFileModal(\'' + r.id + '\',\'' + currentSurvey.id + '\')" title="ファイル" style="background:none;border:1px solid #ddd;color:#4A5D4E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px" id="filebtn_' + r.id + '">📎</button><button onclick="openEditResponseModal(\'' + r.id + '\')" title="回答を修正" style="background:none;border:1px solid #ddd;color:#7B4F6E;padding:3px 7px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✏️</button><button class="btn-delete-sm" onclick="deleteResponse(\'' + r.id + '\')">削除</button></td></tr>';
     }).join('');
   }
 
@@ -2339,6 +2339,98 @@
     </div>
 
     <!-- ファイル管理モーダル -->
+    <div id="editResponseModal" class="modal-overlay" style="display:none">
+      <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto">
+        <h2>✏️ 回答の修正</h2>
+        <div style="font-size:12px;color:#888;margin-bottom:12px">修正内容は履歴として記録されます。空欄で保存するとその項目は空になります。</div>
+        <div id="editResponseFields"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
+          <button class="btn btn-secondary" onclick="closeEditResponseModal()">キャンセル</button>
+          <button class="btn" onclick="saveResponseEdit()" id="saveEditBtn">💾 保存</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    var editingResponseId = null;
+
+    function openEditResponseModal(responseId) {
+      var r = allResponses.find(function(x) { return x.id === responseId; });
+      if (!r || !currentSurvey) { alert('回答データが見つかりません'); return; }
+      editingResponseId = responseId;
+      var questions = currentSurvey.questions || [];
+      var html = questions.map(function(q) {
+        var val = (r.answers && r.answers[q.id] != null) ? String(r.answers[q.id]) : '';
+        var field;
+        if (q.type === 'textarea') {
+          field = '<textarea id="editfield_' + q.id + '" data-qid="' + q.id + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-height:70px">' + esc(val) + '</textarea>';
+        } else if ((q.type === 'radio' || q.type === 'select') && (q.options || []).length > 0) {
+          var opts = ['<option value=""' + (val === '' ? ' selected' : '') + '>（未回答）</option>'].concat((q.options || []).map(function(o) {
+            return '<option value="' + esc(o) + '"' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>';
+          }));
+          // 現在値が選択肢に無い場合も保持できるよう追加
+          if (val && (q.options || []).indexOf(val) === -1) opts.push('<option value="' + esc(val) + '" selected>' + esc(val) + '（現在値）</option>');
+          field = '<select id="editfield_' + q.id + '" data-qid="' + q.id + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px">' + opts.join('') + '</select>';
+        } else if (q.type === 'file') {
+          field = '<div style="font-size:12px;color:#aaa;padding:6px 0">📎 ファイルはこの画面では修正できません（添付ファイル管理から操作してください）</div>';
+        } else {
+          field = '<input type="text" id="editfield_' + q.id + '" data-qid="' + q.id + '" value="' + esc(val) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px">';
+        }
+        return '<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:bold;color:#555;margin-bottom:4px">' + esc(q.label) + '</div>' + field + '</div>';
+      }).join('');
+      var histCount = (r.editHistory || []).length;
+      if (histCount > 0) html += '<div style="font-size:12px;color:#e67e22">⚠️ この回答は過去に' + histCount + '回修正されています</div>';
+      document.getElementById('editResponseFields').innerHTML = html;
+      document.getElementById('editResponseModal').style.display = 'flex';
+    }
+
+    function closeEditResponseModal() {
+      document.getElementById('editResponseModal').style.display = 'none';
+      editingResponseId = null;
+    }
+
+    async function saveResponseEdit() {
+      if (!editingResponseId) return;
+      var r = allResponses.find(function(x) { return x.id === editingResponseId; });
+      if (!r) return;
+      // 変更のあった項目のみ送信（部分更新）
+      var changed = {};
+      document.querySelectorAll('#editResponseFields [data-qid]').forEach(function(el) {
+        var qid = el.getAttribute('data-qid');
+        var newVal = el.value;
+        var oldVal = (r.answers && r.answers[qid] != null) ? String(r.answers[qid]) : '';
+        if (newVal !== oldVal) changed[qid] = newVal;
+      });
+      if (Object.keys(changed).length === 0) { alert('変更はありません'); return; }
+      if (!confirm(Object.keys(changed).length + '項目を修正します。よろしいですか？')) return;
+      var btn = document.getElementById('saveEditBtn');
+      btn.disabled = true; btn.textContent = '保存中...';
+      try {
+        var res = await apiFetch(BASE_URL + '/api/response', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingResponseId, tenant: TENANT, answers: changed })
+        });
+        if (res.ok) {
+          r.answers = r.answers || {};
+          Object.keys(changed).forEach(function(k) { r.answers[k] = changed[k]; });
+          r.editHistory = r.editHistory || [];
+          r.editHistory.push({ editedAt: new Date().toISOString() });
+          closeEditResponseModal();
+          renderResponseTable(); renderCharts();
+          alert('修正を保存しました');
+        } else {
+          var err = await res.json().catch(function() { return {}; });
+          alert('保存に失敗しました: ' + (err.error || res.status));
+        }
+      } catch (e) {
+        alert('保存エラー: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = '💾 保存';
+      }
+    }
+    </script>
+
     <div id="fileModal" class="modal-overlay" style="display:none">
       <div class="modal" style="max-width:560px">
         <h2>📎 添付ファイル管理</h2>
