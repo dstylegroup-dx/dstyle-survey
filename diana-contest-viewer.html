@@ -741,7 +741,7 @@ async function enrichWithMeasure() {
     const salonCode = getAnswerByKey(r, ['サロンコード']);
     const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
     const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
-    if (!salonCode && !dianaCode) return;
+    if (!salonCode || !dianaCode) return; // ダイアナコード＋サロンコード両方必須（AND照合）
     const MAX_RETRY = 3;
     for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
       try {
@@ -1072,7 +1072,7 @@ async function fetchMeasureData(idx) {
   const salonCode = getAnswerByKey(r, ['サロンコード']);
   const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
   const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
-  if (!salonCode && !dianaCode) return;
+  if (!salonCode || !dianaCode) return; // ダイアナコード＋サロンコード両方必須（AND照合）
 
   // ローディング表示（今表示中の応募者の場合のみ）
   const customerSection = document.querySelector('#modalBody .detail-section:nth-child(2) .detail-section-body');

@@ -448,14 +448,14 @@ app.http('surveys', {
 // 💬 【回答データ】※送信時にメール自動送信
 // ----------------------------------------------------
 app.http('response', {
-    methods: ['GET', 'POST', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
             const url = new URL(request.url);
             const container = await getContainer();
 
-            if (request.method === 'GET' || request.method === 'DELETE') {
+            if (request.method === 'GET' || request.method === 'DELETE' || request.method === 'PUT') {
                 const token = request.headers.get('x-admin-token');
                 if (!await verifyToken(token)) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             }
@@ -582,6 +582,38 @@ app.http('response', {
                     parameters: [{ name: "@tenant", value: tenant }, { name: "@surveyId", value: surveyId }]
                 }).fetchAll();
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
+            }
+
+            if (request.method === 'PUT') {
+                // 回答内容の修正（ダッシュボードからの管理者操作）
+                const body = await request.json().catch(() => ({}));
+                const { id, tenant, answers } = body;
+                if (!id || !tenant || !answers || typeof answers !== 'object') {
+                    return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id, tenant, answers は必須です' } };
+                }
+                let existing = null;
+                try {
+                    const { resource } = await container.item(id, tenant).read();
+                    existing = resource;
+                } catch (e) {}
+                if (!existing || existing.docType !== 'survey_response') {
+                    return { status: 404, headers: SECURITY_HEADERS, jsonBody: { error: '対象の回答が見つかりません' } };
+                }
+                // 指定されたキーのみ上書き（部分更新）。修正履歴も保持
+                existing.answers = existing.answers || {};
+                const editedFields = {};
+                for (const [k, v] of Object.entries(answers)) {
+                    if (existing.answers[k] !== v) editedFields[k] = { before: existing.answers[k] ?? null, after: v };
+                    existing.answers[k] = v;
+                }
+                existing.updatedAt = new Date().toISOString();
+                if (Object.keys(editedFields).length > 0) {
+                    existing.editHistory = existing.editHistory || [];
+                    existing.editHistory.push({ editedAt: existing.updatedAt, fields: editedFields });
+                }
+                await container.item(id, tenant).replace(existing);
+                context.log(`[回答修正] tenant=${tenant} id=${id} fields=${Object.keys(editedFields).join(',')}`);
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'updated', editedFields: Object.keys(editedFields) } };
             }
 
             if (request.method === 'DELETE') {
@@ -1869,10 +1901,11 @@ app.http('diana-member', {
             }
 
             const body = await request.json().catch(() => ({}));
-            const { sldsslcd, dia_cd, b_day } = body;
+            const { salon_code, sldsslcd, dia_cd, b_day } = body;
+            const salonCode = salon_code || sldsslcd; // 旧パラメータ名(sldsslcd)も後方互換で受付
 
-            if (!sldsslcd && !dia_cd) {
-                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'sldsslcd または dia_cd は必須です' } };
+            if (!dia_cd || !salonCode) {
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'dia_cd と salon_code の両方が必須です' } };
             }
 
             const schema = process.env.PG_SCHEMA || 'public';
@@ -1904,12 +1937,12 @@ app.http('diana-member', {
             `;
             const params = [];
 
-            // ダイアナコードで検索（コンテストフォームでは必須入力のため常にこちらを使用）
-            // サロンコードはフォームとDB側で一致しないケースがあるため使用しない
-            if (dia_cd) {
-                params.push(String(dia_cd));
-                custQuery += ` AND diana_code::text = $${params.length}`;
-            }
+            // ダイアナコード＋サロンコードの両方一致で検索（取り違え防止のためAND条件）
+            // ※前後の空白は無視して比較
+            params.push(String(dia_cd).trim());
+            custQuery += ` AND TRIM(diana_code::text) = $${params.length}`;
+            params.push(String(salonCode).trim());
+            custQuery += ` AND TRIM(salon_code::text) = $${params.length}`;
             custQuery += ' LIMIT 1';
 
             context.log(`[diana-member] customer_masterクエリ開始: ${Date.now() - t0}ms`);
