@@ -127,10 +127,13 @@
     .modal h2 { font-size: 18px; color: #1A6FA8; margin-bottom: 20px; }
     .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
     .options-input-area { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-    .option-row { display: flex; gap: 8px; align-items: center; }
+    .option-row { display: flex; gap: 6px; align-items: center; }
     .option-row input { flex: 1; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 14px; }
     .option-row button { background: none; border: 1px solid #ddd; color: #999; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
     .option-row button:hover { border-color: #e74c3c; color: #e74c3c; }
+    .option-row .move-btn { border: 1px solid #ddd; color: #666; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; background: #fafafa; line-height: 1; }
+    .option-row .move-btn:hover:not(:disabled) { border-color: #4A5D4E; color: #4A5D4E; background: #f0f4f0; }
+    .option-row .move-btn:disabled { opacity: 0.3; cursor: default; }
     .add-option-btn { background: #f0f4f0; border: 1.5px dashed #1A6FA8; color: #1A6FA8; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
     .survey-url-box { background: #f0f4f0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #1A6FA8; word-break: break-all; margin-top: 8px; }
     .status-msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; display: none; }
@@ -1181,8 +1184,34 @@
   function addOptionRow(value) {
     var row = document.createElement('div');
     row.className = 'option-row';
-    row.innerHTML = '<input type="text" placeholder="選択肢を入力" value="' + (value || '') + '"><button onclick="this.parentElement.remove()">✕</button>';
+    row.innerHTML =
+      '<button type="button" class="move-btn" onclick="moveOptionRow(this,-1)" title="上に移動">▲</button>' +
+      '<button type="button" class="move-btn" onclick="moveOptionRow(this,1)" title="下に移動">▼</button>' +
+      '<input type="text" placeholder="選択肢を入力" value="' + (value || '') + '">' +
+      '<button onclick="this.parentElement.remove();updateOptionMoveButtons();">✕</button>';
     document.getElementById('optionsList').appendChild(row);
+    updateOptionMoveButtons();
+  }
+
+  function moveOptionRow(btn, dir) {
+    var row = btn.closest('.option-row');
+    var list = document.getElementById('optionsList');
+    if (dir < 0 && row.previousElementSibling) {
+      list.insertBefore(row, row.previousElementSibling);
+    } else if (dir > 0 && row.nextElementSibling) {
+      list.insertBefore(row.nextElementSibling, row);
+    }
+    updateOptionMoveButtons();
+  }
+
+  function updateOptionMoveButtons() {
+    var rows = document.querySelectorAll('#optionsList .option-row');
+    rows.forEach(function(row, i) {
+      var upBtn = row.querySelector('.move-btn:nth-child(1)');
+      var downBtn = row.querySelector('.move-btn:nth-child(2)');
+      if (upBtn) upBtn.disabled = (i === 0);
+      if (downBtn) downBtn.disabled = (i === rows.length - 1);
+    });
   }
 
   function saveQuestion() {
