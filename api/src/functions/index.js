@@ -54,7 +54,8 @@ const SECURITY_HEADERS = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Cache-Control': 'no-store',
-    'Strict-Transport-Security': 'max-age=31536000'
+    'Strict-Transport-Security': 'max-age=31536000',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'"
 };
 
 function secureJson(body, status = 200) {
