@@ -387,7 +387,7 @@ app.http('surveys', {
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, title, description, questions, active, thanksMessage, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
+                const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!tenant || !title) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と title は必須です' } };
                 const newSurvey = {
                     id: 'survey_' + crypto.randomUUID(),
@@ -397,6 +397,10 @@ app.http('surveys', {
                     questions: questions || [],
                     active: active !== undefined ? active : true,
                     thanksMessage: thanksMessage || '',
+                    isContest: isContest === true,
+                    contestGroupId: contestGroupId || null,
+                    contestGroupTitle: contestGroupTitle || null,
+                    contestRole: contestRole || null,
                     aiSuggestionEnabled: aiSuggestionEnabled || false,
                     aiOutputFormat: aiOutputFormat || 'text',
                     aiPrompt: aiPrompt || '',
@@ -410,7 +414,7 @@ app.http('surveys', {
 
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
-                const { id, tenant, title, description, questions, active, thanksMessage, isContest, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
+                const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
@@ -421,6 +425,9 @@ app.http('surveys', {
                     active: active !== undefined ? active : existing.active,
                     thanksMessage: thanksMessage !== undefined ? thanksMessage : (existing.thanksMessage || ''),
                     isContest: isContest !== undefined ? isContest : (existing.isContest || false),
+                    contestGroupId: contestGroupId !== undefined ? contestGroupId : (existing.contestGroupId || null),
+                    contestGroupTitle: contestGroupTitle !== undefined ? contestGroupTitle : (existing.contestGroupTitle || null),
+                    contestRole: contestRole !== undefined ? contestRole : (existing.contestRole || null),
                     aiSuggestionEnabled: aiSuggestionEnabled !== undefined ? aiSuggestionEnabled : (existing.aiSuggestionEnabled || false),
                     aiOutputFormat: aiOutputFormat !== undefined ? aiOutputFormat : (existing.aiOutputFormat || 'text'),
                     aiPrompt: aiPrompt !== undefined ? aiPrompt : (existing.aiPrompt || ''),
