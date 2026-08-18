@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダイアナゴールデンプロポーションアワード 応募状況確認</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Helvetica Neue', Arial, sans-serif;
+      background: #f7f3f6; color: #333; min-height: 100vh;
+    }
+
+    /* ============ ローディング ============ */
+    #loadingScreen { position: fixed; inset: 0; background: #f7f3f6; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px; z-index: 9999; }
+    .spinner { width: 34px; height: 34px; border: 3px solid #e8d6e3; border-top-color: #7B4F6E; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: #7B4F6E; font-size: 14px; font-weight: bold; }
+
+    /* ============ ログイン画面 ============ */
+    #loginScreen { display: none; min-height: 100vh; align-items: center; justify-content: center; padding: 24px 16px; }
+    #loginScreen.show { display: flex; }
+
+    .login-box {
+      background: #fff; border-radius: 18px; width: 100%; max-width: 440px;
+      box-shadow: 0 10px 40px rgba(123,79,110,0.16); overflow: hidden;
+    }
+    .login-head {
+      background: linear-gradient(135deg, #7B4F6E 0%, #9d6a8c 100%);
+      color: #fff; padding: 36px 32px 30px; text-align: center;
+    }
+    .login-mark { font-size: 40px; margin-bottom: 10px; }
+    .login-brand { font-size: 13px; letter-spacing: .22em; opacity: .85; margin-bottom: 8px; }
+    .login-title { font-size: 19px; font-weight: bold; line-height: 1.5; }
+    .login-sub { font-size: 12px; opacity: .8; margin-top: 10px; }
+
+    .login-body { padding: 30px 32px 26px; }
+
+    .btn-chief {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 17px 20px; border: none; border-radius: 10px;
+      background: #7B4F6E; color: #fff; font-size: 16px; font-weight: bold;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-chief:hover { background: #6a4260; }
+    .btn-chief:disabled { opacity: .45; cursor: not-allowed; }
+
+    .hint-box {
+      background: #faf6f9; border: 1px solid #ecdfe8; border-radius: 10px;
+      padding: 14px 16px; margin-top: 16px; font-size: 13px; color: #6a5563; line-height: 1.9;
+    }
+    .hint-box .k { display: inline-block; width: 84px; color: #9b8592; }
+
+    .divider { display: flex; align-items: center; gap: 12px; margin: 26px 0 14px; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #eee; }
+    .divider span { font-size: 11px; color: #bbb; }
+
+    .staff-toggle {
+      display: block; width: 100%; background: none; border: none; cursor: pointer;
+      font-family: inherit; font-size: 12px; color: #999; text-align: center; padding: 6px;
+    }
+    .staff-toggle:hover { color: #7B4F6E; text-decoration: underline; }
+
+    #staffArea { display: none; margin-top: 12px; }
+    #staffArea.show { display: block; }
+    .btn-staff {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 13px 18px; border: 1.5px solid #ccd6e0; border-radius: 9px;
+      background: #fff; color: #3a4a5a; font-size: 14px; font-weight: bold;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-staff:hover { background: #f6f9fc; border-color: #0078d4; }
+    .staff-note { font-size: 11px; color: #aaa; text-align: center; margin-top: 8px; line-height: 1.7; }
+
+    .login-error {
+      background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b;
+      border-radius: 9px; padding: 12px 15px; font-size: 12.5px; margin-top: 16px;
+      display: none; white-space: pre-wrap; word-break: break-word; line-height: 1.8;
+    }
+
+    /* ============ メイン ============ */
+    #mainScreen { display: none; }
+    #mainScreen.show { display: block; }
+    .topbar {
+      background: #7B4F6E; color: #fff; padding: 0 20px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .topbar h1 { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-badge { background: rgba(255,255,255,.18); border-radius: 12px; padding: 4px 12px; font-size: 12px; white-space: nowrap; }
+    .btn-logout { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff;
+      border-radius: 6px; padding: 6px 13px; font-size: 12px; cursor: pointer; font-family: inherit; }
+
+    .main { max-width: 900px; margin: 0 auto; padding: 22px 16px 60px; }
+    .card { background: #fff; border-radius: 12px; padding: 22px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(123,79,110,0.07); }
+    .card h2 { font-size: 15px; color: #7B4F6E; margin-bottom: 12px; }
+    .note { font-size: 13px; color: #888; line-height: 1.8; }
+
+    .ok   { background: #eafaf0; border: 1px solid #b7e4c7; color: #2e7d32; border-radius: 9px; padding: 15px 17px; font-size: 14px; font-weight: bold; }
+    .ng   { background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b; border-radius: 9px; padding: 15px 17px; font-size: 13px; white-space: pre-wrap; line-height: 1.9; }
+    .info { background: #eef4fb; border: 1px solid #c5d9ef; color: #14538a; border-radius: 9px; padding: 13px 16px; font-size: 13px; line-height: 1.8; }
+
+    .salon-pick { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .salon-pick input {
+      width: 160px; padding: 11px 13px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 16px; font-family: inherit; letter-spacing: .12em;
+    }
+    .salon-pick button { border: none; border-radius: 8px; padding: 11px 20px; font-size: 14px;
+      font-weight: bold; cursor: pointer; background: #7B4F6E; color: #fff; font-family: inherit; }
+    .salon-current { font-size: 15px; font-weight: bold; color: #7B4F6E; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th, td { border: 1px solid #e8eef3; padding: 8px 10px; text-align: left; vertical-align: top; word-break: break-all; }
+    th { background: #f7f2f6; color: #7B4F6E; width: 205px; }
+    tr.hit td, tr.hit th { background: #eafaf0; }
+    textarea { width: 100%; min-height: 180px; font-family: Consolas, monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+    code { background: #f2f2f2; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; font-size: 13px; color: #7B4F6E; padding: 6px 0; }
+
+    @media (max-width: 480px) {
+      .login-head { padding: 30px 22px 26px; }
+      .login-body { padding: 24px 22px 22px; }
+      .login-title { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============ ローディング ============ -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">読み込んでいます...</div>
+</div>
+
+<!-- ============ ログイン ============ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-head">
+      <div class="login-mark">💎</div>
+      <div class="login-brand">DIANA</div>
+      <div class="login-title">ゴールデンプロポーションアワード<br>応募状況確認</div>
+      <div class="login-sub">サロン別の応募状況をご確認いただけます</div>
+    </div>
+
+    <div class="login-body">
+      <button class="btn-chief" id="chiefBtn" onclick="startLogin('chief')">
+        <span>👑</span> チーフとしてログイン
+      </button>
+
+      <div class="hint-box">
+        <div><span class="k">ID</span>サロンコード（5桁）</div>
+        <div><span class="k">パスワード</span>サロンのパスワード</div>
+      </div>
+
+      <div class="login-error" id="loginError"></div>
+
+      <div class="divider"><span>または</span></div>
+
+      <button class="staff-toggle" onclick="toggleStaff()" id="staffToggleBtn">社員の方はこちら ▾</button>
+
+      <div id="staffArea">
+        <button class="btn-staff" onclick="startLogin('staff')">
+          <span>🏢</span> 社員としてログイン
+        </button>
+        <div class="staff-note">
+          DSHグループのMicrosoft 365アカウントでログインします。<br>
+          ログイン後にサロンを指定してご確認ください。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ メイン ============ -->
+<div id="mainScreen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span>💎</span>
+      <h1>ゴールデンプロポーションアワード 応募状況</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="user-badge" id="userBadge">-</span>
+      <button class="btn-logout" onclick="doLogout()">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- 社員：サロン選択 -->
+    <div class="card" id="salonCard" style="display:none">
+      <h2>🏢 サロンを指定</h2>
+      <p class="note" style="margin-bottom:12px">確認したいサロンコード（5桁）を入力してください。</p>
+      <div class="salon-pick">
+        <input type="text" id="salonInput" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="12015">
+        <button onclick="applySalon()">表示</button>
+        <span class="salon-current" id="salonCurrent"></span>
+      </div>
+    </div>
+
+    <!-- 認証確認結果（本番では応募一覧に差し替え） -->
+    <div class="card">
+      <h2>🔍 認証の確認結果</h2>
+      <p class="note" style="margin-bottom:12px">
+        現在は認証設定の確認段階です。この下に応募一覧を実装していきます。
+      </p>
+      <div id="verdict"></div>
+      <div id="authorityInfo" class="info" style="margin-top:12px;display:none"></div>
+
+      <details>
+        <summary>IDトークンのクレーム一覧を表示</summary>
+        <p class="note">サロンコードらしき値を含む行を緑色にしています。</p>
+        <table id="claimTable"></table>
+      </details>
+
+      <details id="groupDetails" style="display:none">
+        <summary>所属グループを表示</summary>
+        <div id="groupArea" class="note">—</div>
+      </details>
+
+      <details>
+        <summary>コピー用（共有する場合はこちら）</summary>
+        <p class="note" style="margin:6px 0 8px">氏名・メールなど共有したくない値は <code>xxxxx</code> に置き換えてください。</p>
+        <textarea id="rawJson" readonly></textarea>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// ★ 設定
+// ============================================================
+// DIANA-SALON テナントで作成したアプリ登録のクライアントID
+const CHIEF_CLIENT_ID = 'ここにクライアントIDを貼り付け';
+const CHIEF_TENANT_ID = 'ac36e29b-c866-49d3-9391-510bb3e88891'; // DIANA-SALON
+const CIAM_DOMAIN     = 'DianasalonEntra';                       // 外部ID接続時のサブドメイン
+
+// 既存のDSHテナント（社員用・変更不要）
+const STAFF_CLIENT_ID = '1f4f2ade-4eeb-4f65-8fbd-394378a63518';
+const STAFF_TENANT_ID = '2648ac1f-8786-40fb-80f8-14bd84511449';
+
+const REDIRECT_URI = window.location.origin + '/chief-contest.html';
+
+// チーフ用の接続先候補（上から順に試し、成功したものを記憶する）
+const CHIEF_AUTHORITIES = [
+  { authority: 'https://login.microsoftonline.com/' + CHIEF_TENANT_ID, known: [], label: '標準（login.microsoftonline.com）' },
+  { authority: 'https://' + CIAM_DOMAIN + '.ciamlogin.com/' + CHIEF_TENANT_ID, known: [CIAM_DOMAIN + '.ciamlogin.com'], label: '外部ID（ciamlogin.com）' }
+];
+
+let msalInstance = null;
+
+function chiefAuthIndex() { return parseInt(sessionStorage.getItem('chiefAuthIdx') || '0', 10); }
+function savedMode()      { return sessionStorage.getItem('loginMode'); }
+
+function modeConfig(mode) {
+  if (mode === 'staff') {
+    return { label: '🏢 社員', clientId: STAFF_CLIENT_ID,
+             authority: 'https://login.microsoftonline.com/' + STAFF_TENANT_ID, known: [],
+             scopes: ['User.Read', 'GroupMember.Read.All'] };
+  }
+  const a = CHIEF_AUTHORITIES[chiefAuthIndex()] || CHIEF_AUTHORITIES[0];
+  return { label: '👑 チーフ', clientId: CHIEF_CLIENT_ID,
+           authority: a.authority, known: a.known, authorityLabel: a.label,
+           scopes: ['openid', 'profile', 'email', 'User.Read'] };
+}
+
+// ============================================================
+// 初期化
+// ============================================================
+async function init() {
+  if (CHIEF_CLIENT_ID.indexOf('ここに') === 0) {
+    document.getElementById('chiefBtn').disabled = true;
+    showLoginError('チーフ用のクライアントIDが未設定です。設定が完了するまで、社員ログインのみご利用いただけます。');
+  }
+  const remembered = localStorage.getItem('chiefAuthIdxOk');
+  if (remembered !== null && !sessionStorage.getItem('chiefAuthIdx')) {
+    sessionStorage.setItem('chiefAuthIdx', remembered);
+  }
+
+  const mode = savedMode();
+  if (!mode) { showLogin(); return; }
+
+  setLoadingText('ログイン状態を確認しています...');
+  try {
+    await buildInstance(mode);
+    const result = await msalInstance.handleRedirectPromise();
+    let account = result ? result.account : null;
+    if (!account) {
+      const accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) account = accounts[0];
+    }
+    if (!account) { showLogin(); return; }
+    msalInstance.setActiveAccount(account);
+    if (mode === 'chief') localStorage.setItem('chiefAuthIdxOk', String(chiefAuthIndex()));
+    showMain(account, mode);
+  } catch (e) {
+    await handleAuthFailure(e, mode);
+  }
+}
+
+async function buildInstance(mode) {
+  const m = modeConfig(mode);
+  msalInstance = new msal.PublicClientApplication({
+    auth: { clientId: m.clientId, authority: m.authority, redirectUri: REDIRECT_URI, knownAuthorities: m.known },
+    cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+  });
+  await msalInstance.initialize();
+}
+
+async function startLogin(mode) {
+  sessionStorage.setItem('loginMode', mode);
+  setLoadingText('ログイン画面に移動しています...');
+  showLoading();
+  try {
+    await buildInstance(mode);
+    await msalInstance.loginRedirect({ scopes: modeConfig(mode).scopes });
+  } catch (e) {
+    await handleAuthFailure(e, mode);
+  }
+}
+
+// チーフ側は接続先が未確定のため、失敗時は次の候補で自動再試行する
+async function handleAuthFailure(e, mode) {
+  const idx = chiefAuthIndex();
+  const canFallback = (mode === 'chief') && (idx + 1 < CHIEF_AUTHORITIES.length) && looksLikeAuthorityError(e);
+  if (!canFallback) {
+    sessionStorage.removeItem('loginMode');
+    showLogin();
+    showLoginError('ログインできませんでした。\n' + (e && e.message ? e.message : String(e)));
+    return;
+  }
+  sessionStorage.setItem('chiefAuthIdx', String(idx + 1));
+  localStorage.removeItem('chiefAuthIdxOk');
+  setLoadingText('接続先を切り替えて再試行しています...');
+  showLoading();
+  try {
+    await buildInstance('chief');
+    await msalInstance.loginRedirect({ scopes: modeConfig('chief').scopes });
+  } catch (e2) {
+    sessionStorage.removeItem('loginMode');
+    showLogin();
+    showLoginError('ログインできませんでした。\n' + (e2 && e2.message ? e2.message : String(e2)));
+  }
+}
+
+// 接続先の相違によるエラーか（パスワード誤り等では切り替えない）
+function looksLikeAuthorityError(e) {
+  const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
+  if (msg.indexOf('user_cancelled') >= 0 || msg.indexOf('access_denied') >= 0) return false;
+  return /aadsts900023|aadsts90002|aadsts700016|aadsts50194|unauthorized_client|invalid_request|endpoints_resolution_error|openid_config_error|untrusted_authority/.test(msg);
+}
+
+async function doLogout() {
+  const inst = msalInstance;
+  sessionStorage.removeItem('loginMode');
+  sessionStorage.removeItem('chiefAuthIdx');
+  sessionStorage.removeItem('staffSalon');
+  if (inst) { try { await inst.logoutRedirect(); return; } catch (e) {} }
+  location.reload();
+}
+
+// ============================================================
+// メイン表示
+// ============================================================
+function showMain(account, mode) {
+  const claims = account.idTokenClaims || {};
+  const cfg = modeConfig(mode);
+
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('loginScreen').classList.remove('show');
+  document.getElementById('mainScreen').classList.add('show');
+
+  const salon = detectSalonCode(claims);
+  const who = claims.name || claims.preferred_username || claims.email || 'ログイン中';
+  document.getElementById('userBadge').textContent =
+    (mode === 'staff' ? '🏢 ' : '👑 ') + who + (salon ? '（' + salon + '）' : '');
+
+  if (mode === 'staff') {
+    document.getElementById('salonCard').style.display = 'block';
+    document.getElementById('groupDetails').style.display = 'block';
+    const saved = sessionStorage.getItem('staffSalon');
+    if (saved) { document.getElementById('salonInput').value = saved; renderSalonCurrent(saved); }
+    loadGroups();
+  }
+
+  if (mode === 'chief' && cfg.authorityLabel) {
+    const info = document.getElementById('authorityInfo');
+    info.style.display = 'block';
+    info.innerHTML = '接続先： <code>' + esc(cfg.authorityLabel) + '</code><br>本番実装ではこの接続先に固定します。';
+  }
+
+  renderVerdict(claims, mode, salon);
+  renderClaims(claims);
+  document.getElementById('rawJson').value = JSON.stringify(claims, null, 2);
+}
+
+function applySalon() {
+  const v = (document.getElementById('salonInput').value || '').trim();
+  if (!/^\d{5}$/.test(v)) { alert('サロンコードは5桁の数字で入力してください。'); return; }
+  sessionStorage.setItem('staffSalon', v);
+  renderSalonCurrent(v);
+}
+
+function renderSalonCurrent(v) {
+  document.getElementById('salonCurrent').textContent = '選択中：' + v;
+}
+
+// ============================================================
+// 判定
+// ============================================================
+function findSalonCode(value) {
+  if (value == null) return null;
+  const s = String(value);
+  let m = s.match(/^s?(\d{5})@/i);   // s24016@dhn.ne.jp
+  if (m) return m[1];
+  m = s.match(/^s?(\d{5})$/i);       // 24016 / s24016
+  if (m) return m[1];
+  return null;
+}
+
+function detectSalonCode(claims) {
+  let found = null;
+  Object.keys(claims).forEach(function(k) {
+    if (found) return;
+    const v = claims[k];
+    if (Array.isArray(v)) { v.forEach(function(i) { if (!found) found = findSalonCode(i); }); }
+    else { found = findSalonCode(v); }
+  });
+  return found;
+}
+
+function renderVerdict(claims, mode, salon) {
+  const el = document.getElementById('verdict');
+  if (mode === 'staff') {
+    el.innerHTML = salon
+      ? '<div class="ng">⚠️ 社員アカウントから5桁の数字（' + esc(salon) + '）が検出されました。\nチーフと誤判定されないよう、実装側では社員判定を優先します。</div>'
+      : '<div class="ok">✅ 社員としてログインできました（サロンコードなし：正常）</div>';
+    return;
+  }
+  el.innerHTML = salon
+    ? '<div class="ok">✅ サロンコードを検出しました：<span style="font-size:19px">' + esc(salon) + '</span>'
+      + '<div style="font-weight:normal;font-size:13px;margin-top:6px;">クレーム名：<code>' + esc(claimNameOf(claims, salon)) + '</code></div></div>'
+    : '<div class="ng">❌ 5桁のサロンコードらしき値が見つかりませんでした。'
+      + '\n・アプリ登録の「トークン構成」で email / login_hint を追加済みかご確認ください。'
+      + '\n・サロンコードを持たないアカウントの場合は、この結果が正常です。'
+      + '\n・追加済みでも出ない場合は、下の「コピー用」の内容を共有してください。</div>';
+}
+
+function claimNameOf(claims, salon) {
+  let name = '';
+  Object.keys(claims).forEach(function(k) {
+    if (name) return;
+    const v = claims[k];
+    if (Array.isArray(v)) { v.forEach(function(i) { if (!name && findSalonCode(i) === salon) name = k; }); }
+    else if (findSalonCode(v) === salon) name = k;
+  });
+  return name || '(不明)';
+}
+
+function renderClaims(claims) {
+  const rows = Object.keys(claims).sort().map(function(k) {
+    const v = claims[k];
+    const text = (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v);
+    let hit = null;
+    if (Array.isArray(v)) { v.forEach(function(i) { if (!hit) hit = findSalonCode(i); }); }
+    else { hit = findSalonCode(v); }
+    return '<tr class="' + (hit ? 'hit' : '') + '"><th>' + esc(k) + '</th><td>' + esc(text) + '</td></tr>';
+  });
+  document.getElementById('claimTable').innerHTML = rows.join('');
+}
+
+// 社員：所属グループをGraphから取得（既存ページと同じ経路）
+async function loadGroups() {
+  const area = document.getElementById('groupArea');
+  try {
+    const tok = await msalInstance.acquireTokenSilent({
+      scopes: ['User.Read', 'GroupMember.Read.All'],
+      account: msalInstance.getActiveAccount()
+    });
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/memberOf?$select=id,displayName', {
+      headers: { Authorization: 'Bearer ' + tok.accessToken }
+    });
+    if (!res.ok) { area.textContent = 'グループ取得に失敗しました（HTTP ' + res.status + '）'; return; }
+    const data = await res.json();
+    const rows = (data.value || []).map(function(g) {
+      return '<tr><th>' + esc(g.displayName || '(名称なし)') + '</th><td>' + esc(g.id) + '</td></tr>';
+    });
+    area.innerHTML = rows.length ? '<table>' + rows.join('') + '</table>' : '所属グループがありません。';
+  } catch (e) {
+    area.textContent = 'グループ取得エラー: ' + (e && e.message ? e.message : String(e));
+  }
+}
+
+// ============================================================
+// UI ヘルパー
+// ============================================================
+function toggleStaff() {
+  const area = document.getElementById('staffArea');
+  const btn = document.getElementById('staffToggleBtn');
+  const on = area.classList.toggle('show');
+  btn.textContent = on ? '社員の方はこちら ▴' : '社員の方はこちら ▾';
+}
+function showLoading()      { document.getElementById('loadingScreen').style.display = 'flex'; }
+function setLoadingText(t)  { document.getElementById('loadingText').textContent = t; }
+function showLogin()        { document.getElementById('loadingScreen').style.display = 'none';
+                              document.getElementById('loginScreen').classList.add('show'); }
+function showLoginError(m)  { const el = document.getElementById('loginError'); el.textContent = m; el.style.display = 'block'; }
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+init();
+</script>
+</body>
+</html>
