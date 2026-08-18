@@ -265,7 +265,7 @@
       <div class="topbar-select-wrap"><select id="surveySelect" onchange="onSurveyChange()">
         <option value="">アンケートを選択...</option>
       </select></div>
-      <a href="/diana-contest-viewer" target="_blank" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:bold;text-decoration:none;white-space:nowrap;">🏆 コンテスト閲覧</a>
+      <a href="/diana-contest-viewer" target="_blank" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:bold;text-decoration:none;white-space:nowrap;">🏆 アワード閲覧</a>
       <button class="logout" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
@@ -361,7 +361,7 @@
                   別のコンテスト（別年度）とは統合されません。どちらが先に提出されても統合されます。
                 </p>
               </div>
-              <p style="font-size:12px;color:#888;">チェックをつけると Dstyle コンテスト閲覧ページの選択肢に表示されます。</p>
+              <p style="font-size:12px;color:#888;">チェックをつけると ダイアナゴールデンプロポーションアワード 閲覧ページの選択肢に表示されます。</p>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
@@ -781,7 +781,14 @@
           <option value="file">📎 ファイルアップロード</option>
         </select>
       </div>
-      <div class="form-group" id="placeholderGroup"><label>記入例（任意）</label><input type="text" id="qPlaceholder" placeholder="例）山田 花子"></div>
+      <div class="form-group" id="placeholderGroup">
+        <label>記入例（任意）</label>
+        <textarea id="qPlaceholder" placeholder="例）山田 花子" style="min-height:80px;resize:vertical;"></textarea>
+        <p style="font-size:12px;color:#888;margin:4px 0 0;line-height:1.7;">
+          1行だけの場合は入力欄の中に薄く表示されます。<br>
+          改行を入れると、質問文の下に説明ブロックとして表示されます（長い記入例向け）。
+        </p>
+      </div>
       <div class="form-group" id="qRequiredGroup">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:normal">
           <input type="checkbox" id="qRequired" style="width:20px;height:20px;accent-color:#7B4F6E;flex-shrink:0;-webkit-appearance:checkbox;appearance:checkbox;cursor:pointer">
@@ -1401,7 +1408,7 @@
       var roleLabel = s.contestRole === 'chief' ? ' 👑 チーフ用' : (s.contestRole === 'member' ? ' 👤 メンバー用' : '');
       var groupLabel = s.contestGroupTitle ? ' / ' + esc(s.contestGroupTitle) : '';
       var contestBadge = s.isContest ? '<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:4px;">🏆 コンテスト' + roleLabel + groupLabel + '</span>' : '';
-      var contestLink = s.isContest ? '<a href="/diana-contest-viewer" target="_blank" class="btn btn-sm" style="background:#7B4F6E;color:white;text-decoration:none;display:inline-flex;align-items:center;">🏆 コンテスト閲覧</a>' : '';
+      var contestLink = s.isContest ? '<a href="/diana-contest-viewer" target="_blank" class="btn btn-sm" style="background:#7B4F6E;color:white;text-decoration:none;display:inline-flex;align-items:center;">🏆 アワード閲覧</a>' : '';
       return '<div class="survey-item' + (isActive ? '' : ' inactive') + (s.isContest ? '" style="border-color:#ffc107' : '') + '">' +
         '<div class="survey-item-info">' +
         '<div class="survey-item-title">' + s.title +
