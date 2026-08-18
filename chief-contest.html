@@ -8,124 +8,142 @@
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Hiragino Kaku Gothic ProN', 'Helvetica Neue', Arial, sans-serif;
-      background: #f7f3f6; color: #333; min-height: 100vh;
-    }
+    body { font-family: 'Hiragino Kaku Gothic ProN', 'Helvetica Neue', Arial, sans-serif; background: #f7f3f6; color: #333; min-height: 100vh; }
 
     /* ============ ローディング ============ */
     #loadingScreen { position: fixed; inset: 0; background: #f7f3f6; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 16px; z-index: 9999; }
     .spinner { width: 34px; height: 34px; border: 3px solid #e8d6e3; border-top-color: #7B4F6E; border-radius: 50%; animation: spin .8s linear infinite; }
+    .spinner-sm { width: 20px; height: 20px; border-width: 2px; display: inline-block; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-text { color: #7B4F6E; font-size: 14px; font-weight: bold; }
 
-    /* ============ ログイン画面 ============ */
+    /* ============ ログイン ============ */
     #loginScreen { display: none; min-height: 100vh; align-items: center; justify-content: center; padding: 24px 16px; }
     #loginScreen.show { display: flex; }
-
-    .login-box {
-      background: #fff; border-radius: 18px; width: 100%; max-width: 440px;
-      box-shadow: 0 10px 40px rgba(123,79,110,0.16); overflow: hidden;
-    }
-    .login-head {
-      background: linear-gradient(135deg, #7B4F6E 0%, #9d6a8c 100%);
-      color: #fff; padding: 36px 32px 30px; text-align: center;
-    }
+    .login-box { background: #fff; border-radius: 18px; width: 100%; max-width: 440px; box-shadow: 0 10px 40px rgba(123,79,110,0.16); overflow: hidden; }
+    .login-head { background: linear-gradient(135deg, #7B4F6E 0%, #9d6a8c 100%); color: #fff; padding: 36px 32px 30px; text-align: center; }
     .login-mark { font-size: 40px; margin-bottom: 10px; }
     .login-brand { font-size: 13px; letter-spacing: .22em; opacity: .85; margin-bottom: 8px; }
     .login-title { font-size: 19px; font-weight: bold; line-height: 1.5; }
     .login-sub { font-size: 12px; opacity: .8; margin-top: 10px; }
-
     .login-body { padding: 30px 32px 26px; }
-
-    .btn-chief {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 100%; padding: 17px 20px; border: none; border-radius: 10px;
-      background: #7B4F6E; color: #fff; font-size: 16px; font-weight: bold;
-      cursor: pointer; font-family: inherit;
-    }
+    .btn-chief { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+      padding: 17px 20px; border: none; border-radius: 10px; background: #7B4F6E; color: #fff;
+      font-size: 16px; font-weight: bold; cursor: pointer; font-family: inherit; }
     .btn-chief:hover { background: #6a4260; }
     .btn-chief:disabled { opacity: .45; cursor: not-allowed; }
-
-    .hint-box {
-      background: #faf6f9; border: 1px solid #ecdfe8; border-radius: 10px;
-      padding: 14px 16px; margin-top: 16px; font-size: 13px; color: #6a5563; line-height: 1.9;
-    }
+    .hint-box { background: #faf6f9; border: 1px solid #ecdfe8; border-radius: 10px; padding: 14px 16px;
+      margin-top: 16px; font-size: 13px; color: #6a5563; line-height: 1.9; }
     .hint-box .k { display: inline-block; width: 84px; color: #9b8592; }
-
     .divider { display: flex; align-items: center; gap: 12px; margin: 26px 0 14px; }
     .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #eee; }
     .divider span { font-size: 11px; color: #bbb; }
-
-    .staff-toggle {
-      display: block; width: 100%; background: none; border: none; cursor: pointer;
-      font-family: inherit; font-size: 12px; color: #999; text-align: center; padding: 6px;
-    }
+    .staff-toggle { display: block; width: 100%; background: none; border: none; cursor: pointer;
+      font-family: inherit; font-size: 12px; color: #999; text-align: center; padding: 6px; }
     .staff-toggle:hover { color: #7B4F6E; text-decoration: underline; }
-
     #staffArea { display: none; margin-top: 12px; }
     #staffArea.show { display: block; }
-    .btn-staff {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 100%; padding: 13px 18px; border: 1.5px solid #ccd6e0; border-radius: 9px;
-      background: #fff; color: #3a4a5a; font-size: 14px; font-weight: bold;
-      cursor: pointer; font-family: inherit;
-    }
+    .btn-staff { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+      padding: 13px 18px; border: 1.5px solid #ccd6e0; border-radius: 9px; background: #fff; color: #3a4a5a;
+      font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit; }
     .btn-staff:hover { background: #f6f9fc; border-color: #0078d4; }
     .staff-note { font-size: 11px; color: #aaa; text-align: center; margin-top: 8px; line-height: 1.7; }
-
-    .login-error {
-      background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b;
-      border-radius: 9px; padding: 12px 15px; font-size: 12.5px; margin-top: 16px;
-      display: none; white-space: pre-wrap; word-break: break-word; line-height: 1.8;
-    }
+    .login-error { background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b; border-radius: 9px;
+      padding: 12px 15px; font-size: 12.5px; margin-top: 16px; display: none; white-space: pre-wrap; word-break: break-word; line-height: 1.8; }
 
     /* ============ メイン ============ */
     #mainScreen { display: none; }
     #mainScreen.show { display: block; }
-    .topbar {
-      background: #7B4F6E; color: #fff; padding: 0 20px; height: 56px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 100;
-    }
+    .topbar { background: #7B4F6E; color: #fff; padding: 0 20px; height: 56px; display: flex;
+      align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
     .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .topbar h1 { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .user-badge { background: rgba(255,255,255,.18); border-radius: 12px; padding: 4px 12px; font-size: 12px; white-space: nowrap; }
     .btn-logout { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff;
       border-radius: 6px; padding: 6px 13px; font-size: 12px; cursor: pointer; font-family: inherit; }
 
-    .main { max-width: 900px; margin: 0 auto; padding: 22px 16px 60px; }
-    .card { background: #fff; border-radius: 12px; padding: 22px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(123,79,110,0.07); }
-    .card h2 { font-size: 15px; color: #7B4F6E; margin-bottom: 12px; }
+    .main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+    .card { background: #fff; border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; box-shadow: 0 2px 12px rgba(123,79,110,0.07); }
     .note { font-size: 13px; color: #888; line-height: 1.8; }
+    .err-banner { background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b; border-radius: 9px;
+      padding: 12px 16px; font-size: 13px; margin-bottom: 14px; display: none; white-space: pre-wrap; }
 
-    .ok   { background: #eafaf0; border: 1px solid #b7e4c7; color: #2e7d32; border-radius: 9px; padding: 15px 17px; font-size: 14px; font-weight: bold; }
-    .ng   { background: #fdf0ef; border: 1px solid #f5c6c2; color: #c0392b; border-radius: 9px; padding: 15px 17px; font-size: 13px; white-space: pre-wrap; line-height: 1.9; }
-    .info { background: #eef4fb; border: 1px solid #c5d9ef; color: #14538a; border-radius: 9px; padding: 13px 16px; font-size: 13px; line-height: 1.8; }
+    /* バー */
+    .bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .bar label { font-size: 13px; font-weight: bold; color: #555; white-space: nowrap; }
+    select, .txt { padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; background: #fff; }
+    select { min-width: 260px; cursor: pointer; }
+    .txt { width: 150px; letter-spacing: .1em; }
+    .btn { border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: bold; cursor: pointer; font-family: inherit; }
+    .btn-primary { background: #7B4F6E; color: #fff; }
+    .btn-light { background: #f0eaee; color: #7B4F6E; }
+    .ml-auto { margin-left: auto; }
 
-    .salon-pick { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .salon-pick input {
-      width: 160px; padding: 11px 13px; border: 1.5px solid #ddd; border-radius: 8px;
-      font-size: 16px; font-family: inherit; letter-spacing: .12em;
-    }
-    .salon-pick button { border: none; border-radius: 8px; padding: 11px 20px; font-size: 14px;
-      font-weight: bold; cursor: pointer; background: #7B4F6E; color: #fff; font-family: inherit; }
-    .salon-current { font-size: 15px; font-weight: bold; color: #7B4F6E; }
+    /* サマリー */
+    .sum-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .sum-card { background: #fff; border-radius: 12px; padding: 14px 20px; min-width: 128px; box-shadow: 0 2px 12px rgba(123,79,110,0.07); }
+    .sum-card .lbl { font-size: 12px; color: #999; }
+    .sum-card .val { font-size: 26px; font-weight: bold; color: #7B4F6E; line-height: 1.3; }
+    .sum-card .sub { font-size: 11px; color: #aaa; }
 
-    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-    th, td { border: 1px solid #e8eef3; padding: 8px 10px; text-align: left; vertical-align: top; word-break: break-all; }
-    th { background: #f7f2f6; color: #7B4F6E; width: 205px; }
-    tr.hit td, tr.hit th { background: #eafaf0; }
-    textarea { width: 100%; min-height: 180px; font-family: Consolas, monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-    code { background: #f2f2f2; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-    details { margin-top: 10px; }
-    summary { cursor: pointer; font-size: 13px; color: #7B4F6E; padding: 6px 0; }
+    /* 一覧 */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .app-card { background: #fff; border: 1.5px solid #eee; border-radius: 12px; overflow: hidden; cursor: pointer; transition: .15s; }
+    .app-card:hover { border-color: #7B4F6E; transform: translateY(-2px); box-shadow: 0 6px 18px rgba(123,79,110,.13); }
+    .app-head { background: linear-gradient(135deg, #7B4F6E, #9d6a8c); color: #fff; padding: 13px 16px; }
+    .app-no { font-size: 11px; opacity: .8; }
+    .app-name { font-size: 16px; font-weight: bold; }
+    .app-kana { font-size: 11px; opacity: .85; }
+    .app-body { padding: 12px 16px; }
+    .app-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 4px 0; border-bottom: 1px dashed #f0eaee; }
+    .app-row .k { color: #999; }
+    .app-row .v { font-weight: bold; color: #444; text-align: right; word-break: break-all; }
+    .app-foot { padding: 10px 16px; background: #fafafa; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: #999; }
+    .chip { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+    .thumbs { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #eee; }
+    .thumb-file { width: 44px; height: 44px; border-radius: 6px; background: #f2eef1; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 
-    @media (max-width: 480px) {
+    .empty { text-align: center; padding: 50px 20px; color: #aaa; }
+    .empty .icon { font-size: 46px; margin-bottom: 10px; }
+
+    /* モーダル */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 500; padding: 16px; }
+    .overlay.show { display: flex; }
+    .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 860px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; }
+    .modal-head { background: #7B4F6E; color: #fff; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .modal-head .nm { font-size: 17px; font-weight: bold; }
+    .modal-head .kn { font-size: 12px; opacity: .85; }
+    .modal-close { background: rgba(255,255,255,.18); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 17px; cursor: pointer; }
+    .modal-body { padding: 18px 20px 28px; overflow-y: auto; }
+    .sec-title { font-size: 14px; font-weight: bold; color: #7B4F6E; margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #f0e6ec; }
+    .sec-title:first-child { margin-top: 0; }
+    .ans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+    .ans-item { background: #faf7f9; border-radius: 8px; padding: 9px 12px; }
+    .ans-lbl { font-size: 11px; color: #9b8592; margin-bottom: 3px; }
+    .ans-val { font-size: 13.5px; color: #333; word-break: break-word; white-space: pre-wrap; }
+    .ans-long { background: #faf7f9; border-radius: 8px; padding: 11px 14px; margin-bottom: 10px; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .gal-item { border: 1px solid #eee; border-radius: 8px; overflow: hidden; background: #fafafa; }
+    .gal-item img { width: 100%; height: 150px; object-fit: cover; display: block; cursor: pointer; }
+    .gal-cap { padding: 7px 9px; font-size: 11px; color: #777; word-break: break-all; }
+    .gal-file { display: flex; align-items: center; gap: 8px; padding: 12px; font-size: 13px; }
+    table.m { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.m th { background: #f5eaf2; color: #7B4F6E; padding: 8px 10px; white-space: nowrap; border-bottom: 2px solid #e0c8d8; }
+    .info { background: #eef4fb; border: 1px solid #c5d9ef; color: #14538a; border-radius: 9px; padding: 12px 15px; font-size: 13px; line-height: 1.8; }
+    .warn { background: #fff8e6; border: 1px solid #ffcc80; color: #8a5a00; border-radius: 9px; padding: 12px 15px; font-size: 13px; line-height: 1.8; }
+    #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none; align-items: center; justify-content: center; z-index: 900; padding: 20px; }
+    #lightbox.show { display: flex; }
+    #lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+    @media (max-width: 560px) {
       .login-head { padding: 30px 22px 26px; }
       .login-body { padding: 24px 22px 22px; }
       .login-title { font-size: 17px; }
+      select { min-width: 0; width: 100%; }
+      .grid { grid-template-columns: 1fr; }
+      .ans-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -146,27 +164,17 @@
       <div class="login-title">ゴールデンプロポーションアワード<br>応募状況確認</div>
       <div class="login-sub">サロン別の応募状況をご確認いただけます</div>
     </div>
-
     <div class="login-body">
-      <button class="btn-chief" id="chiefBtn" onclick="startLogin('chief')">
-        <span>👑</span> チーフとしてログイン
-      </button>
-
+      <button class="btn-chief" id="chiefBtn" onclick="startLogin('chief')"><span>👑</span> チーフとしてログイン</button>
       <div class="hint-box">
         <div><span class="k">ID</span>サロンコード（5桁）</div>
         <div><span class="k">パスワード</span>サロンのパスワード</div>
       </div>
-
       <div class="login-error" id="loginError"></div>
-
       <div class="divider"><span>または</span></div>
-
       <button class="staff-toggle" onclick="toggleStaff()" id="staffToggleBtn">社員の方はこちら ▾</button>
-
       <div id="staffArea">
-        <button class="btn-staff" onclick="startLogin('staff')">
-          <span>🏢</span> 社員としてログイン
-        </button>
+        <button class="btn-staff" onclick="startLogin('staff')"><span>🏢</span> 社員としてログイン</button>
         <div class="staff-note">
           DSHグループのMicrosoft 365アカウントでログインします。<br>
           ログイン後にサロンを指定してご確認ください。
@@ -190,94 +198,117 @@
   </div>
 
   <div class="main">
+    <div class="err-banner" id="errBanner"></div>
 
-    <!-- 社員：サロン選択 -->
+    <!-- 社員：サロン指定 -->
     <div class="card" id="salonCard" style="display:none">
-      <h2>🏢 サロンを指定</h2>
-      <p class="note" style="margin-bottom:12px">確認したいサロンコード（5桁）を入力してください。</p>
-      <div class="salon-pick">
-        <input type="text" id="salonInput" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="00000">
-        <button onclick="applySalon()">表示</button>
-        <span class="salon-current" id="salonCurrent"></span>
+      <div class="bar">
+        <label>🏢 サロンコード</label>
+        <input type="text" class="txt" id="salonInput" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="00000">
+        <button class="btn btn-primary" onclick="applySalon()">表示</button>
+        <span class="note" id="salonNote">確認したいサロンコード（5桁）を入力してください。</span>
       </div>
     </div>
 
-    <!-- 認証確認結果（本番では応募一覧に差し替え） -->
-    <div class="card">
-      <h2>🔍 認証の確認結果</h2>
-      <p class="note" style="margin-bottom:12px">
-        現在は認証設定の確認段階です。この下に応募一覧を実装していきます。
-      </p>
-      <div id="verdict"></div>
-      <div id="authorityInfo" class="info" style="margin-top:12px;display:none"></div>
-
-      <details>
-        <summary>IDトークンのクレーム一覧を表示</summary>
-        <p class="note">サロンコードらしき値を含む行を緑色にしています。</p>
-        <table id="claimTable"></table>
-      </details>
-
-      <details id="groupDetails" style="display:none">
-        <summary>所属グループを表示</summary>
-        <div id="groupArea" class="note">—</div>
-      </details>
-
-      <details>
-        <summary>コピー用（共有する場合はこちら）</summary>
-        <p class="note" style="margin:6px 0 8px">氏名・メールなど共有したくない値は <code>xxxxx</code> に置き換えてください。</p>
-        <textarea id="rawJson" readonly></textarea>
-      </details>
+    <!-- コンテスト選択 -->
+    <div class="card" id="contestCard" style="display:none">
+      <div class="bar">
+        <label>🏆 コンテスト</label>
+        <select id="contestSelect" onchange="onContestChange()"></select>
+        <button class="btn btn-light ml-auto" onclick="loadEntries()">🔄 更新</button>
+      </div>
     </div>
 
+    <div id="dataArea" style="display:none">
+      <div class="sum-row">
+        <div class="sum-card"><div class="lbl">応募者数</div><div class="val" id="cntTotal">0</div><div class="sub">名</div></div>
+        <div class="sum-card"><div class="lbl">両方提出済</div><div class="val" id="cntComplete" style="color:#2e7d32">0</div><div class="sub">名</div></div>
+        <div class="sum-card"><div class="lbl">未完了</div><div class="val" id="cntPending" style="color:#e65100">0</div><div class="sub" id="cntPendingSub">-</div></div>
+      </div>
+      <div class="grid" id="appGrid"></div>
+    </div>
+
+    <div id="emptyArea" style="display:none">
+      <div class="card empty"><div class="icon">📭</div><p id="emptyMsg">応募はまだありません。</p></div>
+    </div>
   </div>
 </div>
+
+<!-- 詳細モーダル -->
+<div class="overlay" id="detailModal" onclick="onOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="nm" id="mName">-</div>
+        <div class="kn" id="mKana"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+  </div>
+</div>
+
+<div id="lightbox" onclick="closeLightbox()"><img id="lightboxImg" src="" alt=""></div>
 
 <script>
 // ============================================================
 // ★ 設定
 // ============================================================
-// DIANA-SALON テナントで作成したアプリ登録のクライアントID
-const CHIEF_CLIENT_ID = '5503ac94-f3bf-42fa-8074-27557ca61ae1';
-const CHIEF_TENANT_ID = 'ac36e29b-c866-49d3-9391-510bb3e88891'; // DIANA-SALON
-const CIAM_DOMAIN     = 'DianasalonEntra';                       // 外部ID接続時のサブドメイン
-
-// 既存のDSHテナント（社員用・変更不要）
-const STAFF_CLIENT_ID = '1f4f2ade-4eeb-4f65-8fbd-394378a63518';
-const STAFF_TENANT_ID = '2648ac1f-8786-40fb-80f8-14bd84511449';
+const CHIEF_CLIENT_ID = '5503ac94-f3bf-42fa-8074-27557ca61ae1'; // DstyleSurvey-Chief-SPA
+const CHIEF_TENANT_ID = 'ac36e29b-c866-49d3-9391-510bb3e88891'; // DIANA-SALON（外部ID）
+const CIAM_DOMAIN     = 'DianasalonEntra';
+const STAFF_CLIENT_ID = '1f4f2ade-4eeb-4f65-8fbd-394378a63518'; // dstyle-survey（既存）
+const STAFF_TENANT_ID = '2648ac1f-8786-40fb-80f8-14bd84511449'; // DSHグループ
 
 const REDIRECT_URI = window.location.origin + '/chief-contest.html';
+const BASE_URL = location.hostname === 'localhost'
+  ? 'http://localhost:7071'
+  : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
 
-// チーフ用の接続先候補（上から順に試し、成功したものを記憶する）
 const CHIEF_AUTHORITIES = [
-  { authority: 'https://login.microsoftonline.com/' + CHIEF_TENANT_ID, known: [], label: '標準（login.microsoftonline.com）' },
-  { authority: 'https://' + CIAM_DOMAIN + '.ciamlogin.com/' + CHIEF_TENANT_ID, known: [CIAM_DOMAIN + '.ciamlogin.com'], label: '外部ID（ciamlogin.com）' }
+  { authority: 'https://login.microsoftonline.com/' + CHIEF_TENANT_ID, known: [] },
+  { authority: 'https://' + CIAM_DOMAIN + '.ciamlogin.com/' + CHIEF_TENANT_ID, known: [CIAM_DOMAIN + '.ciamlogin.com'] }
 ];
 
+const STATUS_META = {
+  complete:    { label: '両方提出済',     icon: '✅', color: '#2e7d32', bg: '#eafaf0', bd: '#b7e4c7' },
+  member_only: { label: 'チーフ未提出',   icon: '👤', color: '#e65100', bg: '#fff5e6', bd: '#ffcc80' },
+  chief_only:  { label: 'メンバー未提出', icon: '👑', color: '#0d47a1', bg: '#e8f1fc', bd: '#a9c9f0' },
+  unkeyed:     { label: '要確認',         icon: '⚠️', color: '#b71c1c', bg: '#fdeceb', bd: '#f5b7b1' },
+  single:      { label: '提出済',         icon: '📄', color: '#555',    bg: '#f2f2f2', bd: '#ddd' }
+};
+
+// ============================================================
+// 状態
+// ============================================================
 let msalInstance = null;
+let apiToken = null;
+let myRole = null;
+let mySalon = null;
+let myName = '';
+let contests = [];
+let entries = [];
+let questionLabels = {};
+let measureCache = {};
+let detailIndex = -1;
 
 function chiefAuthIndex() { return parseInt(sessionStorage.getItem('chiefAuthIdx') || '0', 10); }
 function savedMode()      { return sessionStorage.getItem('loginMode'); }
 
 function modeConfig(mode) {
   if (mode === 'staff') {
-    return { label: '🏢 社員', clientId: STAFF_CLIENT_ID,
-             authority: 'https://login.microsoftonline.com/' + STAFF_TENANT_ID, known: [],
-             scopes: ['User.Read', 'GroupMember.Read.All'] };
+    return { clientId: STAFF_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + STAFF_TENANT_ID,
+             known: [], scopes: ['User.Read', 'GroupMember.Read.All'] };
   }
   const a = CHIEF_AUTHORITIES[chiefAuthIndex()] || CHIEF_AUTHORITIES[0];
-  return { label: '👑 チーフ', clientId: CHIEF_CLIENT_ID,
-           authority: a.authority, known: a.known, authorityLabel: a.label,
-           scopes: ['openid', 'profile', 'email', 'User.Read'] };
+  return { clientId: CHIEF_CLIENT_ID, authority: a.authority, known: a.known,
+           scopes: ['openid', 'profile', 'User.Read'] };
 }
 
 // ============================================================
-// 初期化
+// 初期化・認証
 // ============================================================
 async function init() {
-  if (CHIEF_CLIENT_ID.indexOf('ここに') === 0) {
-    document.getElementById('chiefBtn').disabled = true;
-    showLoginError('チーフ用のクライアントIDが未設定です。設定が完了するまで、社員ログインのみご利用いただけます。');
-  }
   const remembered = localStorage.getItem('chiefAuthIdxOk');
   if (remembered !== null && !sessionStorage.getItem('chiefAuthIdx')) {
     sessionStorage.setItem('chiefAuthIdx', remembered);
@@ -290,24 +321,30 @@ async function init() {
   try {
     await buildInstance(mode);
     const result = await msalInstance.handleRedirectPromise();
+
+    if (sessionStorage.getItem('postLogout')) {
+      sessionStorage.removeItem('postLogout');
+      sessionStorage.removeItem('loginMode');
+      sessionStorage.removeItem('chiefAuthIdx');
+      sessionStorage.removeItem('apiToken');
+      clearMsalInteractionState();
+      showLogin();
+      return;
+    }
+
     let account = result ? result.account : null;
     if (!account) {
       const accounts = msalInstance.getAllAccounts();
       if (accounts.length > 0) account = accounts[0];
     }
-    // ログアウトから戻ってきた場合は、ここまででMSALの処理中フラグが解除されている
-    if (sessionStorage.getItem('postLogout')) {
-      sessionStorage.removeItem('postLogout');
-      sessionStorage.removeItem('loginMode');
-      sessionStorage.removeItem('chiefAuthIdx');
-      clearMsalInteractionState();
-      showLogin();
-      return;
-    }
     if (!account) { showLogin(); return; }
+
     msalInstance.setActiveAccount(account);
     if (mode === 'chief') localStorage.setItem('chiefAuthIdxOk', String(chiefAuthIndex()));
-    showMain(account, mode);
+
+    setLoadingText('権限を確認しています...');
+    await ensureApiToken(mode);
+    await startApp();
   } catch (e) {
     await handleAuthFailure(e, mode);
   }
@@ -324,49 +361,59 @@ async function buildInstance(mode) {
 
 async function startLogin(mode) {
   sessionStorage.setItem('loginMode', mode);
+  sessionStorage.removeItem('apiToken');
   setLoadingText('ログイン画面に移動しています...');
   showLoading();
   try {
     await buildInstance(mode);
     await msalInstance.loginRedirect({ scopes: modeConfig(mode).scopes });
   } catch (e) {
-    // 前回の処理中フラグが残っている場合は解除して1回だけ再試行する
     if (isInteractionInProgress(e)) {
       clearMsalInteractionState();
-      try {
-        await msalInstance.loginRedirect({ scopes: modeConfig(mode).scopes });
-        return;
-      } catch (e2) { await handleAuthFailure(e2, mode); return; }
+      try { await msalInstance.loginRedirect({ scopes: modeConfig(mode).scopes }); return; }
+      catch (e2) { await handleAuthFailure(e2, mode); return; }
     }
     await handleAuthFailure(e, mode);
   }
 }
 
-function isInteractionInProgress(e) {
-  const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
-  return msg.indexOf('interaction_in_progress') >= 0;
-}
-
-// MSALが残した「処理中」フラグを掃除する
-function clearMsalInteractionState() {
-  [sessionStorage, localStorage].forEach(function(store) {
-    try {
-      const keys = [];
-      for (let i = 0; i < store.length; i++) {
-        const k = store.key(i);
-        if (k && k.indexOf('msal') >= 0 && k.indexOf('interaction.status') >= 0) keys.push(k);
-      }
-      keys.forEach(function(k) { store.removeItem(k); });
-    } catch (e) {}
+// サーバー側でトークンを検証し、ロール付きAPIトークンを受け取る
+async function ensureApiToken(mode, force) {
+  if (!force) {
+    const cached = sessionStorage.getItem('apiToken');
+    if (cached) {
+      const info = JSON.parse(cached);
+      apiToken = info.token; myRole = info.role; mySalon = info.salonCode || null; myName = info.userName || '';
+      return;
+    }
+  }
+  const cfg = modeConfig(mode);
+  const account = msalInstance.getActiveAccount();
+  let tok;
+  try {
+    tok = await msalInstance.acquireTokenSilent({ scopes: cfg.scopes, account });
+  } catch (e) {
+    // Graphのスコープが取れない場合でも、IDトークンだけは取得できるようにする
+    tok = await msalInstance.acquireTokenSilent({ scopes: ['openid', 'profile'], account });
+  }
+  const res = await fetch(BASE_URL + '/api/chiefauth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, idToken: tok.idToken, accessToken: tok.accessToken })
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('認証に失敗しました（HTTP ' + res.status + '）'));
+
+  apiToken = data.token; myRole = data.role; mySalon = data.salonCode || null; myName = data.userName || '';
+  sessionStorage.setItem('apiToken', JSON.stringify({ token: apiToken, role: myRole, salonCode: mySalon, userName: myName }));
 }
 
-// チーフ側は接続先が未確定のため、失敗時は次の候補で自動再試行する
 async function handleAuthFailure(e, mode) {
   const idx = chiefAuthIndex();
   const canFallback = (mode === 'chief') && (idx + 1 < CHIEF_AUTHORITIES.length) && looksLikeAuthorityError(e);
   if (!canFallback) {
     sessionStorage.removeItem('loginMode');
+    sessionStorage.removeItem('apiToken');
     clearMsalInteractionState();
     showLogin();
     showLoginError('ログインできませんでした。\n' + (e && e.message ? e.message : String(e)));
@@ -386,20 +433,33 @@ async function handleAuthFailure(e, mode) {
   }
 }
 
-// 接続先の相違によるエラーか（パスワード誤り等では切り替えない）
 function looksLikeAuthorityError(e) {
   const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
   if (msg.indexOf('user_cancelled') >= 0 || msg.indexOf('access_denied') >= 0) return false;
   return /aadsts900023|aadsts90002|aadsts700016|aadsts50194|unauthorized_client|invalid_request|endpoints_resolution_error|openid_config_error|untrusted_authority/.test(msg);
 }
+function isInteractionInProgress(e) {
+  const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
+  return msg.indexOf('interaction_in_progress') >= 0;
+}
+function clearMsalInteractionState() {
+  [sessionStorage, localStorage].forEach(function(store) {
+    try {
+      const keys = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && k.indexOf('msal') >= 0 && k.indexOf('interaction.status') >= 0) keys.push(k);
+      }
+      keys.forEach(function(k) { store.removeItem(k); });
+    } catch (e) {}
+  });
+}
 
 async function doLogout() {
-  // loginMode は残す（復帰時に handleRedirectPromise を通して状態を解除するため）
   sessionStorage.setItem('postLogout', '1');
+  sessionStorage.removeItem('apiToken');
   sessionStorage.removeItem('staffSalon');
-  if (msalInstance) {
-    try { await msalInstance.logoutRedirect(); return; } catch (e) {}
-  }
+  if (msalInstance) { try { await msalInstance.logoutRedirect(); return; } catch (e) {} }
   sessionStorage.removeItem('postLogout');
   sessionStorage.removeItem('loginMode');
   sessionStorage.removeItem('chiefAuthIdx');
@@ -408,154 +468,441 @@ async function doLogout() {
 }
 
 // ============================================================
-// メイン表示
+// API
 // ============================================================
-function showMain(account, mode) {
-  const claims = account.idTokenClaims || {};
-  const cfg = modeConfig(mode);
+async function apiGet(path) {
+  const res = await fetch(BASE_URL + path, { headers: { 'x-admin-token': apiToken || '' } });
+  if (res.status === 401) {
+    // トークン期限切れ → 再取得して1回だけ再試行
+    await ensureApiToken(savedMode(), true);
+    const retry = await fetch(BASE_URL + path, { headers: { 'x-admin-token': apiToken || '' } });
+    if (!retry.ok) throw new Error((await retry.json().catch(() => ({}))).error || ('HTTP ' + retry.status));
+    return retry.json();
+  }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ('HTTP ' + res.status));
+  return res.json();
+}
 
+// ============================================================
+// 画面本体
+// ============================================================
+async function startApp() {
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('loginScreen').classList.remove('show');
   document.getElementById('mainScreen').classList.add('show');
 
-  const salon = detectSalonCode(claims);
-  const who = claims.name || claims.preferred_username || claims.email || 'ログイン中';
   document.getElementById('userBadge').textContent =
-    (mode === 'staff' ? '🏢 ' : '👑 ') + who + (salon ? '（' + salon + '）' : '');
+    (myRole === 'staff' ? '🏢 ' : '👑 ') + (myName || '') + (mySalon ? '（' + mySalon + '）' : '');
 
-  if (mode === 'staff') {
+  if (myRole === 'staff') {
     document.getElementById('salonCard').style.display = 'block';
-    document.getElementById('groupDetails').style.display = 'block';
     const saved = sessionStorage.getItem('staffSalon');
-    if (saved) { document.getElementById('salonInput').value = saved; renderSalonCurrent(saved); }
-    loadGroups();
+    if (saved) document.getElementById('salonInput').value = saved;
   }
 
-  if (mode === 'chief' && cfg.authorityLabel) {
-    const info = document.getElementById('authorityInfo');
-    info.style.display = 'block';
-    info.innerHTML = '接続先： <code>' + esc(cfg.authorityLabel) + '</code><br>本番実装ではこの接続先に固定します。';
+  try {
+    const data = await apiGet('/api/contest-entries');
+    contests = data.contests || [];
+    renderContestSelect();
+    if (myRole === 'staff' && !sessionStorage.getItem('staffSalon')) {
+      showEmpty('サロンコードを入力して「表示」を押してください。');
+      return;
+    }
+    if (contests.length > 0) await loadEntries();
+  } catch (e) {
+    showError(e.message);
   }
-
-  renderVerdict(claims, mode, salon);
-  renderClaims(claims);
-  document.getElementById('rawJson').value = JSON.stringify(claims, null, 2);
 }
+
+function renderContestSelect() {
+  const card = document.getElementById('contestCard');
+  const sel = document.getElementById('contestSelect');
+  if (contests.length === 0) {
+    card.style.display = 'none';
+    showEmpty('現在公開中のコンテストはありません。');
+    return;
+  }
+  card.style.display = 'block';
+  sel.innerHTML = contests.map(function(c, i) {
+    const mark = (c.roles.indexOf('member') >= 0 ? '👤' : '') + (c.roles.indexOf('chief') >= 0 ? '👑' : '');
+    return '<option value="' + esc(c.groupId) + '"' + (i === 0 ? ' selected' : '') + '>' + mark + ' ' + esc(c.title) + '</option>';
+  }).join('');
+}
+
+async function onContestChange() { await loadEntries(); }
 
 function applySalon() {
   const v = (document.getElementById('salonInput').value || '').trim();
   if (!/^\d{5}$/.test(v)) { alert('サロンコードは5桁の数字で入力してください。'); return; }
   sessionStorage.setItem('staffSalon', v);
-  renderSalonCurrent(v);
+  loadEntries();
 }
 
-function renderSalonCurrent(v) {
-  document.getElementById('salonCurrent').textContent = '選択中：' + v;
+async function loadEntries() {
+  const groupId = document.getElementById('contestSelect').value;
+  if (!groupId) return;
+
+  let path = '/api/contest-entries?groupId=' + encodeURIComponent(groupId);
+  if (myRole === 'staff') {
+    const salon = sessionStorage.getItem('staffSalon');
+    if (!salon) { showEmpty('サロンコードを入力して「表示」を押してください。'); return; }
+    path += '&salon=' + encodeURIComponent(salon);
+  }
+
+  showEmpty('読み込んでいます...');
+  try {
+    const data = await apiGet(path);
+    entries = data.entries || [];
+    questionLabels = data.questionLabels || {};
+    measureCache = {};
+    if (myRole === 'staff') {
+      mySalon = data.salonCode;
+      document.getElementById('salonNote').textContent = 'サロン ' + data.salonCode + ' の応募状況を表示しています。';
+    }
+    renderList();
+  } catch (e) {
+    showError(e.message);
+    showEmpty('データを取得できませんでした。');
+  }
 }
 
-// ============================================================
-// 判定
-// ============================================================
-function findSalonCode(value) {
-  if (value == null) return null;
-  const s = String(value);
-  let m = s.match(/^s?(\d{5})@/i);   // s24016@dhn.ne.jp
-  if (m) return m[1];
-  m = s.match(/^s?(\d{5})$/i);       // 24016 / s24016
-  if (m) return m[1];
-  return null;
-}
+function renderList() {
+  const dataArea = document.getElementById('dataArea');
+  const emptyArea = document.getElementById('emptyArea');
 
-function detectSalonCode(claims) {
-  let found = null;
-  Object.keys(claims).forEach(function(k) {
-    if (found) return;
-    const v = claims[k];
-    if (Array.isArray(v)) { v.forEach(function(i) { if (!found) found = findSalonCode(i); }); }
-    else { found = findSalonCode(v); }
-  });
-  return found;
-}
-
-function renderVerdict(claims, mode, salon) {
-  const el = document.getElementById('verdict');
-  if (mode === 'staff') {
-    el.innerHTML = salon
-      ? '<div class="ng">⚠️ 社員アカウントから5桁の数字（' + esc(salon) + '）が検出されました。\nチーフと誤判定されないよう、実装側では社員判定を優先します。</div>'
-      : '<div class="ok">✅ 社員としてログインできました（サロンコードなし：正常）</div>';
+  if (entries.length === 0) {
+    dataArea.style.display = 'none';
+    showEmpty(myRole === 'staff'
+      ? 'サロン ' + (mySalon || '') + ' の応募はまだありません。'
+      : 'このコンテストへの応募はまだありません。');
     return;
   }
-  el.innerHTML = salon
-    ? '<div class="ok">✅ サロンコードを検出しました：<span style="font-size:19px">' + esc(salon) + '</span>'
-      + '<div style="font-weight:normal;font-size:13px;margin-top:6px;">クレーム名：<code>' + esc(claimNameOf(claims, salon)) + '</code></div></div>'
-    : '<div class="ng">❌ 5桁のサロンコードらしき値が見つかりませんでした。'
-      + '\n・アプリ登録の「トークン構成」で email / login_hint を追加済みかご確認ください。'
-      + '\n・サロンコードを持たないアカウントの場合は、この結果が正常です。'
-      + '\n・追加済みでも出ない場合は、下の「コピー用」の内容を共有してください。</div>';
+  emptyArea.style.display = 'none';
+  dataArea.style.display = 'block';
+
+  const complete = entries.filter(function(e) { return e.status === 'complete'; }).length;
+  const memberOnly = entries.filter(function(e) { return e.status === 'member_only'; }).length;
+  const chiefOnly = entries.filter(function(e) { return e.status === 'chief_only'; }).length;
+  document.getElementById('cntTotal').textContent = entries.length;
+  document.getElementById('cntComplete').textContent = complete;
+  document.getElementById('cntPending').textContent = memberOnly + chiefOnly;
+  document.getElementById('cntPendingSub').textContent = 'チーフ未' + memberOnly + ' / メンバー未' + chiefOnly;
+
+  document.getElementById('appGrid').innerHTML = entries.map(function(e, i) {
+    const meta = STATUS_META[e.status] || STATUS_META.single;
+    const imgs = (e.files || []).filter(function(f) { return f.kind === 'image'; });
+    const others = (e.files || []).filter(function(f) { return f.kind !== 'image'; });
+    return '<div class="app-card" onclick="openDetail(' + i + ')">'
+      + '<div class="app-head">'
+      +   '<div class="app-no">No.' + (i + 1) + '</div>'
+      +   '<div class="app-name">' + esc(nameOf(e) || '（氏名なし）') + '</div>'
+      +   (kanaOf(e) ? '<div class="app-kana">' + esc(kanaOf(e)) + '</div>' : '')
+      + '</div>'
+      + '<div class="app-body">'
+      +   row('ダイアナコード', e.memberCode || '-')
+      +   row('提出日', fmtDateTime(e.createdAt))
+      +   ((imgs.length + others.length) > 0
+            ? '<div class="thumbs">'
+              + imgs.slice(0, 3).map(function(f) { return '<img class="thumb" src="' + esc(f.url) + '" alt="" loading="lazy">'; }).join('')
+              + others.slice(0, 2).map(function(f) { return '<span class="thumb-file">' + kindIcon(f.kind) + '</span>'; }).join('')
+              + ((imgs.length + others.length) > 5 ? '<span style="font-size:11px;color:#aaa;align-self:center">+' + (imgs.length + others.length - 5) + '</span>' : '')
+              + '</div>'
+            : '')
+      + '</div>'
+      + '<div class="app-foot">'
+      +   '<span class="chip" style="background:' + meta.bg + ';border:1px solid ' + meta.bd + ';color:' + meta.color + '">' + meta.icon + ' ' + meta.label + '</span>'
+      +   (e.resubmit ? '<span class="chip" style="background:#f3e8f7;border:1px solid #d9b8e6;color:#7B4F6E">🔁 再提出</span>' : '')
+      +   '<span style="margin-left:auto">詳細 ›</span>'
+      + '</div>'
+      + '</div>';
+  }).join('');
 }
 
-function claimNameOf(claims, salon) {
-  let name = '';
-  Object.keys(claims).forEach(function(k) {
-    if (name) return;
-    const v = claims[k];
-    if (Array.isArray(v)) { v.forEach(function(i) { if (!name && findSalonCode(i) === salon) name = k; }); }
-    else if (findSalonCode(v) === salon) name = k;
-  });
-  return name || '(不明)';
+function row(k, v) {
+  return '<div class="app-row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
 }
 
-function renderClaims(claims) {
-  const rows = Object.keys(claims).sort().map(function(k) {
-    const v = claims[k];
-    const text = (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v);
-    let hit = null;
-    if (Array.isArray(v)) { v.forEach(function(i) { if (!hit) hit = findSalonCode(i); }); }
-    else { hit = findSalonCode(v); }
-    return '<tr class="' + (hit ? 'hit' : '') + '"><th>' + esc(k) + '</th><td>' + esc(text) + '</td></tr>';
-  });
-  document.getElementById('claimTable').innerHTML = rows.join('');
+// ============================================================
+// 詳細モーダル
+// ============================================================
+async function openDetail(i) {
+  detailIndex = i;
+  const e = entries[i];
+  if (!e) return;
+  document.getElementById('mName').textContent = nameOf(e) || '（氏名なし）';
+  document.getElementById('mKana').textContent = kanaOf(e) || '';
+  document.getElementById('detailModal').classList.add('show');
+  renderDetail();
+  await loadMeasure(e);
+  if (detailIndex === i) renderDetail();
 }
 
-// 社員：所属グループをGraphから取得（既存ページと同じ経路）
-async function loadGroups() {
-  const area = document.getElementById('groupArea');
+function renderDetail() {
+  const e = entries[detailIndex];
+  if (!e) return;
+  const meta = STATUS_META[e.status] || STATUS_META.single;
+  const fileQids = {};
+  (e.files || []).forEach(function(f) { fileQids[f.qid] = true; });
+
+  // 回答内容（添付ファイルの設問は除外）
+  const shortKeys = ['出場区分', '氏名', 'ふりがな', 'ダイアナコード', '生年月日', 'サロンコード', '都道府県', 'サロン名', 'チーフ名', 'サロン所在地'];
+  const list = Object.keys(e.answers || {})
+    .filter(function(k) { return !fileQids[k]; })
+    .map(function(k) {
+      const v = e.answers[k];
+      return { label: questionLabels[k] || k, value: (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v) };
+    })
+    .filter(function(a) { return a.value !== ''; });
+  const shorts = list.filter(function(a) { return shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
+  const longs  = list.filter(function(a) { return !shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
+
+  const imgs = (e.files || []).filter(function(f) { return f.kind === 'image'; });
+  const others = (e.files || []).filter(function(f) { return f.kind !== 'image'; });
+
+  let html = '';
+
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+        + '<span class="chip" style="background:' + meta.bg + ';border:1px solid ' + meta.bd + ';color:' + meta.color + '">' + meta.icon + ' ' + meta.label + '</span>'
+        + (e.resubmit ? '<span class="chip" style="background:#f3e8f7;border:1px solid #d9b8e6;color:#7B4F6E">🔁 再提出あり</span>' : '')
+        + '</div>';
+  html += '<div class="note">メンバー提出：' + esc(fmtDateTime(e.memberAt) || '未提出')
+        + '　／　チーフ提出：' + esc(fmtDateTime(e.chiefAt) || '未提出') + '</div>';
+
+  html += '<div class="sec-title">📝 応募内容</div>';
+  if (shorts.length > 0) {
+    html += '<div class="ans-grid">' + shorts.map(function(a) {
+      return '<div class="ans-item"><div class="ans-lbl">' + esc(a.label) + '</div><div class="ans-val">' + esc(a.value) + '</div></div>';
+    }).join('') + '</div>';
+  }
+  if (longs.length > 0) {
+    html += '<div style="margin-top:10px">' + longs.map(function(a) {
+      return '<div class="ans-long"><div class="ans-lbl">' + esc(a.label) + '</div><div class="ans-val">' + esc(a.value) + '</div></div>';
+    }).join('') + '</div>';
+  }
+  if (shorts.length === 0 && longs.length === 0) html += '<div class="note">回答内容がありません。</div>';
+
+  if (imgs.length > 0 || others.length > 0) {
+    html += '<div class="sec-title">📷 応募写真・添付ファイル</div>';
+    if (imgs.length > 0) {
+      html += '<div class="gallery">' + imgs.map(function(f) {
+        return '<div class="gal-item">'
+             + '<img src="' + esc(f.url) + '" alt="" loading="lazy" onclick="openLightbox(\'' + esc(f.url) + '\')">'
+             + '<div class="gal-cap">' + esc(f.label) + '</div></div>';
+      }).join('') + '</div>';
+    }
+    if (others.length > 0) {
+      html += '<div style="margin-top:10px">' + others.map(function(f) {
+        return '<div class="gal-item gal-file">' + kindIcon(f.kind)
+             + '<span style="flex:1">' + esc(f.label) + '<br><span style="font-size:11px;color:#999">' + esc(f.fileName) + '</span></span>'
+             + '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" class="btn btn-light" style="text-decoration:none">開く</a></div>';
+      }).join('') + '</div>';
+    }
+  }
+
+  html += '<div class="sec-title">📐 採寸データ</div>' + measureHtml(e);
+
+  document.getElementById('mBody').innerHTML = html;
+}
+
+// ============================================================
+// 採寸データ（PostgreSQL照合）
+// ============================================================
+async function loadMeasure(e) {
+  if (!e.memberCode) { measureCache[e.id] = { error: 'nokey' }; return; }
+  if (measureCache[e.id] !== undefined) return;
+  measureCache[e.id] = { loading: true };
   try {
-    const tok = await msalInstance.acquireTokenSilent({
-      scopes: ['User.Read', 'GroupMember.Read.All'],
-      account: msalInstance.getActiveAccount()
+    const controller = new AbortController();
+    const timer = setTimeout(function() { controller.abort(); }, 120000); // 初回起動が遅いため長め
+    const res = await fetch(BASE_URL + '/api/diana-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken || '' },
+      body: JSON.stringify({ salon_code: e.salonCode, dia_cd: e.memberCode }),
+      signal: controller.signal
     });
-    const res = await fetch('https://graph.microsoft.com/v1.0/me/memberOf?$select=id,displayName', {
-      headers: { Authorization: 'Bearer ' + tok.accessToken }
-    });
-    if (!res.ok) { area.textContent = 'グループ取得に失敗しました（HTTP ' + res.status + '）'; return; }
-    const data = await res.json();
-    const rows = (data.value || []).map(function(g) {
-      return '<tr><th>' + esc(g.displayName || '(名称なし)') + '</th><td>' + esc(g.id) + '</td></tr>';
-    });
-    area.innerHTML = rows.length ? '<table>' + rows.join('') + '</table>' : '所属グループがありません。';
-  } catch (e) {
-    area.textContent = 'グループ取得エラー: ' + (e && e.message ? e.message : String(e));
+    clearTimeout(timer);
+    if (res.ok) measureCache[e.id] = { data: await res.json() };
+    else if (res.status === 404) measureCache[e.id] = { error: 'notfound' };
+    else measureCache[e.id] = { error: 'http' + res.status };
+  } catch (err) {
+    measureCache[e.id] = { error: 'timeout' };
   }
 }
 
+function measureHtml(e) {
+  const c = measureCache[e.id];
+  if (!c) return '<div class="note">読み込み中...</div>';
+  if (c.loading) return '<div class="note"><span class="spinner spinner-sm"></span> 採寸データを照合しています（初回は時間がかかります）...</div>';
+  if (c.error === 'nokey') return '<div class="warn">ダイアナコードが未入力のため、採寸データを照合できません。</div>';
+  if (c.error === 'notfound') return '<div class="warn">ダイアナコードとサロンコードに一致する会員データが見つかりませんでした。入力内容をご確認ください。</div>';
+  if (c.error) return '<div class="warn">採寸データを取得できませんでした（' + esc(c.error) + '）。時間をおいて「更新」をお試しください。</div>';
+
+  const m = c.data || {};
+  let html = '<div class="ans-grid" style="margin-bottom:14px">'
+    + block('生年月日', m.b_day ? fmtDate(m.b_day) : null)
+    + block('年齢', m.age != null ? m.age + '歳' : null)
+    + block('性別', m.gender)
+    + block('ダイアナ歴', m.diana_years != null ? m.diana_years + '年' : null)
+    + block('サロン名', m.salon_name)
+    + block('身長', (m.first_height || m.latest_height) ? (m.first_height || m.latest_height) + 'cm' : null)
+    + block('ボディチェック回数', m.total_body_check != null ? m.total_body_check + '回' : null)
+    + block('最終BC日', m.last_body_check_date ? fmtDate(m.last_body_check_date) : null)
+    + block('GP倶楽部', m.gp_club_type == null ? null : (String(m.gp_club_type) === '001' ? 'あり' : 'なし'))
+    + '</div>';
+
+  if (!m.first_check_date) {
+    html += '<div class="warn">ボディチェックの採寸データが登録されていません。</div>';
+    return html;
+  }
+
+  html += '<div style="overflow-x:auto"><table class="m"><thead><tr>'
+    + '<th style="text-align:left">項目</th><th>理想値</th>'
+    + '<th>初回<br><span style="font-size:11px;font-weight:normal">' + esc(fmtDate(m.first_check_date)) + '</span></th>'
+    + '<th>現在<br><span style="font-size:11px;font-weight:normal">' + esc(fmtDate(m.latest_check_date)) + '</span></th>'
+    + '<th>理想値との差</th></tr></thead><tbody>'
+    + measureRows(m)
+    + '</tbody></table></div>'
+    + '<div class="note" style="margin-top:8px">＊印は審査対象項目です。</div>';
+  return html;
+}
+
+function measureRows(m) {
+  const rows = [];
+  rows.push(mrow('身長', 'cm', null, m.first_height, m.latest_height, false));
+  if (m.gender === '男性') {
+    rows.push(mrow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
+    rows.push(mrow('肩周囲', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, true));
+    rows.push(mrow('胸囲', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, true));
+    rows.push(mrow('腹囲', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, true));
+    rows.push(mrow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
+    rows.push(mrow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
+    rows.push(mrow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
+    rows.push(mrow('ふくらはぎ左', 'cm', null, m.first_calf_l, m.latest_calf_l, false));
+    rows.push(mrow('ふくらはぎ右', 'cm', null, m.first_calf_r, m.latest_calf_r, false));
+    rows.push(mrow('アーム左', 'cm', null, m.first_arm_l, m.latest_arm_l, false));
+    rows.push(mrow('アーム右', 'cm', null, m.first_arm_r, m.latest_arm_r, false));
+    rows.push(mrow('体脂肪率', '%', null, m.first_fat, m.latest_fat, true));
+    rows.push(mrow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
+  } else {
+    rows.push(mrow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
+    rows.push(mrow('トップバスト', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, true));
+    rows.push(mrow('アンダーバスト', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, true));
+    rows.push(mrow('ウエスト', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, true));
+    rows.push(mrow('ミドルヒップ', 'cm', m.ideal_mid_hip, m.first_mid_hip, m.latest_mid_hip, true));
+    rows.push(mrow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
+    rows.push(mrow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
+    rows.push(mrow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
+    rows.push(mrow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, true));
+    rows.push(mrow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, true));
+    rows.push(mrow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, true));
+    rows.push(mrow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, true));
+    rows.push(mrow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, false));
+    rows.push(mrow('PI', '', null, m.first_pi, m.latest_pi, false));
+    rows.push(mrow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
+  }
+  return rows.join('');
+}
+
+function mrow(label, unit, ideal, first, latest, required) {
+  const fmt = function(v) {
+    return (v != null && v !== '')
+      ? '<strong>' + esc(String(v)) + '</strong><span style="font-size:11px;color:#888">' + unit + '</span>'
+      : '<span style="color:#ccc">-</span>';
+  };
+  let diff = '<span style="color:#ccc">-</span>';
+  if (latest != null && latest !== '' && ideal != null && ideal !== '') {
+    const d = Math.round((parseFloat(latest) - parseFloat(ideal)) * 10) / 10;
+    const color = d < 0 ? '#27ae60' : d > 0 ? '#e74c3c' : '#888';
+    diff = '<span style="color:' + color + ';font-weight:bold">' + (d > 0 ? '+' : '') + d + '<span style="font-size:11px">' + unit + '</span></span>';
+  }
+  const lab = required ? esc(label) + '<span style="color:#e53935;font-weight:bold"> ＊</span>' : esc(label);
+  return '<tr style="border-bottom:1px solid #f5f0f3">'
+    + '<td style="padding:8px 10px;color:#555;white-space:nowrap">' + lab + '</td>'
+    + '<td style="padding:8px 10px;text-align:center;background:#fdf8fb">' + fmt(ideal) + '</td>'
+    + '<td style="padding:8px 10px;text-align:center;background:#f8fffe">' + fmt(first) + '</td>'
+    + '<td style="padding:8px 10px;text-align:center;background:#f0f8ff">' + fmt(latest) + '</td>'
+    + '<td style="padding:8px 10px;text-align:center;background:#fffdf0">' + diff + '</td></tr>';
+}
+
+function block(label, val) {
+  return '<div class="ans-item"><div class="ans-lbl">' + esc(label) + '</div><div class="ans-val">'
+    + (val != null && val !== '' ? esc(String(val)) : '<span style="color:#ccc">-</span>') + '</div></div>';
+}
+
 // ============================================================
-// UI ヘルパー
+// ヘルパー
 // ============================================================
+function answerByKeywords(e, keywords) {
+  const answers = e.answers || {};
+  for (const kw of keywords) {
+    for (const k of Object.keys(answers)) {
+      const label = questionLabels[k] || k;
+      if (label.indexOf(kw) >= 0) {
+        const v = answers[k];
+        const s = (typeof v === 'object' && v !== null) ? (v.value || '') : String(v == null ? '' : v);
+        if (s) return s;
+      }
+    }
+  }
+  return '';
+}
+function nameOf(e) { return answerByKeywords(e, ['応募者氏名', '氏名', 'お名前', '名前']); }
+function kanaOf(e) { return answerByKeywords(e, ['ふりがな', 'フリガナ', 'カナ']); }
+
+function kindIcon(kind) {
+  return kind === 'pdf' ? '📕' : kind === 'excel' ? '📊' : kind === 'word' ? '📄' : kind === 'image' ? '🖼️' : '📎';
+}
+function fmtDate(v) {
+  if (!v) return '';
+  const m = String(v).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) return m[1] + '/' + ('0' + m[2]).slice(-2) + '/' + ('0' + m[3]).slice(-2);
+  const d = new Date(v);
+  return isNaN(d) ? String(v) : d.toLocaleDateString('ja-JP');
+}
+function fmtDateTime(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return isNaN(d) ? String(v) : d.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function closeModal() { document.getElementById('detailModal').classList.remove('show'); detailIndex = -1; }
+function onOverlayClick(ev) { if (ev.target === document.getElementById('detailModal')) closeModal(); }
+function openLightbox(url) { document.getElementById('lightboxImg').src = url; document.getElementById('lightbox').classList.add('show'); }
+function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+document.addEventListener('keydown', function(ev) {
+  if (ev.key !== 'Escape') return;
+  if (document.getElementById('lightbox').classList.contains('show')) closeLightbox();
+  else closeModal();
+});
+
 function toggleStaff() {
   const area = document.getElementById('staffArea');
   const btn = document.getElementById('staffToggleBtn');
-  const on = area.classList.toggle('show');
-  btn.textContent = on ? '社員の方はこちら ▴' : '社員の方はこちら ▾';
+  btn.textContent = area.classList.toggle('show') ? '社員の方はこちら ▴' : '社員の方はこちら ▾';
 }
-function showLoading()      { document.getElementById('loadingScreen').style.display = 'flex'; }
-function setLoadingText(t)  { document.getElementById('loadingText').textContent = t; }
-function showLogin()        { document.getElementById('loadingScreen').style.display = 'none';
-                              document.getElementById('loginScreen').classList.add('show'); }
-function showLoginError(m)  { const el = document.getElementById('loginError'); el.textContent = m; el.style.display = 'block'; }
-function esc(str) {
-  if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+function showLoading()     { document.getElementById('loadingScreen').style.display = 'flex'; }
+function setLoadingText(t) { document.getElementById('loadingText').textContent = t; }
+function showLogin() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('mainScreen').classList.remove('show');
+  document.getElementById('loginScreen').classList.add('show');
+}
+function showLoginError(m) { const el = document.getElementById('loginError'); el.textContent = m; el.style.display = 'block'; }
+function showError(m) {
+  const el = document.getElementById('errBanner');
+  el.textContent = m;
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, 10000);
+}
+function showEmpty(msg) {
+  document.getElementById('dataArea').style.display = 'none';
+  const a = document.getElementById('emptyArea');
+  a.style.display = 'block';
+  document.getElementById('emptyMsg').textContent = msg;
 }
 
 init();
