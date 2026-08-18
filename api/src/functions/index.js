@@ -180,20 +180,47 @@ async function issueToken(tenant) {
     return token;
 }
 
-async function verifyToken(token) {
-    if (!token) return false;
+// ロール付きトークンの発行（チーフ／社員用）
+// role: 'chief' | 'staff'、salonCode: チーフの場合のみ
+async function issueScopedToken(meta) {
+    const container = await getContainer();
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(); // 8時間
+    await container.items.upsert(Object.assign({
+        id: 'token_' + token,
+        docType: 'auth_token',
+        tenant: 'auth_token',
+        token,
+        expiresAt
+    }, meta || {}));
+    return token;
+}
+
+// トークンドキュメントを取得（期限切れは削除して null）
+async function getTokenDoc(token) {
+    if (!token) return null;
     try {
         const container = await getContainer();
         const { resource } = await container.item('token_' + token, 'auth_token').read();
-        if (!resource) return false;
+        if (!resource) return null;
         if (new Date(resource.expiresAt) < new Date()) {
             await container.item('token_' + token, 'auth_token').delete().catch(() => {});
-            return false;
+            return null;
         }
-        return true;
+        return resource;
     } catch (e) {
-        return false;
+        return null;
     }
+}
+
+// 既定は管理者ロールのみ許可。role未設定の既存トークンは admin 扱い（後方互換）。
+// これによりチーフ／社員トークンでは既存の管理系APIを一切呼べない。
+async function verifyToken(token, allowedRoles) {
+    const doc = await getTokenDoc(token);
+    if (!doc) return false;
+    const roles = allowedRoles || ['admin'];
+    const role = doc.role || 'admin';
+    return roles.indexOf(role) >= 0;
 }
 
 // ----------------------------------------------------
@@ -1712,6 +1739,422 @@ app.http('msalauth', {
         }
     }
 });
+// ====================================================
+// 👑 【チーフ用コンテスト閲覧】認証・データ取得
+// ====================================================
+
+// --- 認証に関わる定数（Entra 側の設定と一致させる）---
+const CHIEF_TENANT_ID  = 'ac36e29b-c866-49d3-9391-510bb3e88891'; // DIANA-SALON（外部IDテナント）
+const CHIEF_CLIENT_ID  = '5503ac94-f3bf-42fa-8074-27557ca61ae1'; // DstyleSurvey-Chief-SPA
+const DSH_TENANT_ID    = '2648ac1f-8786-40fb-80f8-14bd84511449'; // DSHグループ
+const DSH_CLIENT_ID    = '1f4f2ade-4eeb-4f65-8fbd-394378a63518'; // dstyle-survey
+const STAFF_GROUP_ID   = '6e4af16e-cfe1-49a6-968e-05b8cef847d8'; // ディライトテクノロジーズ事業部
+const CHIEF_TENANT_KEY = 'diana';                                // 対象テナント（アンケート側）
+
+// チーフ用トークンの発行元（サブドメインはGUID形式・ドメイン名形式の両方を許容）
+const CHIEF_METADATA_URL = `https://${CHIEF_TENANT_ID}.ciamlogin.com/${CHIEF_TENANT_ID}/v2.0/.well-known/openid-configuration`;
+const CHIEF_ISSUERS = [
+    `https://${CHIEF_TENANT_ID}.ciamlogin.com/${CHIEF_TENANT_ID}/v2.0`,
+    `https://login.microsoftonline.com/${CHIEF_TENANT_ID}/v2.0`
+];
+const DSH_METADATA_URL = `https://login.microsoftonline.com/${DSH_TENANT_ID}/v2.0/.well-known/openid-configuration`;
+const DSH_ISSUERS = [
+    `https://login.microsoftonline.com/${DSH_TENANT_ID}/v2.0`,
+    `https://sts.windows.net/${DSH_TENANT_ID}/`
+];
+
+// ----------------------------------------------------
+// 🔏 IDトークンの署名検証（JWKSを取得してRS256で検証）
+// ----------------------------------------------------
+const jwksCache = {}; // { metadataUrl: { keys, fetchedAt } }
+
+async function getJwks(metadataUrl, forceRefresh) {
+    const cached = jwksCache[metadataUrl];
+    if (!forceRefresh && cached && (Date.now() - cached.fetchedAt) < 6 * 60 * 60 * 1000) {
+        return cached.keys;
+    }
+    const metaRes = await fetch(metadataUrl);
+    if (!metaRes.ok) throw new Error('OIDCメタデータの取得に失敗しました');
+    const meta = await metaRes.json();
+    if (!meta.jwks_uri) throw new Error('jwks_uri が取得できません');
+    const jwksRes = await fetch(meta.jwks_uri);
+    if (!jwksRes.ok) throw new Error('JWKSの取得に失敗しました');
+    const jwks = await jwksRes.json();
+    jwksCache[metadataUrl] = { keys: jwks.keys || [], fetchedAt: Date.now() };
+    return jwksCache[metadataUrl].keys;
+}
+
+async function verifyIdToken(idToken, metadataUrl, allowedIssuers, expectedAudience) {
+    const parts = String(idToken || '').split('.');
+    if (parts.length !== 3) throw new Error('トークンの形式が不正です');
+
+    const header  = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    if (header.alg !== 'RS256') throw new Error('署名アルゴリズムが不正です');
+
+    let keys = await getJwks(metadataUrl);
+    let jwk = keys.find(k => k.kid === header.kid);
+    if (!jwk) {
+        // 鍵のローテーション直後を考慮して再取得
+        keys = await getJwks(metadataUrl, true);
+        jwk = keys.find(k => k.kid === header.kid);
+    }
+    if (!jwk) throw new Error('署名鍵が見つかりません');
+
+    const publicKey = crypto.createPublicKey({ key: { kty: 'RSA', n: jwk.n, e: jwk.e }, format: 'jwk' });
+    const verified = crypto.createVerify('RSA-SHA256')
+        .update(parts[0] + '.' + parts[1])
+        .verify(publicKey, Buffer.from(parts[2], 'base64url'));
+    if (!verified) throw new Error('署名の検証に失敗しました');
+
+    if (allowedIssuers.indexOf(payload.iss) < 0) throw new Error('トークンの発行元が不正です');
+    if (payload.aud !== expectedAudience) throw new Error('トークンの対象アプリが不正です');
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload.exp || payload.exp <= now) throw new Error('トークンの有効期限が切れています');
+    if (payload.nbf && payload.nbf > now + 300) throw new Error('トークンの有効開始前です');
+
+    return payload;
+}
+
+// ----------------------------------------------------
+// 🔤 コンテスト回答のマージ（閲覧ページと同じロジック）
+// ----------------------------------------------------
+const KEY_SALON_LABELS       = ['サロンコード'];
+const KEY_DIANA_LABELS       = ['応募者 ダイアナコード', 'ダイアナコード'];
+const KEY_DIANA_LABELS_CHIEF = ['メンバーのダイアナコード', 'メンバー ダイアナコード', '応募者 ダイアナコード', 'ダイアナコード'];
+
+// 全角→半角、空白・ハイフン・アンダースコアを除去して大文字化（先頭の0は保持）
+function normalizeCode(v) {
+    if (v == null) return '';
+    return String(v)
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/[\s\-\u2010\u2011\u2012\u2013\u2014\uFF0D_]/g, '')
+        .trim()
+        .toUpperCase();
+}
+
+function isSalonCode(v) {
+    return /^\d{5}$/.test(String(v == null ? '' : v).trim());
+}
+
+// keywords は優先度順に探す
+function pickAnswer(answers, labelMap, keywords) {
+    for (const kw of keywords) {
+        for (const [k, v] of Object.entries(answers || {})) {
+            const label = labelMap[k] || k;
+            if (label.includes(kw) || k.includes(kw)) {
+                return (typeof v === 'object' && v !== null) ? (v.value || '') : String(v == null ? '' : v);
+            }
+        }
+    }
+    return '';
+}
+
+function surveyRole(s) { return s.contestRole === 'chief' ? 'chief' : 'member'; }
+function surveyGroupId(s) { return s.contestGroupId || ('single_' + s.id); }
+
+// parts: [{ survey, role, labelMap, responses }]
+function mergeContestResponses(parts) {
+    const multi = parts.length > 1;
+    const map = new Map();
+    const unkeyed = [];
+
+    parts.forEach(p => {
+        (p.responses || []).forEach(r => {
+            const salon = pickAnswer(r.answers, p.labelMap, KEY_SALON_LABELS);
+            const diana = pickAnswer(r.answers, p.labelMap, p.role === 'chief' ? KEY_DIANA_LABELS_CHIEF : KEY_DIANA_LABELS);
+            const ns = normalizeCode(salon), nd = normalizeCode(diana);
+            if (!multi || !ns || !nd) { unkeyed.push({ r, role: p.role, salon: ns, diana: nd }); return; }
+            const key = ns + '|' + nd;
+            if (!map.has(key)) map.set(key, { key, salonCode: ns, memberCode: nd, member: [], chief: [] });
+            map.get(key)[p.role].push(r);
+        });
+    });
+
+    const byNewest = (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+
+    const entries = [...map.values()].map(g => {
+        g.member.sort(byNewest);
+        g.chief.sort(byNewest);
+        const m = g.member[0] || null;
+        const c = g.chief[0] || null;
+        return {
+            id: 'merged_' + g.key,
+            key: g.key,
+            salonCode: g.salonCode,
+            memberCode: g.memberCode,
+            status: (m && c) ? 'complete' : (m ? 'member_only' : 'chief_only'),
+            createdAt: (m && m.createdAt) || (c && c.createdAt) || null,
+            memberAt: m ? m.createdAt : null,
+            chiefAt: c ? c.createdAt : null,
+            resubmit: Math.max(0, g.member.length - 1) + Math.max(0, g.chief.length - 1),
+            answers: Object.assign({}, m ? m.answers : {}, c ? c.answers : {})
+        };
+    });
+
+    unkeyed.forEach(u => {
+        entries.push({
+            id: u.r.id,
+            key: null,
+            salonCode: u.salon || '',
+            memberCode: u.diana || '',
+            status: multi ? 'unkeyed' : 'single',
+            createdAt: u.r.createdAt || null,
+            memberAt: u.role === 'member' ? (u.r.createdAt || null) : null,
+            chiefAt:  u.role === 'chief'  ? (u.r.createdAt || null) : null,
+            resubmit: 0,
+            answers: u.r.answers || {}
+        });
+    });
+
+    entries.sort(byNewest);
+    return entries;
+}
+
+// ----------------------------------------------------
+// 🔐 【チーフ用認証】チーフ／社員のIDトークンを検証してロール付きトークンを発行
+// POST /api/chiefauth
+// body: { mode: 'chief' | 'staff', idToken, accessToken }
+// ----------------------------------------------------
+app.http('chiefauth', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        const writeLog = async (result, meta) => {
+            try {
+                const container = await getContainer();
+                await container.items.create(Object.assign({
+                    id: crypto.randomUUID(),
+                    docType: 'access_log',
+                    tenant: CHIEF_TENANT_KEY,
+                    app: 'chief-contest',
+                    result,
+                    ip,
+                    createdAt: new Date().toISOString()
+                }, meta || {})).catch(() => {});
+            } catch (e) {}
+        };
+
+        try {
+            const body = await request.json().catch(() => ({}));
+            const { mode, idToken, accessToken } = body;
+            if (!idToken || (mode !== 'chief' && mode !== 'staff')) {
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'mode と idToken は必須です' } };
+            }
+
+            // ---- チーフ（DIANA-SALONテナント）----
+            if (mode === 'chief') {
+                let payload;
+                try {
+                    payload = await verifyIdToken(idToken, CHIEF_METADATA_URL, CHIEF_ISSUERS, CHIEF_CLIENT_ID);
+                } catch (e) {
+                    await writeLog('failure', { userName: 'unknown（検証失敗）', userEmail: 'unknown', error: e.message });
+                    return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: 'トークンの検証に失敗しました' } };
+                }
+
+                // サロンコードは preferred_username（5桁・先頭0を保持）から取得する
+                const salonCode = String(payload.preferred_username || '').trim();
+                if (!isSalonCode(salonCode)) {
+                    await writeLog('forbidden', {
+                        userName: payload.name || 'unknown',
+                        userEmail: payload.preferred_username || 'unknown',
+                        error: 'サロンコードを持たないアカウント'
+                    });
+                    return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'このアカウントにはサロンコードが設定されていません。管理者にお問い合わせください。' } };
+                }
+
+                const token = await issueScopedToken({
+                    role: 'chief',
+                    salonCode,
+                    userName: payload.name || salonCode,
+                    userEmail: payload.preferred_username || ''
+                });
+                await writeLog('success', { userName: payload.name || salonCode, userEmail: payload.preferred_username || '', salonCode, role: 'chief' });
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: { token, role: 'chief', salonCode, userName: payload.name || salonCode } };
+            }
+
+            // ---- 社員（DSHテナント）----
+            let payload;
+            try {
+                payload = await verifyIdToken(idToken, DSH_METADATA_URL, DSH_ISSUERS, DSH_CLIENT_ID);
+            } catch (e) {
+                await writeLog('failure', { userName: 'unknown（検証失敗）', userEmail: 'unknown', error: e.message });
+                return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: 'トークンの検証に失敗しました' } };
+            }
+
+            const userName  = payload.name || payload.preferred_username || 'unknown';
+            const userEmail = payload.preferred_username || payload.upn || 'unknown';
+
+            // M365グループ（ディライトテクノロジーズ事業部）に所属していることを必須とする
+            let userGroups = [];
+            if (accessToken) {
+                try {
+                    const graphRes = await fetch('https://graph.microsoft.com/v1.0/me/memberOf?$select=id', {
+                        headers: { Authorization: 'Bearer ' + accessToken }
+                    });
+                    if (graphRes.ok) {
+                        const graphData = await graphRes.json();
+                        userGroups = (graphData.value || []).map(g => g.id);
+                    }
+                } catch (e) { context.log('[chiefauth] Graph error: ' + e.message); }
+            }
+            if (userGroups.indexOf(STAFF_GROUP_ID) < 0) {
+                await writeLog('forbidden', { userName, userEmail, error: 'グループ未所属' });
+                return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'この画面へのアクセス権限がありません' } };
+            }
+
+            const token = await issueScopedToken({ role: 'staff', userName, userEmail });
+            await writeLog('success', { userName, userEmail, role: 'staff' });
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: { token, role: 'staff', userName } };
+
+        } catch (e) {
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 📋 【チーフ用コンテスト取得】自サロン分のみ返す
+// GET /api/contest-entries              → コンテスト一覧
+// GET /api/contest-entries?groupId=xxx  → 応募一覧（マージ済み）
+//   社員のみ &salon=12345 でサロンを指定できる
+//   ※チーフのサロンコードは必ずトークンから取得し、クエリからは受け取らない
+// ----------------------------------------------------
+app.http('contestEntries', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'contest-entries',
+    handler: async (request, context) => {
+        try {
+            const tokenDoc = await getTokenDoc(request.headers.get('x-admin-token'));
+            if (!tokenDoc) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
+
+            const role = tokenDoc.role;
+            if (role !== 'chief' && role !== 'staff') {
+                return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'この操作は許可されていません' } };
+            }
+
+            const url = new URL(request.url);
+            const groupId = url.searchParams.get('groupId');
+
+            // ---- 対象サロンの決定（チーフはトークン固定）----
+            let salonCode;
+            if (role === 'chief') {
+                salonCode = String(tokenDoc.salonCode || '');
+                if (!isSalonCode(salonCode)) {
+                    return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'サロンコードが取得できません' } };
+                }
+            } else {
+                salonCode = String(url.searchParams.get('salon') || '').trim();
+                if (groupId && !isSalonCode(salonCode)) {
+                    return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'サロンコード（5桁）を指定してください' } };
+                }
+            }
+
+            const container = await getContainer();
+
+            // ---- コンテスト対象アンケートを取得 ----
+            const { resources: surveys } = await container.items.query({
+                query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true",
+                parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }]
+            }).fetchAll();
+
+            // グループ単位にまとめる
+            const groupMap = new Map();
+            surveys.forEach(s => {
+                const gid = surveyGroupId(s);
+                if (!groupMap.has(gid)) {
+                    groupMap.set(gid, { groupId: gid, title: s.contestGroupTitle || s.title, createdAt: s.createdAt, surveys: [] });
+                }
+                const g = groupMap.get(gid);
+                if (s.contestGroupTitle) g.title = s.contestGroupTitle;
+                if (new Date(s.createdAt) > new Date(g.createdAt)) g.createdAt = s.createdAt;
+                g.surveys.push(s);
+            });
+            const groups = [...groupMap.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            const contests = groups.map(g => ({
+                groupId: g.groupId,
+                title: g.title,
+                roles: g.surveys.map(surveyRole),
+                active: g.surveys.some(s => s.active !== false)
+            }));
+
+            // ---- 一覧のみの要求 ----
+            if (!groupId) {
+                return secureJson({
+                    role,
+                    salonCode: role === 'chief' ? salonCode : null,
+                    userName: tokenDoc.userName || '',
+                    contests
+                });
+            }
+
+            const group = groups.find(g => g.groupId === groupId);
+            if (!group) return { status: 404, headers: SECURITY_HEADERS, jsonBody: { error: '指定のコンテストが見つかりません' } };
+
+            // ---- 回答を取得してマージ ----
+            const parts = [];
+            for (const s of group.surveys) {
+                const { resources: responses } = await container.items.query({
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' ORDER BY c.createdAt DESC",
+                    parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }, { name: "@surveyId", value: s.id }]
+                }).fetchAll();
+                const labelMap = {};
+                (s.questions || []).forEach(q => { if (q.id && q.label) labelMap[q.id] = q.label; });
+                parts.push({ survey: s, role: surveyRole(s), labelMap, responses: responses || [] });
+            }
+
+            // 質問ラベル（複数アンケートの場合、チーフ側は【チーフ】を接頭）
+            const questionLabels = {};
+            parts.forEach(p => {
+                Object.entries(p.labelMap).forEach(([qid, label]) => {
+                    questionLabels[qid] = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
+                });
+            });
+
+            const all = mergeContestResponses(parts);
+
+            // ---- サロンで絞り込み（ここが情報分離の要）----
+            const target = normalizeCode(salonCode);
+            const entries = all.filter(e => normalizeCode(e.salonCode) === target);
+
+            // 誰がどのサロンを閲覧したかを記録
+            await container.items.create({
+                id: crypto.randomUUID(),
+                docType: 'access_log',
+                tenant: CHIEF_TENANT_KEY,
+                app: 'chief-contest',
+                result: 'view',
+                role,
+                salonCode,
+                groupId,
+                count: entries.length,
+                ip: request.headers.get('x-forwarded-for') || 'unknown',
+                userName: tokenDoc.userName || '',
+                userEmail: tokenDoc.userEmail || '',
+                createdAt: new Date().toISOString()
+            }).catch(() => {});
+
+            return secureJson({
+                role,
+                salonCode,
+                userName: tokenDoc.userName || '',
+                groupId,
+                groupTitle: group.title,
+                contests,
+                questionLabels,
+                entries
+            });
+
+        } catch (e) {
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
+        }
+    }
+});
+
 // ----------------------------------------------------
 // 📁 【ファイルアップロード】回答者向け SAS URL 発行
 // POST /api/fileupload
