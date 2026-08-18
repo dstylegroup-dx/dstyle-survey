@@ -55,6 +55,12 @@ input[type="number"]::-webkit-inner-spin-button,
     .image-choice-item img { width: 100%; max-height: 90px; object-fit: contain; border-radius: 6px; margin-bottom: 6px; }
     .image-choice-item span { font-size: 13px; color: #333; display: block; }
     .question-image { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin: 8px 0 12px; border: 1px solid #eee; }
+    .question-hint {
+      white-space: pre-wrap; word-break: break-word;
+      background: #f7f9fb; border: 1px solid #e3e9ee; border-left: 3px solid #b9c7d3;
+      border-radius: 6px; padding: 10px 12px; margin: 4px 0 10px;
+      font-size: 13px; line-height: 1.8; color: #555;
+    }
     .privacy-notice { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin: 16px 0 12px; font-size: 13px; color: #666; line-height: 1.7; }
     .privacy-notice a { color: #2980B9; text-decoration: underline; }
     .privacy-notice a:hover { opacity: 0.8; }
@@ -317,6 +323,12 @@ input[type="number"]::-webkit-inner-spin-button,
         showIfAttr = ' data-showif-qid="' + esc(q.showIf.questionId) + '" data-showif-val="' + esc(q.showIf.value) + '" data-hidden="true"';
         initialHidden = true;
       }
+      // 記入例：改行を含む場合はヒントブロックとして表示し、placeholder には出さない
+      // （placeholder 属性は改行が潰れて読めなくなるため）
+      var hintText = '';
+      var phValue = q.placeholder || '';
+      if (phValue.indexOf('\n') >= 0) { hintText = phValue; phValue = ''; }
+
       html += '<div class="section" id="section_' + q.id + '"' + showIfAttr + '>';
       html += '<div class="section-label" style="color:' + color + '">';
       html += '<span class="num" style="background:' + color + '">' + (i + 1) + '</span>';
@@ -324,19 +336,20 @@ input[type="number"]::-webkit-inner-spin-button,
       if (q.required) html += '<span class="required">※必須</span>';
       html += '</div>';
       if (q.imageBase64) html += '<img src="' + q.imageBase64 + '" class="question-image" alt="質問画像">';
+      if (hintText) html += '<div class="question-hint">' + esc(hintText) + '</div>';
       if (q.type === 'text') {
-        html += '<input type="text" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '">';
+        html += '<input type="text" id="q_' + esc(q.id) + '" placeholder="' + esc(phValue) + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'tel') {
-        html += '<input type="tel" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '例）090-1234-5678') + '" pattern="[0-9\-+()\s]*">';
+        html += '<input type="tel" id="q_' + esc(q.id) + '" placeholder="' + esc(phValue || '例）090-1234-5678') + '" pattern="[0-9\-+()\s]*">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'email') {
-        html += '<input type="email" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '例）example@email.com') + '">';
+        html += '<input type="email" id="q_' + esc(q.id) + '" placeholder="' + esc(phValue || '例）example@email.com') + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'number') {
         var minAttr = (q.min !== undefined && q.min !== null && q.min !== '') ? ' data-min="' + q.min + '"' : '';
         var maxAttr = (q.max !== undefined && q.max !== null && q.max !== '') ? ' data-max="' + q.max + '"' : '';
-        html += '<input type="text" inputmode="numeric" pattern="[0-9]*" id="q_' + esc(q.id) + '" placeholder="' + esc(q.placeholder || '') + '"' + minAttr + maxAttr + '>';
+        html += '<input type="text" inputmode="numeric" pattern="[0-9]*" id="q_' + esc(q.id) + '" placeholder="' + esc(phValue) + '"' + minAttr + maxAttr + '>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'date') {
         html += '<input type="date" id="q_' + esc(q.id) + '">';
@@ -364,7 +377,7 @@ input[type="number"]::-webkit-inner-spin-button,
         html += '<div class="star-selected-label" id="starLabel_' + esc(q.id) + '"></div>';
         if (q.required) html += '<div class="field-error-msg">評価を選択してください</div>';
       } else if (q.type === 'textarea') {
-        html += '<textarea id="q_' + q.id + '" placeholder="' + (q.placeholder || '') + '"></textarea>';
+        html += '<textarea id="q_' + q.id + '" placeholder="' + esc(phValue) + '"></textarea>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'select') {
         html += '<select id="q_' + q.id + '"><option value="">選択してください</option>';
