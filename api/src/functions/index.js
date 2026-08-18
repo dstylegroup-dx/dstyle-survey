@@ -1913,6 +1913,61 @@ function mergeContestResponses(parts) {
 }
 
 // ----------------------------------------------------
+// 📎 添付ファイル（回答内のBlobパス）→ 読み取りSAS URL
+// ※サロンで絞り込んだ後の回答に対してのみ発行する（他サロンのURLは作らない）
+// ----------------------------------------------------
+function isBlobPathValue(v) {
+    if (typeof v !== 'string' || !v) return false;
+    if (v.startsWith('https://')) return v.indexOf('.blob.core.windows.net/') > 0;
+    return /^(diana|herbelle|dstylehd)\//.test(v);
+}
+
+function fileKindOf(name) {
+    const n = String(name || '').toLowerCase().split('?')[0];
+    if (/\.(png|jpe?g|gif|webp|bmp)$/.test(n)) return 'image';
+    if (/\.pdf$/.test(n)) return 'pdf';
+    if (/\.(xlsx?|csv)$/.test(n)) return 'excel';
+    if (/\.(docx?)$/.test(n)) return 'word';
+    return 'file';
+}
+
+function buildFileList(answers, labels) {
+    const files = [];
+    const push = (qid, blobName, nameHint) => {
+        if (!blobName) return;
+        let url = null;
+        try { url = generateSasUrl(blobName, 'r', 120); } catch (e) { url = null; }
+        if (!url) return;
+        const fileName = String(nameHint || blobName).split('?')[0].split('/').pop();
+        files.push({
+            qid,
+            label: (labels && labels[qid]) || qid,
+            blobName,
+            fileName,
+            url,
+            kind: fileKindOf(fileName)
+        });
+    };
+    // フルURLで保存されている場合はコンテナ名以降をBlob名として取り出す
+    const toBlobName = (v) => {
+        if (!v.startsWith('https://')) return v;
+        const m = v.match(/^https:\/\/[^/]+\.blob\.core\.windows\.net\/[^/]+\/(.+?)(\?|$)/);
+        return m ? decodeURIComponent(m[1]) : null;
+    };
+    Object.entries(answers || {}).forEach(([qid, v]) => {
+        const vals = Array.isArray(v) ? v : [v];
+        vals.forEach(item => {
+            if (typeof item === 'string' && isBlobPathValue(item)) {
+                push(qid, toBlobName(item), item);
+            } else if (item && typeof item === 'object' && item.blobName) {
+                push(qid, item.blobName, item.name || item.blobName);
+            }
+        });
+    });
+    return files;
+}
+
+// ----------------------------------------------------
 // 🔐 【チーフ用認証】チーフ／社員のIDトークンを検証してロール付きトークンを発行
 // POST /api/chiefauth
 // body: { mode: 'chief' | 'staff', idToken, accessToken }
@@ -2119,7 +2174,9 @@ app.http('contestEntries', {
 
             // ---- サロンで絞り込み（ここが情報分離の要）----
             const target = normalizeCode(salonCode);
-            const entries = all.filter(e => normalizeCode(e.salonCode) === target);
+            const entries = all
+                .filter(e => normalizeCode(e.salonCode) === target)
+                .map(e => Object.assign({}, e, { files: buildFileList(e.answers, questionLabels) }));
 
             // 誰がどのサロンを閲覧したかを記録
             await container.items.create({
@@ -2346,14 +2403,26 @@ app.http('diana-member', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
-            const token = request.headers.get('x-admin-token');
-            if (!await verifyToken(token)) {
+            const tokenDoc = await getTokenDoc(request.headers.get('x-admin-token'));
+            if (!tokenDoc) {
                 return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
+            }
+            const callerRole = tokenDoc.role || 'admin';
+            if (['admin', 'chief', 'staff'].indexOf(callerRole) < 0) {
+                return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'この操作は許可されていません' } };
             }
 
             const body = await request.json().catch(() => ({}));
             const { salon_code, sldsslcd, dia_cd, b_day } = body;
-            const salonCode = salon_code || sldsslcd; // 旧パラメータ名(sldsslcd)も後方互換で受付
+            let salonCode = salon_code || sldsslcd; // 旧パラメータ名(sldsslcd)も後方互換で受付
+
+            // チーフは自サロン固定。リクエストで指定された値は採用しない
+            if (callerRole === 'chief') {
+                salonCode = String(tokenDoc.salonCode || '');
+                if (!isSalonCode(salonCode)) {
+                    return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'サロンコードが取得できません' } };
+                }
+            }
 
             if (!dia_cd || !salonCode) {
                 return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'dia_cd と salon_code の両方が必須です' } };
