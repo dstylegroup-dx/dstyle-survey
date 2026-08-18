@@ -127,7 +127,7 @@ app.get('/api/surveys', async (req, res) => {
 
 app.post('/api/surveys', async (req, res) => {
     if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, title, description, questions, active, thanksMessage } = req.body;
+    const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole } = req.body;
     if (!tenant || !title) return res.status(400).json({ error: 'tenant と title は必須です' });
     try {
         const container = await getContainer();
@@ -136,6 +136,10 @@ app.post('/api/surveys', async (req, res) => {
             tenant, title, description: description || '', questions: questions || [],
             active: active !== undefined ? active : true,
             thanksMessage: thanksMessage || '',
+            isContest: isContest === true,
+            contestGroupId: contestGroupId || null,
+            contestGroupTitle: contestGroupTitle || null,
+            contestRole: contestRole || null,
             createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         };
         await container.items.create(newSurvey);
@@ -145,7 +149,7 @@ app.post('/api/surveys', async (req, res) => {
 
 app.put('/api/surveys', async (req, res) => {
     if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { id, tenant, title, description, questions, active, thanksMessage } = req.body;
+    const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole } = req.body;
     if (!id || !tenant) return res.status(400).json({ error: 'id と tenant は必須です' });
     try {
         const container = await getContainer();
@@ -157,6 +161,10 @@ app.put('/api/surveys', async (req, res) => {
             questions: questions ?? existing.questions,
             active: active !== undefined ? active : existing.active,
             thanksMessage: thanksMessage !== undefined ? thanksMessage : (existing.thanksMessage || ''),
+            isContest: isContest !== undefined ? isContest : (existing.isContest || false),
+            contestGroupId: contestGroupId !== undefined ? contestGroupId : (existing.contestGroupId || null),
+            contestGroupTitle: contestGroupTitle !== undefined ? contestGroupTitle : (existing.contestGroupTitle || null),
+            contestRole: contestRole !== undefined ? contestRole : (existing.contestRole || null),
             updatedAt: new Date().toISOString()
         };
         await container.items.upsert(updated);

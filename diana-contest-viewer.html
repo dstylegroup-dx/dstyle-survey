@@ -79,6 +79,7 @@
 
     /* サマリー */
     .summary-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+    .status-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; white-space: nowrap; margin-right: 4px; }
     .summary-card { background: white; border-radius: 10px; padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex: 1; min-width: 140px; }
     .summary-card .lbl { font-size: 11px; color: #888; margin-bottom: 4px; }
     .summary-card .val { font-size: 26px; font-weight: bold; color: #7B4F6E; }
@@ -424,6 +425,21 @@
           <div class="val" id="totalCount">0</div>
           <div class="sub">名</div>
         </div>
+        <div class="summary-card" id="completeCard" style="display:none">
+          <div class="lbl">両方提出済</div>
+          <div class="val" id="countComplete" style="color:#2e7d32;">0</div>
+          <div class="sub">名</div>
+        </div>
+        <div class="summary-card" id="pendingCard" style="display:none">
+          <div class="lbl">片側のみ</div>
+          <div class="val" id="countPending" style="color:#e65100;">0</div>
+          <div class="sub" id="countPendingSub">-</div>
+        </div>
+        <div class="summary-card" id="unkeyedCard" style="display:none">
+          <div class="lbl">⚠️ 照合キーなし</div>
+          <div class="val" id="countUnkeyed" style="color:#b71c1c;">0</div>
+          <div class="sub">要確認</div>
+        </div>
         <div class="summary-card">
           <div class="lbl">最終更新</div>
           <div class="val" style="font-size:16px;" id="lastUpdated">-</div>
@@ -455,6 +471,15 @@
             <option value="女性">女性</option>
             <option value="男性">男性</option>
           </select>
+          <span id="statusFilterWrap" style="display:none">
+            <select class="search-select" id="filterStatus" onchange="applyFilter()">
+              <option value="">提出状況（すべて）</option>
+              <option value="complete">両方提出済</option>
+              <option value="member_only">チーフ未提出</option>
+              <option value="chief_only">メンバー未提出</option>
+              <option value="unkeyed">照合キーなし</option>
+            </select>
+          </span>
           <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
           <span id="filterCount" style="font-size:13px;color:#7B4F6E;font-weight:bold;white-space:nowrap;"></span>
         </div>
@@ -529,6 +554,28 @@ let listView = false; // false=カード表示, true=リスト（列並び）表
 let dbConnected = true; // customer_master接続済み
 let currentDetailIndex = -1;
 let currentContest = null;
+let contestGroups = [];   // [{ groupId, title, surveys: [...] }]
+
+// 提出状況の表示定義
+const STATUS_META = {
+  complete:    { label: '両方提出済',     icon: '✅', color: '#2e7d32', bg: '#eafaf0', bd: '#b7e4c7' },
+  member_only: { label: 'チーフ未提出',   icon: '👤', color: '#e65100', bg: '#fff5e6', bd: '#ffcc80' },
+  chief_only:  { label: 'メンバー未提出', icon: '👑', color: '#0d47a1', bg: '#e8f1fc', bd: '#a9c9f0' },
+  unkeyed:     { label: '照合キーなし',   icon: '⚠️', color: '#b71c1c', bg: '#fdeceb', bd: '#f5b7b1' },
+  single:      { label: '', icon: '', color: '', bg: '', bd: '' }
+};
+
+function statusChip(r) {
+  const meta = STATUS_META[r._status];
+  let html = '';
+  if (meta && meta.label) {
+    html += `<span class="status-chip" style="background:${meta.bg};border:1px solid ${meta.bd};color:${meta.color};">${meta.icon} ${meta.label}</span>`;
+  }
+  if (r._resubmit) {
+    html += `<span class="status-chip" style="background:#f3e8f7;border:1px solid #d9b8e6;color:#7B4F6E;">🔁 再提出あり</span>`;
+  }
+  return html;
+}
 
 function esc(str) {
   if (str == null) return '';
@@ -639,6 +686,10 @@ async function getAdminToken() {
 // ============================================================
 // コンテスト一覧取得
 // ============================================================
+// アンケート定義 → コンテストグループID / 応募区分
+function surveyGroupId(s) { return s.contestGroupId || ('single_' + s.id); }
+function surveyRole(s)    { return s.contestRole === 'chief' ? 'chief' : 'member'; }
+
 async function loadContestList() {
   try {
     const res = await fetch(BASE_URL + '/api/surveys?tenant=' + TENANT);
@@ -650,17 +701,34 @@ async function loadContestList() {
       sel.innerHTML = '<option value="">コンテスト対象アンケートがありません</option>';
       return;
     }
+    // コンテストグループ単位でまとめる（グループ未設定のアンケートは単独コンテスト扱い）
+    const map = new Map();
+    contests.forEach(s => {
+      const gid = surveyGroupId(s);
+      if (!map.has(gid)) {
+        map.set(gid, { groupId: gid, title: s.contestGroupTitle || s.title, surveys: [], createdAt: s.createdAt });
+      }
+      const g = map.get(gid);
+      g.surveys.push(s);
+      if (s.contestGroupTitle) g.title = s.contestGroupTitle;
+      if (new Date(s.createdAt) > new Date(g.createdAt)) g.createdAt = s.createdAt;
+    });
     // 新しい順に並べる
-    contests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    contestGroups = [...map.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     sel.innerHTML = '<option value="">コンテストを選択してください...</option>' +
-      contests.map((s, i) => `<option value="${esc(s.id)}">${esc(s.title)}${s.active ? '' : ' （非公開）'}</option>`).join('');
+      contestGroups.map(g => {
+        const roles = g.surveys.map(surveyRole);
+        const mark = (roles.includes('member') ? '👤' : '') + (roles.includes('chief') ? '👑' : '');
+        const inactive = g.surveys.every(s => s.active === false) ? ' （非公開）' : '';
+        return `<option value="${esc(g.groupId)}">${mark} ${esc(g.title)}${inactive}</option>`;
+      }).join('');
   } catch (e) { showError('コンテスト一覧の取得に失敗しました: ' + e.message); }
 }
 
 async function onContestChange() {
   const sel = document.getElementById('contestSelect');
-  const surveyId = sel.value;
-  if (!surveyId) {
+  const groupId = sel.value;
+  if (!groupId) {
     document.getElementById('noContestMsg').style.display = 'block';
     document.getElementById('dataArea').style.display = 'none';
     document.getElementById('contestBadge').style.display = 'none';
@@ -671,10 +739,15 @@ async function onContestChange() {
     currentContest = null;
     return;
   }
-  // 選択されたコンテスト情報
-  currentContest = { id: surveyId, title: sel.options[sel.selectedIndex].text };
+  // 選択されたコンテスト情報（グループ内の全アンケートを保持）
+  const group = contestGroups.find(g => g.groupId === groupId);
+  if (!group) return;
+  currentContest = { groupId: groupId, title: group.title, surveys: group.surveys };
   const badge = document.getElementById('contestBadge');
-  badge.textContent = '🏆 ' + currentContest.title;
+  const roleNote = group.surveys.length > 1
+    ? '（' + group.surveys.map(s => surveyRole(s) === 'chief' ? 'チーフ用' : 'メンバー用').join(' + ') + '）'
+    : '';
+  badge.textContent = '🏆 ' + currentContest.title + roleNote;
   badge.style.display = 'inline-block';
   document.getElementById('csvBtn').style.display = 'inline-block';
   document.getElementById('refreshBtn').style.display = 'inline-block';
@@ -690,6 +763,95 @@ async function onContestChange() {
 // ============================================================
 let questionLabelMap = {}; // { q_XXXXXXXXX: '氏名' } のマップ
 
+// ── マージキー（サロンコード＋ダイアナコード）─────────────────
+const KEY_SALON_LABELS = ['サロンコード'];
+// 優先度順に探す（チーフ用フォームは「メンバーのダイアナコード」を優先）
+const KEY_DIANA_LABELS       = ['応募者 ダイアナコード', 'ダイアナコード'];
+const KEY_DIANA_LABELS_CHIEF = ['メンバーのダイアナコード', 'メンバー ダイアナコード', '応募者 ダイアナコード', 'ダイアナコード'];
+
+// コード正規化：全角→半角、空白・ハイフン・アンダースコア除去、大文字化
+function normalizeCode(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\s\-\u2010\u2011\u2012\u2013\u2014\uFF0D_]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+// 指定アンケートのラベルマップを使って回答値を1件取り出す（keywords は優先度順）
+function pickAnswer(answers, labelMap, keywords) {
+  for (const kw of keywords) {
+    for (const [k, v] of Object.entries(answers || {})) {
+      const label = labelMap[k] || k;
+      if (label.includes(kw) || k.includes(kw)) {
+        return typeof v === 'object' && v !== null ? (v.value || '') : String(v == null ? '' : v);
+      }
+    }
+  }
+  return '';
+}
+
+// チーフ用回答とメンバー用回答を外部結合（どちらが先に提出されても成立）
+function mergeContestResponses(parts) {
+  // アンケートが1本だけのコンテストは従来どおり（マージしない）
+  if (parts.length <= 1) {
+    const p = parts[0] || { responses: [], role: 'member' };
+    return (p.responses || []).map(r => ({ ...r, measure: null, _status: 'single', _role: p.role, _resubmit: 0 }));
+  }
+
+  const map = new Map();
+  const unkeyed = [];
+
+  parts.forEach(p => {
+    (p.responses || []).forEach(r => {
+      const salon = pickAnswer(r.answers, p.labelMap, KEY_SALON_LABELS);
+      const diana = pickAnswer(r.answers, p.labelMap, p.role === 'chief' ? KEY_DIANA_LABELS_CHIEF : KEY_DIANA_LABELS);
+      const ns = normalizeCode(salon), nd = normalizeCode(diana);
+      if (!ns || !nd) { unkeyed.push({ r, role: p.role }); return; }
+      const key = ns + '|' + nd;
+      if (!map.has(key)) map.set(key, { key, salon, diana, member: [], chief: [] });
+      map.get(key)[p.role].push(r);
+    });
+  });
+
+  const byNewest = (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+
+  const entries = [...map.values()].map(g => {
+    g.member.sort(byNewest);
+    g.chief.sort(byNewest);
+    const m = g.member[0] || null;   // 最新のメンバー回答
+    const c = g.chief[0]  || null;   // 最新のチーフ回答
+    // 設問IDはアンケートごとに一意なのでキー衝突なく統合できる
+    const answers = Object.assign({}, m ? m.answers : {}, c ? c.answers : {});
+    return {
+      id: 'merged_' + g.key,
+      docType: 'merged_contest_entry',
+      tenant: TENANT,
+      answers: answers,
+      createdAt: (m && m.createdAt) || (c && c.createdAt) || null,
+      measure: null,
+      _status: (m && c) ? 'complete' : (m ? 'member_only' : 'chief_only'),
+      _key: g.key,
+      _memberId: m ? m.id : null,
+      _chiefId:  c ? c.id : null,
+      _memberAt: m ? m.createdAt : null,
+      _chiefAt:  c ? c.createdAt : null,
+      _resubmit: Math.max(0, g.member.length - 1) + Math.max(0, g.chief.length - 1)
+    };
+  });
+
+  // 照合キーが取れなかった回答も落とさずに出す（要確認として可視化）
+  unkeyed.forEach(u => {
+    entries.push({ ...u.r, measure: null, _status: 'unkeyed', _role: u.role, _resubmit: 0,
+                   _memberAt: u.role === 'member' ? u.r.createdAt : null,
+                   _chiefAt:  u.role === 'chief'  ? u.r.createdAt : null });
+  });
+
+  entries.sort(byNewest);
+  return entries;
+}
+
 async function loadResponses() {
   if (!currentContest) return;
   const btn = document.getElementById('refreshBtn');
@@ -698,24 +860,28 @@ async function loadResponses() {
   try {
     const headers = adminToken ? { 'x-admin-token': adminToken } : {};
 
-    // アンケート定義と回答データを並行取得
-    const [surveyRes, responseRes] = await Promise.all([
-      fetch(BASE_URL + '/api/surveys?tenant=' + TENANT + '&id=' + currentContest.id, { headers }),
-      fetch(BASE_URL + '/api/response?surveyId=' + currentContest.id + '&tenant=' + TENANT, { headers })
-    ]);
+    // グループ内の全アンケート（メンバー用・チーフ用）の定義と回答を並行取得
+    const parts = await Promise.all(currentContest.surveys.map(async s => {
+      const [defRes, resRes] = await Promise.all([
+        fetch(BASE_URL + '/api/surveys?tenant=' + TENANT + '&id=' + s.id, { headers }),
+        fetch(BASE_URL + '/api/response?surveyId=' + s.id + '&tenant=' + TENANT, { headers })
+      ]);
+      if (!resRes.ok) throw new Error('回答取得エラー HTTP ' + resRes.status + '（' + s.title + '）');
+      const def = defRes.ok ? await defRes.json() : s;
+      const labelMap = {};
+      (def.questions || []).forEach(q => { if (q.id && q.label) labelMap[q.id] = q.label; });
+      return { survey: s, role: surveyRole(s), labelMap: labelMap, responses: (await resRes.json()) || [] };
+    }));
 
-    // 質問ラベルマップを構築
+    // 質問ラベルマップを構築（複数アンケートの場合、チーフ側は【チーフ】を接頭）
     questionLabelMap = {};
-    if (surveyRes.ok) {
-      const survey = await surveyRes.json();
-      (survey.questions || []).forEach(q => {
-        if (q.id && q.label) questionLabelMap[q.id] = q.label;
+    parts.forEach(p => {
+      Object.entries(p.labelMap).forEach(([qid, label]) => {
+        questionLabelMap[qid] = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
       });
-    }
+    });
 
-    if (!responseRes.ok) throw new Error('HTTP ' + responseRes.status);
-    const data = await responseRes.json();
-    allResponses = (data || []).map(r => ({ ...r, measure: null }));
+    allResponses = mergeContestResponses(parts);
 
     // ※採寸データは詳細を開いた時に個別取得（遅延読み込み）
 
@@ -908,6 +1074,7 @@ async function applyFilter() {
   const div     = document.getElementById('filterDivision')?.value || '';
   const pref    = document.getElementById('filterPref')?.value || '';
   const gender  = document.getElementById('filterGender')?.value || '';
+  const status  = document.getElementById('filterStatus')?.value || '';
 
   filteredResponses = allResponses.filter(r => {
     const nameVal  = (getAnswerByKey(r, ['応募者氏名', '氏名', 'ふりがな']) || '').toLowerCase();
@@ -926,11 +1093,12 @@ async function applyFilter() {
     if (div    && divVal !== div) return false;
     if (pref   && prefVal !== pref) return false;
     if (gender && genderVal !== gender) return false;
+    if (status && r._status !== status) return false;
     return true;
   });
 
   currentPage = 1;
-  const hasFilter = name || salon || diana || div || pref || gender;
+  const hasFilter = name || salon || salonName || diana || div || pref || gender || status;
   document.getElementById('filterCount').textContent = hasFilter ? filteredResponses.length + '件該当' : '';
   await renderGrid();
 }
@@ -940,7 +1108,7 @@ function clearSearch() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['filterDivision','filterPref','filterGender'].forEach(id => {
+  ['filterDivision','filterPref','filterGender','filterStatus'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1012,6 +1180,7 @@ async function renderGrid() {
       </div>
       <div class="card-footer">
         <span class="card-date">📅 ${date}</span>
+        ${statusChip(r)}
         <span>${hasCustomer ? '<span class="measure-chip">✅ DB照合済</span>' : '<span class="no-measure-chip">📋 DB照合なし</span>'}</span>
         <span class="card-arrow">›</span>
       </div>
@@ -1050,6 +1219,25 @@ async function goPage(p) {
 // ============================================================
 function updateSummary() {
   document.getElementById('totalCount').textContent = allResponses.length;
+
+  // マージ表示（チーフ用＋メンバー用）のときだけ提出状況サマリーを出す
+  const isMerged = allResponses.some(r => r._status && r._status !== 'single');
+  const complete = allResponses.filter(r => r._status === 'complete').length;
+  const memberOnly = allResponses.filter(r => r._status === 'member_only').length;
+  const chiefOnly = allResponses.filter(r => r._status === 'chief_only').length;
+  const unkeyed = allResponses.filter(r => r._status === 'unkeyed').length;
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+
+  show('completeCard', isMerged);
+  show('pendingCard', isMerged);
+  show('unkeyedCard', isMerged && unkeyed > 0);
+  show('statusFilterWrap', isMerged);
+  set('countComplete', complete);
+  set('countPending', memberOnly + chiefOnly);
+  set('countPendingSub', 'チーフ未' + memberOnly + ' / メンバー未' + chiefOnly);
+  set('countUnkeyed', unkeyed);
 }
 
 // ============================================================
@@ -1488,10 +1676,13 @@ function downloadSingleCSV() {
   const answerLabels = answerKeys.map(k => questionLabelMap[k] || k);
   const m = r.measure || {};
 
-  const headers = ['No.', '応募日時', ...answerLabels, ...MEASURE_CSV_COLUMNS.map(c => c[0])];
+  const headers = ['No.', '応募日時', '提出状況', 'メンバー提出日時', 'チーフ提出日時', ...answerLabels, ...MEASURE_CSV_COLUMNS.map(c => c[0])];
   const row = [
     currentDetailIndex + 1,
     r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
+    (STATUS_META[r._status] || {}).label || '',
+    r._memberAt ? new Date(r._memberAt).toLocaleString('ja-JP') : '',
+    r._chiefAt ? new Date(r._chiefAt).toLocaleString('ja-JP') : '',
     ...answerKeys.map(k => {
       const v = (r.answers||{})[k];
       if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp|pdf|xlsx?|docx?)/i.test(v)) return v.split('/').pop();
@@ -1516,13 +1707,16 @@ function downloadCSV() {
   const answerKeys = [...new Set(filteredResponses.flatMap(r => Object.keys(r.answers || {})))];
   const answerLabels = answerKeys.map(k => questionLabelMap[k] || k);
 
-  const headers = ['No.', '応募日時', ...answerLabels, ...MEASURE_CSV_COLUMNS.map(c => c[0])];
+  const headers = ['No.', '応募日時', '提出状況', 'メンバー提出日時', 'チーフ提出日時', ...answerLabels, ...MEASURE_CSV_COLUMNS.map(c => c[0])];
 
   const rows = filteredResponses.map((r, i) => {
     const m = r.measure || {};
     return [
       i + 1,
       r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '',
+      (STATUS_META[r._status] || {}).label || '',
+      r._memberAt ? new Date(r._memberAt).toLocaleString('ja-JP') : '',
+      r._chiefAt ? new Date(r._chiefAt).toLocaleString('ja-JP') : '',
       ...answerKeys.map(k => {
         const v = (r.answers||{})[k];
         if (typeof v === 'string' && v.includes('/') && /\.(png|jpg|jpeg|gif|webp|pdf|xlsx?|docx?)/i.test(v)) {

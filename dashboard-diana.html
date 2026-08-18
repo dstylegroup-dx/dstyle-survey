@@ -333,8 +333,33 @@
             <div style="display:flex;flex-direction:column;gap:6px;">
               <div style="font-size:13px;font-weight:bold;color:#555;">コンテスト設定</div>
               <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid #ddd;border-radius:8px;background:#fafafa;">
-                <input type="checkbox" id="isContest" style="width:18px;height:18px;min-width:18px;accent-color:#7B4F6E;cursor:pointer;padding:0;border:none;appearance:auto;-webkit-appearance:checkbox;border-radius:0;">
+                <input type="checkbox" id="isContest" onchange="toggleContestUI()" style="width:18px;height:18px;min-width:18px;accent-color:#7B4F6E;cursor:pointer;padding:0;border:none;appearance:auto;-webkit-appearance:checkbox;border-radius:0;">
                 <span style="font-size:14px;cursor:pointer;" onclick="document.getElementById('isContest').click()">🏆 コンテスト対象アンケートとして登録する</span>
+              </div>
+              <div id="contestDetail" style="display:none;flex-direction:column;gap:12px;padding:14px 16px;border:1.5px solid #ffc107;border-radius:8px;background:#fffdf3;">
+                <div class="form-group" style="margin:0">
+                  <label>コンテスト（年度ごとに1つ作成します）</label>
+                  <select id="contestGroupSelect" onchange="onContestGroupChange()"></select>
+                </div>
+                <div class="form-group" id="contestNewTitleWrap" style="display:none;margin:0">
+                  <label>新しいコンテスト名</label>
+                  <input type="text" id="contestGroupNewTitle" placeholder="例）2026 ダイアナゴールデンプロポーションアワード">
+                </div>
+                <div class="form-group" style="margin:0">
+                  <label>このアンケートの応募区分</label>
+                  <div style="display:flex;gap:20px;margin-top:6px;">
+                    <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
+                      <input type="radio" name="contestRole" value="member" checked style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> 👤 メンバー用
+                    </label>
+                    <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
+                      <input type="radio" name="contestRole" value="chief" style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> 👑 チーフ用
+                    </label>
+                  </div>
+                </div>
+                <p style="font-size:12px;color:#8a6d1f;margin:0;line-height:1.7;">
+                  同じコンテストを選んだ「メンバー用」と「チーフ用」の回答は、閲覧ページで<b>サロンコード＋ダイアナコード</b>を照合して1件に統合表示されます。<br>
+                  別のコンテスト（別年度）とは統合されません。どちらが先に提出されても統合されます。
+                </p>
               </div>
               <p style="font-size:12px;color:#888;">チェックをつけると Dstyle コンテスト閲覧ページの選択肢に表示されます。</p>
             </div>
@@ -1019,10 +1044,44 @@
     document.getElementById('surveyDescription').value = currentSurvey.description || '';
     document.getElementById('surveyThanksMessage').value = currentSurvey.thanksMessage || '';
     document.getElementById('isContest').checked = currentSurvey.isContest === true;
+    var role = currentSurvey.contestRole === 'chief' ? 'chief' : 'member';
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="contestRole"]'), function(rb) {
+      rb.checked = (rb.value === role);
+    });
+    document.getElementById('contestGroupNewTitle').value = '';
+    toggleContestUI();
     renderQuestions();
     updateSurveyUrl();
     document.getElementById('qrArea').style.display = 'none';
     if (qrInstance) { document.getElementById('qrcode').innerHTML = ''; qrInstance = null; }
+  }
+
+  // ── コンテスト設定 ────────────────────────────────
+  function toggleContestUI() {
+    var on = document.getElementById('isContest').checked;
+    document.getElementById('contestDetail').style.display = on ? 'flex' : 'none';
+    if (on) populateContestGroups();
+  }
+
+  function populateContestGroups(selectedId) {
+    var sel = document.getElementById('contestGroupSelect');
+    if (!sel) return;
+    var groups = {};
+    (allSurveys || []).forEach(function(s) {
+      if (s.isContest && s.contestGroupId) groups[s.contestGroupId] = s.contestGroupTitle || s.title;
+    });
+    var cur = selectedId !== undefined ? selectedId : ((currentSurvey && currentSurvey.contestGroupId) || '');
+    var opts = Object.keys(groups).map(function(gid) {
+      return '<option value="' + esc(gid) + '"' + (gid === cur ? ' selected' : '') + '>' + esc(groups[gid]) + '</option>';
+    });
+    sel.innerHTML = opts.join('') + '<option value="__new__"' + (cur && groups[cur] ? '' : ' selected') + '>＋ 新しいコンテストを作成</option>';
+    onContestGroupChange();
+  }
+
+  function onContestGroupChange() {
+    var sel = document.getElementById('contestGroupSelect');
+    var isNew = !sel || sel.value === '__new__';
+    document.getElementById('contestNewTitleWrap').style.display = isNew ? '' : 'none';
   }
 
   function updateSurveyUrl() {
@@ -1058,8 +1117,24 @@
     try {
       var thanksMessage = document.getElementById('surveyThanksMessage').value.trim();
       var isContest = document.getElementById('isContest').checked;
-      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest }) });
-      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
+      var contestGroupId = null, contestGroupTitle = null, contestRole = null;
+      if (isContest) {
+        var gsel = document.getElementById('contestGroupSelect').value;
+        if (!gsel || gsel === '__new__') {
+          var newTitle = document.getElementById('contestGroupNewTitle').value.trim();
+          if (!newTitle) { alert('新しいコンテスト名を入力してください'); return; }
+          contestGroupId = 'contest_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+          contestGroupTitle = newTitle;
+        } else {
+          contestGroupId = gsel;
+          var found = (allSurveys || []).find(function(s) { return s.contestGroupId === gsel; });
+          contestGroupTitle = found ? (found.contestGroupTitle || found.title) : gsel;
+        }
+        var checked = document.querySelector('input[name="contestRole"]:checked');
+        contestRole = checked ? checked.value : 'member';
+      }
+      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest, contestGroupId: contestGroupId, contestGroupTitle: contestGroupTitle, contestRole: contestRole }) });
+      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; currentSurvey.contestGroupId = contestGroupId; currentSurvey.contestGroupTitle = contestGroupTitle; currentSurvey.contestRole = contestRole; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
       else { showStatus('infoStatus', '❌ 保存失敗', 'error'); }
     } catch (e) { showStatus('infoStatus', '❌ エラー: ' + e.message, 'error'); }
   }
@@ -1323,7 +1398,9 @@
       var date = new Date(s.createdAt).toLocaleDateString('ja-JP');
       var qCount = (s.questions || []).length;
       var isActive = s.active !== false;
-      var contestBadge = s.isContest ? '<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:4px;">🏆 コンテスト</span>' : '';
+      var roleLabel = s.contestRole === 'chief' ? ' 👑 チーフ用' : (s.contestRole === 'member' ? ' 👤 メンバー用' : '');
+      var groupLabel = s.contestGroupTitle ? ' / ' + esc(s.contestGroupTitle) : '';
+      var contestBadge = s.isContest ? '<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:4px;">🏆 コンテスト' + roleLabel + groupLabel + '</span>' : '';
       var contestLink = s.isContest ? '<a href="/diana-contest-viewer" target="_blank" class="btn btn-sm" style="background:#7B4F6E;color:white;text-decoration:none;display:inline-flex;align-items:center;">🏆 コンテスト閲覧</a>' : '';
       return '<div class="survey-item' + (isActive ? '' : ' inactive') + (s.isContest ? '" style="border-color:#ffc107' : '') + '">' +
         '<div class="survey-item-info">' +
