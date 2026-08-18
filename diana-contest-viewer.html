@@ -942,6 +942,15 @@ function getAnswerByKey(r, keywords) {
   return '';
 }
 
+// 生年月日：アンケート回答を優先し、無ければ customer_master の値を使う
+// 戻り値 { value: 'YYYY/MM/DD', fromDb: true/false }
+function getBirthday(r) {
+  const fromAnswer = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
+  if (fromAnswer) return { value: fmtDate(fromAnswer), fromDb: false };
+  const fromDb = r.measure && r.measure.b_day ? fmtDate(r.measure.b_day) : '';
+  return { value: fromDb, fromDb: !!fromDb };
+}
+
 function getAnswerEntries(r) {
   const answers = r.answers || {};
   // 上部表示する写真ラベル
@@ -1154,7 +1163,8 @@ async function renderGrid() {
     const kana    = esc(getAnswerByKey(r, ['ふりがな', 'フリガナ', 'カナ', 'かな']));
     const salon   = esc(getAnswerByKey(r, ['サロンコード']));
     const diana   = esc(getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']));
-    const bday    = esc(getAnswerByKey(r, ['応募者 生年月日', '生年月日']));
+    const bdayObj = getBirthday(r);
+    const bday    = esc(bdayObj.value) + (bdayObj.fromDb ? '<span style="font-size:10px;color:#aaa;margin-left:4px;">DB</span>' : '');
     const date    = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ja-JP') : '-';
     const imgs    = await getImageUrls(r);
     const hasMeasure = r.measure && r.measure.diag_dt;
@@ -1170,7 +1180,7 @@ async function renderGrid() {
       <div class="card-body">
         <div class="card-row"><span class="key">サロンコード</span><span class="val">${salon || '-'}</span></div>
         <div class="card-row"><span class="key">ダイアナコード</span><span class="val">${diana || '-'}</span></div>
-        <div class="card-row"><span class="key">生年月日</span><span class="val">${bday || '-'}</span></div>
+        <div class="card-row"><span class="key">生年月日</span><span class="val">${bdayObj.value ? bday : '-'}</span></div>
         ${dianaYears !== null && dianaYears !== undefined ? `<div class="card-row"><span class="key">ダイアナ歴</span><span class="val">${dianaYears}年</span></div>` : ''}
         ${age !== null && age !== undefined ? `<div class="card-row"><span class="key">年齢</span><span class="val">${age}歳</span></div>` : ''}
         ${imgs.length > 0 ? `<div class="img-thumb-row">${imgs.slice(0,3).map(img => img.kind === 'image'
@@ -1365,6 +1375,7 @@ async function renderModal() {
   // customer_master情報セクション
   const customerHtml = m && m.salon_code ? `
     <div class="measure-grid">
+      ${mBlock('生年月日', m.b_day ? fmtDate(m.b_day) : null, '')}
       ${mBlock('ダイアナ歴', m.diana_years !== null && m.diana_years !== undefined ? m.diana_years + '年' : null, '')}
       ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
       ${mBlock('性別', m.gender || null, '')}
@@ -1597,6 +1608,7 @@ function closeLightbox() { document.getElementById('lightbox').classList.remove(
 
 // DB会員・採寸データのCSVカラム定義（ヘッダー名 → 値の取り出し関数）
 const MEASURE_CSV_COLUMNS = [
+  ['生年月日',              m => fmtDate(m.b_day)],
   ['ダイアナ歴(年)',        m => m.diana_years],
   ['年齢',                  m => m.age],
   ['性別',                  m => m.gender || ''],
@@ -1767,6 +1779,7 @@ function printDetail() {
   if (m && m.salon_code) {
     const gp = m.gp_club_type == null ? 'なし' : (String(m.gp_club_type) === '001' ? 'あり' : 'なし');
     const cells = [
+      ['生年月日', fmtDate(m.b_day) || '-'],
       ['ダイアナ歴', m.diana_years != null ? m.diana_years + '年' : '-'],
       ['年齢', m.age != null ? m.age + '歳' : '-'],
       ['性別', m.gender || '-'],
@@ -1903,6 +1916,7 @@ function printList() {
       <td>${fmt(pref)}</td>
       <td>${fmt(salon)}</td>
       <td>${fmt(diana)}</td>
+      <td>${fmt(getBirthday(r).value)}</td>
       <td>${m.diana_years != null ? m.diana_years + '年' : '-'}</td>
       <td>${m.age != null ? m.age + '歳' : '-'}</td>
       <td>${fmt(m.salon_name)}</td>
@@ -1929,7 +1943,7 @@ function printList() {
     <table>
       <thead><tr>
         <th>No.</th><th>氏名</th><th>出場区分</th><th>都道府県</th><th>サロンコード</th>
-        <th>ダイアナコード</th><th>ダイアナ歴</th><th>年齢</th><th>サロン名</th><th>BC回数</th><th>GP倶楽部</th>
+        <th>ダイアナコード</th><th>生年月日</th><th>ダイアナ歴</th><th>年齢</th><th>サロン名</th><th>BC回数</th><th>GP倶楽部</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
