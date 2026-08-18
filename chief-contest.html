@@ -295,6 +295,15 @@ async function init() {
       const accounts = msalInstance.getAllAccounts();
       if (accounts.length > 0) account = accounts[0];
     }
+    // ログアウトから戻ってきた場合は、ここまででMSALの処理中フラグが解除されている
+    if (sessionStorage.getItem('postLogout')) {
+      sessionStorage.removeItem('postLogout');
+      sessionStorage.removeItem('loginMode');
+      sessionStorage.removeItem('chiefAuthIdx');
+      clearMsalInteractionState();
+      showLogin();
+      return;
+    }
     if (!account) { showLogin(); return; }
     msalInstance.setActiveAccount(account);
     if (mode === 'chief') localStorage.setItem('chiefAuthIdxOk', String(chiefAuthIndex()));
@@ -321,8 +330,35 @@ async function startLogin(mode) {
     await buildInstance(mode);
     await msalInstance.loginRedirect({ scopes: modeConfig(mode).scopes });
   } catch (e) {
+    // 前回の処理中フラグが残っている場合は解除して1回だけ再試行する
+    if (isInteractionInProgress(e)) {
+      clearMsalInteractionState();
+      try {
+        await msalInstance.loginRedirect({ scopes: modeConfig(mode).scopes });
+        return;
+      } catch (e2) { await handleAuthFailure(e2, mode); return; }
+    }
     await handleAuthFailure(e, mode);
   }
+}
+
+function isInteractionInProgress(e) {
+  const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
+  return msg.indexOf('interaction_in_progress') >= 0;
+}
+
+// MSALが残した「処理中」フラグを掃除する
+function clearMsalInteractionState() {
+  [sessionStorage, localStorage].forEach(function(store) {
+    try {
+      const keys = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && k.indexOf('msal') >= 0 && k.indexOf('interaction.status') >= 0) keys.push(k);
+      }
+      keys.forEach(function(k) { store.removeItem(k); });
+    } catch (e) {}
+  });
 }
 
 // チーフ側は接続先が未確定のため、失敗時は次の候補で自動再試行する
@@ -331,6 +367,7 @@ async function handleAuthFailure(e, mode) {
   const canFallback = (mode === 'chief') && (idx + 1 < CHIEF_AUTHORITIES.length) && looksLikeAuthorityError(e);
   if (!canFallback) {
     sessionStorage.removeItem('loginMode');
+    clearMsalInteractionState();
     showLogin();
     showLoginError('ログインできませんでした。\n' + (e && e.message ? e.message : String(e)));
     return;
@@ -357,11 +394,16 @@ function looksLikeAuthorityError(e) {
 }
 
 async function doLogout() {
-  const inst = msalInstance;
+  // loginMode は残す（復帰時に handleRedirectPromise を通して状態を解除するため）
+  sessionStorage.setItem('postLogout', '1');
+  sessionStorage.removeItem('staffSalon');
+  if (msalInstance) {
+    try { await msalInstance.logoutRedirect(); return; } catch (e) {}
+  }
+  sessionStorage.removeItem('postLogout');
   sessionStorage.removeItem('loginMode');
   sessionStorage.removeItem('chiefAuthIdx');
-  sessionStorage.removeItem('staffSalon');
-  if (inst) { try { await inst.logoutRedirect(); return; } catch (e) {} }
+  clearMsalInteractionState();
   location.reload();
 }
 
