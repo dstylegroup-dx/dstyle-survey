@@ -1748,7 +1748,11 @@ const CHIEF_TENANT_ID  = 'ac36e29b-c866-49d3-9391-510bb3e88891'; // DIANA-SALON�
 const CHIEF_CLIENT_ID  = '5503ac94-f3bf-42fa-8074-27557ca61ae1'; // DstyleSurvey-Chief-SPA
 const DSH_TENANT_ID    = '2648ac1f-8786-40fb-80f8-14bd84511449'; // DSHグループ
 const DSH_CLIENT_ID    = '1f4f2ade-4eeb-4f65-8fbd-394378a63518'; // dstyle-survey
-const STAFF_GROUP_ID   = '6e4af16e-cfe1-49a6-968e-05b8cef847d8'; // ディライトテクノロジーズ事業部
+// 社員としてアクセスを許可するM365グループ（いずれかに所属していれば可）
+const STAFF_GROUP_IDS = [
+    '6e4af16e-cfe1-49a6-968e-05b8cef847d8', // ディライトテクノロジーズ事業部
+    '84b52c84-a162-43e0-a4be-30bc13ff36b0'  // 全社連絡用
+];
 const CHIEF_TENANT_KEY = 'diana';                                // 対象テナント（アンケート側）
 
 // チーフ用トークンの発行元（サブドメインはGUID形式・ドメイン名形式の両方を許容）
@@ -2055,7 +2059,8 @@ app.http('chiefauth', {
                     }
                 } catch (e) { context.log('[chiefauth] Graph error: ' + e.message); }
             }
-            if (userGroups.indexOf(STAFF_GROUP_ID) < 0) {
+            const isStaff = userGroups.some(g => STAFF_GROUP_IDS.indexOf(g) >= 0);
+            if (!isStaff) {
                 await writeLog('forbidden', { userName, userEmail, error: 'グループ未所属' });
                 return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'この画面へのアクセス権限がありません' } };
             }
