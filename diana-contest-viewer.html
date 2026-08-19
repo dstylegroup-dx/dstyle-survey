@@ -959,7 +959,7 @@ function getAnswerEntries(r) {
   // 上部表示する写真ラベル
   const topPhotoLabels = ['ダイアナスタート前の全身写真', '現在の全身写真', '現在の顔写真'];
 
-  return Object.entries(answers)
+  const entries = Object.entries(answers)
     .filter(([k, v]) => {
       const label = questionLabelMap[k] || k;
       // 画像パスは応募内容から除外（応募写真・上部写真セクションで表示）
@@ -972,6 +972,49 @@ function getAnswerEntries(r) {
       const value = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '');
       return { key: label, rawKey: k, value };
     });
+
+  // メンバー用とチーフ用で同じ設問がある場合、値が一致していればチーフ側を隠す
+  // （値が食い違う場合は、確認できるよう両方表示する）
+  return dedupeChiefAnswers(entries);
+}
+
+// ラベルから【チーフ】と表記ゆれを取り除いて比較用のキーにする
+function baseLabel(label) {
+  return String(label || '')
+    .replace(/^【チーフ】/, '')
+    .replace(/^(応募者|メンバーの|メンバー)\s*/, '')
+    .replace(/[\s　]/g, '');
+}
+
+function normalizeValue(v) {
+  return String(v == null ? '' : v)
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\s　]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+function dedupeChiefAnswers(entries) {
+  // メンバー側（【チーフ】が付かない）の値を基準にする
+  const memberByBase = {};
+  entries.forEach(e => {
+    if (e.key.indexOf('【チーフ】') === 0) return;
+    const b = baseLabel(e.key);
+    if (b && memberByBase[b] === undefined) memberByBase[b] = e.value;
+  });
+
+  return entries.filter(e => {
+    if (e.key.indexOf('【チーフ】') !== 0) return true;
+    const b = baseLabel(e.key);
+    if (!(b in memberByBase)) return true;                      // メンバー側に無い設問はそのまま表示
+    return normalizeValue(memberByBase[b]) !== normalizeValue(e.value); // 一致していれば隠す
+  }).map(e => {
+    // 食い違って残ったチーフ側の項目には目印を付ける
+    if (e.key.indexOf('【チーフ】') === 0 && (baseLabel(e.key) in memberByBase)) {
+      return Object.assign({}, e, { mismatch: true });
+    }
+    return e;
+  });
 }
 
 // Blob Storageのパスかどうか判定
@@ -1379,16 +1422,16 @@ async function renderModal() {
     (shortEntries.length > 0 ? `
       <div class="answer-grid-short">
         ${shortEntries.map(e => `
-          <div class="answer-item-short">
-            <div class="answer-lbl">${esc(e.key)}</div>
+          <div class="answer-item-short"${e.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : ''}>
+            <div class="answer-lbl">${esc(e.key)}${e.mismatch ? ' <span style="color:#e65100;">⚠️ 相違</span>' : ''}</div>
             <div class="answer-val">${esc(e.value)}</div>
           </div>`).join('')}
       </div>` : '') +
     (longEntries.length > 0 ? `
       <div class="answer-grid-long">
         ${longEntries.map(e => `
-          <div class="answer-item">
-            <div class="answer-lbl">${esc(e.key)}</div>
+          <div class="answer-item"${e.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : ''}>
+            <div class="answer-lbl">${esc(e.key)}${e.mismatch ? ' <span style="color:#e65100;">⚠️ メンバー回答と相違</span>' : ''}</div>
             <div class="answer-val">${esc(e.value)}</div>
           </div>`).join('')}
       </div>` : '');
