@@ -64,6 +64,8 @@
         tr:hover td { background: #f9fbf9; }
         .badge-success { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
         .badge-fail { background: #fce8e6; color: #c62828; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .badge-view { background: #e8f1fc; color: #0d47a1; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .badge-warn { background: #fff8e6; color: #8a5a00; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
         .empty { text-align: center; padding: 40px; color: #888; }
         .loading { text-align: center; padding: 30px; color: #888; }
         .system-status { font-size: 13px; color: #95a5a6; border-top: 1px dashed #ccc; padding-top: 15px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
@@ -237,6 +239,7 @@
                         <div class="card hl"><div class="num" id="logMonth">—</div><div class="label">今月のログイン</div></div>
                         <div class="card hl"><div class="num" id="logSuccess">—</div><div class="label">成功（直近200件）</div></div>
                         <div class="card danger"><div class="num" id="logFail">—</div><div class="label">失敗（直近200件）</div></div>
+                        <div class="card hl"><div class="num" id="logView">—</div><div class="label">応募閲覧（直近200件）</div></div>
                     </div>
                     <div class="filter-row">
                         <label>テナント絞り込み：</label>
@@ -247,11 +250,19 @@
                             <option value="dstylehd">dstylehd</option>
                             <option value="portal">portal</option>
                         </select>
+                        <label style="margin-left:8px">画面：</label>
+                        <select id="logAppFilter" onchange="applyLogFilter()">
+                            <option value="">すべて</option>
+                            <option value="chief-contest">チーフ用画面</option>
+                            <option value="__admin">管理画面</option>
+                        </select>
                         <label style="margin-left:8px">結果：</label>
                         <select id="logResultFilter" onchange="applyLogFilter()">
                             <option value="">すべて</option>
-                            <option value="success">成功</option>
-                            <option value="failure">失敗</option>
+                            <option value="success">ログイン成功</option>
+                            <option value="failure">ログイン失敗</option>
+                            <option value="view">閲覧</option>
+                            <option value="forbidden">権限なし</option>
                         </select>
                     </div>
                     <div class="toolbar">
@@ -260,8 +271,8 @@
                     <div class="table-wrap">
                         <div class="table-scroll">
                             <table>
-                                <thead><tr><th>日時</th><th>テナント</th><th>ユーザー</th><th>IPアドレス</th><th>結果</th></tr></thead>
-                                <tbody id="logTableBody"><tr><td colspan="5" class="loading">タブを開くと読み込みます</td></tr></tbody>
+                                <thead><tr><th>日時</th><th>テナント</th><th>画面</th><th>ユーザー</th><th>対象サロン</th><th>IPアドレス</th><th>結果</th></tr></thead>
+                                <tbody id="logTableBody"><tr><td colspan="7" class="loading">タブを開くと読み込みます</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -420,6 +431,7 @@
             document.getElementById('logMonth').textContent   = allLogs.filter(function(l) { return l.createdAt.slice(0,7) === monthStr; }).length;
             document.getElementById('logSuccess').textContent = allLogs.filter(function(l) { return l.result === 'success'; }).length;
             document.getElementById('logFail').textContent    = allLogs.filter(function(l) { return l.result === 'failure'; }).length;
+            document.getElementById('logView').textContent    = allLogs.filter(function(l) { return l.result === 'view'; }).length;
 
             applyLogFilter();
         } catch(e) {
@@ -427,23 +439,46 @@
         }
     }
 
+    // 結果の表示定義
+    var LOG_RESULT_BADGE = {
+        success:   '<span class="badge-success">ログイン成功</span>',
+        failure:   '<span class="badge-fail">ログイン失敗</span>',
+        view:      '<span class="badge-view">閲覧</span>',
+        forbidden: '<span class="badge-warn">権限なし</span>'
+    };
+    var LOG_APP_LABEL = { 'chief-contest': 'チーフ用画面' };
+
     function applyLogFilter() {
         var tenantFilter = document.getElementById('logTenantFilter').value;
         var resultFilter = document.getElementById('logResultFilter').value;
+        var appFilter    = document.getElementById('logAppFilter').value;
+
         var filtered = allLogs.filter(function(l) {
             if (tenantFilter && l.tenant !== tenantFilter) return false;
             if (resultFilter && l.result !== resultFilter) return false;
+            if (appFilter === '__admin' && l.app) return false;          // app未設定＝従来の管理画面
+            if (appFilter && appFilter !== '__admin' && l.app !== appFilter) return false;
             return true;
         });
+
         var tbody = document.getElementById('logTableBody');
-        if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">ログがありません</td></tr>'; return; }
+        if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">ログがありません</td></tr>'; return; }
+
         tbody.innerHTML = filtered.map(function(l) {
             var date = new Date(l.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-            var badge = l.result === 'success'
-                ? '<span class="badge-success">成功</span>'
-                : '<span class="badge-fail">失敗</span>';
+            var badge = LOG_RESULT_BADGE[l.result] || '<span class="badge-fail">' + esc(l.result || '—') + '</span>';
             var user = l.userName || l.userEmail || '—';
-            return '<tr><td style="white-space:nowrap;color:#888">' + date + '</td><td>' + (l.tenant||'—') + '</td><td style="font-size:12px">' + user + '</td><td style="color:#888;font-size:12px">' + (l.ip||'—') + '</td><td>' + badge + '</td></tr>';
+            var role = l.role === 'chief' ? '👑' : l.role === 'staff' ? '🏢' : '';
+            var app  = l.app ? (LOG_APP_LABEL[l.app] || l.app) : '管理画面';
+            var salon = l.salonCode ? esc(l.salonCode) + (l.count != null ? '（' + l.count + '件）' : '') : '—';
+            return '<tr>'
+                + '<td style="white-space:nowrap;color:#888">' + date + '</td>'
+                + '<td>' + esc(l.tenant || '—') + '</td>'
+                + '<td style="font-size:12px">' + esc(app) + '</td>'
+                + '<td style="font-size:12px">' + role + ' ' + esc(user) + '</td>'
+                + '<td style="font-size:12px">' + salon + '</td>'
+                + '<td style="color:#888;font-size:12px">' + esc(l.ip || '—') + '</td>'
+                + '<td>' + badge + '</td></tr>';
         }).join('');
     }
 
