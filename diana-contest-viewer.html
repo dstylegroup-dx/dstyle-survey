@@ -460,6 +460,9 @@
           <input type="text" class="search-input" id="searchSalon" placeholder="サロンコード..." oninput="applyFilter()" style="width:140px;">
           <input type="text" class="search-input" id="searchSalonName" placeholder="サロン名..." oninput="applyFilter()" style="width:140px;">
           <input type="text" class="search-input" id="searchDiana" placeholder="ダイアナコード..." oninput="applyFilter()" style="width:150px;">
+          <select class="search-select" id="filterEntry" onchange="applyFilter()" style="display:none">
+            <option value="">応募区分（すべて）</option>
+          </select>
           <select class="search-select" id="filterDivision" onchange="applyFilter()">
             <option value="">出場区分（すべて）</option>
           </select>
@@ -1080,6 +1083,7 @@ async function applyFilter() {
   const salon   = (document.getElementById('searchSalon')?.value || '').toLowerCase();
   const salonName = (document.getElementById('searchSalonName')?.value || '').toLowerCase();
   const diana   = (document.getElementById('searchDiana')?.value || '').toLowerCase();
+  const entry   = document.getElementById('filterEntry')?.value || '';
   const div     = document.getElementById('filterDivision')?.value || '';
   const pref    = document.getElementById('filterPref')?.value || '';
   const gender  = document.getElementById('filterGender')?.value || '';
@@ -1090,6 +1094,7 @@ async function applyFilter() {
     const kanaVal  = (getAnswerByKey(r, ['ふりがな']) || '').toLowerCase();
     const salonVal = (getAnswerByKey(r, ['サロンコード']) || '').toLowerCase();
     const dianaVal = (getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']) || '').toLowerCase();
+    const entryVal = getAnswerByKey(r, ['応募区分']) || '';
     const divVal   = getAnswerByKey(r, ['出場区分']) || '';
     const prefVal  = getAnswerByKey(r, ['応募者 都道府県', '都道府県']) || '';
     const genderVal = r.measure?.gender || '';
@@ -1099,6 +1104,7 @@ async function applyFilter() {
     const salonNameVal = (r.measure?.salon_name || '').toLowerCase();
     if (salonName && !salonNameVal.includes(salonName)) return false;
     if (diana  && !dianaVal.includes(diana)) return false;
+    if (entry  && entryVal !== entry) return false;
     if (div    && divVal !== div) return false;
     if (pref   && prefVal !== pref) return false;
     if (gender && genderVal !== gender) return false;
@@ -1107,7 +1113,7 @@ async function applyFilter() {
   });
 
   currentPage = 1;
-  const hasFilter = name || salon || salonName || diana || div || pref || gender || status;
+  const hasFilter = name || salon || salonName || diana || entry || div || pref || gender || status;
   document.getElementById('filterCount').textContent = hasFilter ? filteredResponses.length + '件該当' : '';
   await renderGrid();
 }
@@ -1117,7 +1123,7 @@ function clearSearch() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['filterDivision','filterPref','filterGender','filterStatus'].forEach(id => {
+  ['filterEntry','filterDivision','filterPref','filterGender','filterStatus'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1126,8 +1132,23 @@ function clearSearch() {
 
 // 絞り込みドロップダウンの選択肢を生成
 function buildFilterOptions() {
+  const entries   = [...new Set(allResponses.map(r => getAnswerByKey(r, ['応募区分'])).filter(Boolean))].sort();
   const divisions = [...new Set(allResponses.map(r => getAnswerByKey(r, ['出場区分'])).filter(Boolean))].sort();
   const prefs     = [...new Set(allResponses.map(r => getAnswerByKey(r, ['応募者 都道府県', '都道府県'])).filter(Boolean))].sort();
+
+  // 「応募区分」の設問が無いコンテストでは、この絞り込み自体を表示しない
+  const entrySel = document.getElementById('filterEntry');
+  if (entrySel) {
+    if (entries.length === 0) {
+      entrySel.style.display = 'none';
+      entrySel.value = '';
+    } else {
+      const cur = entrySel.value;
+      entrySel.style.display = '';
+      entrySel.innerHTML = '<option value="">応募区分（すべて）</option>' +
+        entries.map(e => `<option value="${esc(e)}" ${cur===e?'selected':''}>${esc(e)}</option>`).join('');
+    }
+  }
 
   const divSel = document.getElementById('filterDivision');
   if (divSel) {
