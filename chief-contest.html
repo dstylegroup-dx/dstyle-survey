@@ -82,6 +82,10 @@
     .btn-primary { background: #7B4F6E; color: #fff; }
     .btn-light { background: #f0eaee; color: #7B4F6E; }
     .ml-auto { margin-left: auto; }
+    .filter-wrap { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .filter-wrap .txt { width: 160px; }
+    .filter-wrap select { min-width: 150px; }
+    .filter-count { font-size: 13px; color: #7B4F6E; font-weight: bold; white-space: nowrap; }
 
     /* サマリー */
     .sum-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -152,6 +156,8 @@
       .sum-card { flex: 1; min-width: 92px; padding: 12px 14px; }
       .sum-card .val { font-size: 22px; }
       .txt { flex: 1; width: auto; min-width: 110px; }
+      .filter-wrap .txt { width: auto; flex: 1 1 130px; }
+      .filter-wrap select { min-width: 0; flex: 1 1 130px; }
       .modal-body { padding: 16px 14px 24px; }
       .login-head { padding: 30px 22px 26px; }
       .login-body { padding: 24px 22px 22px; }
@@ -234,6 +240,20 @@
       </div>
     </div>
 
+    <!-- 絞り込み -->
+    <div class="card" id="filterCard" style="display:none">
+      <div class="filter-wrap">
+        <label>🔍 絞り込み</label>
+        <input type="text" class="txt" id="fName" placeholder="応募者氏名・ふりがな" oninput="applyFilter()">
+        <input type="text" class="txt" id="fDiana" placeholder="ダイアナコード" oninput="applyFilter()">
+        <select id="fEntry" onchange="applyFilter()" style="display:none"></select>
+        <select id="fDivision" onchange="applyFilter()" style="display:none"></select>
+        <select id="fGender" onchange="applyFilter()" style="display:none"></select>
+        <button class="btn btn-light" onclick="clearFilter()">クリア</button>
+        <span class="filter-count" id="filterCount"></span>
+      </div>
+    </div>
+
     <div id="dataArea" style="display:none">
       <div class="sum-row">
         <div class="sum-card"><div class="lbl">応募者数</div><div class="val" id="cntTotal">0</div><div class="sub">名</div></div>
@@ -303,6 +323,7 @@ let mySalon = null;
 let myName = '';
 let contests = [];
 let entries = [];
+let filtered = [];
 let questionLabels = {};
 let measureCache = {};
 let detailIndex = -1;
@@ -574,11 +595,73 @@ async function loadEntries() {
       mySalon = data.salonCode;
       document.getElementById('salonNote').textContent = 'サロン ' + data.salonCode + ' の応募状況を表示しています。';
     }
-    renderList();
+    buildFilters();
+    applyFilter();
   } catch (e) {
     showError(e.message);
     showEmpty('データを取得できませんでした。');
   }
+}
+
+// 選択肢はデータから自動生成し、該当する設問が無ければ非表示にする
+const FILTER_DEFS = [
+  { id: 'fEntry',    keywords: ['応募区分'],          label: '応募区分' },
+  { id: 'fDivision', keywords: ['出場区分', '部門'],  label: '出場区分' },
+  { id: 'fGender',   keywords: ['性別'],              label: '性別' }
+];
+
+function buildFilters() {
+  document.getElementById('filterCard').style.display = entries.length > 0 ? 'block' : 'none';
+
+  FILTER_DEFS.forEach(function(def) {
+    const sel = document.getElementById(def.id);
+    const values = [];
+    entries.forEach(function(e) {
+      const v = answerByKeywords(e, def.keywords);
+      if (v && values.indexOf(v) < 0) values.push(v);
+    });
+    if (values.length === 0) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
+    values.sort();
+    sel.style.display = '';
+    sel.innerHTML = '<option value="">' + esc(def.label) + '（すべて）</option>'
+      + values.map(function(v) { return '<option value="' + esc(v) + '">' + esc(v) + '</option>'; }).join('');
+  });
+}
+
+function applyFilter() {
+  const name  = (document.getElementById('fName').value || '').trim().toLowerCase();
+  const diana = (document.getElementById('fDiana').value || '').trim().toLowerCase();
+
+  filtered = entries.filter(function(e) {
+    if (name) {
+      const hay = ((nameOf(e) || '') + ' ' + (kanaOf(e) || '')).toLowerCase();
+      if (hay.indexOf(name) < 0) return false;
+    }
+    if (diana) {
+      const code = ((e.memberCode || '') + ' ' + answerByKeywords(e, ['ダイアナコード'])).toLowerCase();
+      if (code.indexOf(diana) < 0) return false;
+    }
+    for (const def of FILTER_DEFS) {
+      const sel = document.getElementById(def.id);
+      if (!sel || sel.style.display === 'none' || !sel.value) continue;
+      if (answerByKeywords(e, def.keywords) !== sel.value) return false;
+    }
+    return true;
+  });
+
+  const cnt = document.getElementById('filterCount');
+  cnt.textContent = (filtered.length === entries.length)
+    ? entries.length + '件'
+    : filtered.length + '件 / 全' + entries.length + '件';
+
+  renderList();
+}
+
+function clearFilter() {
+  document.getElementById('fName').value = '';
+  document.getElementById('fDiana').value = '';
+  FILTER_DEFS.forEach(function(def) { document.getElementById(def.id).value = ''; });
+  applyFilter();
 }
 
 function renderList() {
@@ -587,23 +670,29 @@ function renderList() {
 
   if (entries.length === 0) {
     dataArea.style.display = 'none';
+    document.getElementById('filterCard').style.display = 'none';
     showEmpty(myRole === 'staff'
       ? 'サロン ' + (mySalon || '') + ' の応募はまだありません。'
       : 'このコンテストへの応募はまだありません。');
     return;
   }
+  if (filtered.length === 0) {
+    dataArea.style.display = 'none';
+    showEmpty('条件に一致する応募がありません。');
+    return;
+  }
   emptyArea.style.display = 'none';
   dataArea.style.display = 'block';
 
-  const complete = entries.filter(function(e) { return e.status === 'complete'; }).length;
-  const memberOnly = entries.filter(function(e) { return e.status === 'member_only'; }).length;
-  const chiefOnly = entries.filter(function(e) { return e.status === 'chief_only'; }).length;
-  document.getElementById('cntTotal').textContent = entries.length;
+  const complete = filtered.filter(function(e) { return e.status === 'complete'; }).length;
+  const memberOnly = filtered.filter(function(e) { return e.status === 'member_only'; }).length;
+  const chiefOnly = filtered.filter(function(e) { return e.status === 'chief_only'; }).length;
+  document.getElementById('cntTotal').textContent = filtered.length;
   document.getElementById('cntComplete').textContent = complete;
   document.getElementById('cntPending').textContent = memberOnly + chiefOnly;
   document.getElementById('cntPendingSub').textContent = 'チーフ未' + memberOnly + ' / メンバー未' + chiefOnly;
 
-  document.getElementById('appGrid').innerHTML = entries.map(function(e, i) {
+  document.getElementById('appGrid').innerHTML = filtered.map(function(e, i) {
     const meta = STATUS_META[e.status] || STATUS_META.single;
     const imgs = (e.files || []).filter(function(f) { return f.kind === 'image'; });
     const others = (e.files || []).filter(function(f) { return f.kind !== 'image'; });
@@ -642,7 +731,7 @@ function row(k, v) {
 // ============================================================
 async function openDetail(i) {
   detailIndex = i;
-  const e = entries[i];
+  const e = filtered[i];
   if (!e) return;
   document.getElementById('mName').textContent = nameOf(e) || '（氏名なし）';
   document.getElementById('mKana').textContent = kanaOf(e) || '';
@@ -653,7 +742,7 @@ async function openDetail(i) {
 }
 
 function renderDetail() {
-  const e = entries[detailIndex];
+  const e = filtered[detailIndex];
   if (!e) return;
   const meta = STATUS_META[e.status] || STATUS_META.single;
   const fileQids = {};
