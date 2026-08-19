@@ -300,10 +300,9 @@ const BASE_URL = location.hostname === 'localhost'
   ? 'http://localhost:7071'
   : 'https://func-dstyle-survey-gab2dwg3gdcqecgz.japaneast-01.azurewebsites.net';
 
-const CHIEF_AUTHORITIES = [
-  { authority: 'https://login.microsoftonline.com/' + CHIEF_TENANT_ID, known: [] },
-  { authority: 'https://' + CIAM_DOMAIN + '.ciamlogin.com/' + CHIEF_TENANT_ID, known: [CIAM_DOMAIN + '.ciamlogin.com'] }
-];
+// チーフ用の接続先（外部IDテナントのため ciamlogin.com に固定）
+const CHIEF_AUTHORITY = 'https://' + CIAM_DOMAIN + '.ciamlogin.com/' + CHIEF_TENANT_ID;
+const CHIEF_KNOWN_AUTHORITIES = [CIAM_DOMAIN + '.ciamlogin.com'];
 
 const STATUS_META = {
   complete:    { label: '両方提出済',     icon: '✅', color: '#2e7d32', bg: '#eafaf0', bd: '#b7e4c7' },
@@ -328,16 +327,14 @@ let questionLabels = {};
 let measureCache = {};
 let detailIndex = -1;
 
-function chiefAuthIndex() { return parseInt(sessionStorage.getItem('chiefAuthIdx') || '0', 10); }
-function savedMode()      { return sessionStorage.getItem('loginMode'); }
+function savedMode() { return sessionStorage.getItem('loginMode'); }
 
 function modeConfig(mode) {
   if (mode === 'staff') {
     return { clientId: STAFF_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + STAFF_TENANT_ID,
              known: [], scopes: ['User.Read', 'GroupMember.Read.All'] };
   }
-  const a = CHIEF_AUTHORITIES[chiefAuthIndex()] || CHIEF_AUTHORITIES[0];
-  return { clientId: CHIEF_CLIENT_ID, authority: a.authority, known: a.known,
+  return { clientId: CHIEF_CLIENT_ID, authority: CHIEF_AUTHORITY, known: CHIEF_KNOWN_AUTHORITIES,
            scopes: ['openid', 'profile', 'User.Read'] };
 }
 
@@ -345,10 +342,9 @@ function modeConfig(mode) {
 // 初期化・認証
 // ============================================================
 async function init() {
-  const remembered = localStorage.getItem('chiefAuthIdxOk');
-  if (remembered !== null && !sessionStorage.getItem('chiefAuthIdx')) {
-    sessionStorage.setItem('chiefAuthIdx', remembered);
-  }
+  // 旧バージョンが残した接続先の記憶を掃除する
+  localStorage.removeItem('chiefAuthIdxOk');
+  sessionStorage.removeItem('chiefAuthIdx');
 
   const mode = savedMode();
   if (!mode) { showLogin(); return; }
@@ -361,7 +357,6 @@ async function init() {
     if (sessionStorage.getItem('postLogout')) {
       sessionStorage.removeItem('postLogout');
       sessionStorage.removeItem('loginMode');
-      sessionStorage.removeItem('chiefAuthIdx');
       sessionStorage.removeItem('apiToken');
       clearMsalInteractionState();
       showLogin();
@@ -376,7 +371,6 @@ async function init() {
     if (!account) { showLogin(); return; }
 
     msalInstance.setActiveAccount(account);
-    if (mode === 'chief') localStorage.setItem('chiefAuthIdxOk', String(chiefAuthIndex()));
 
     setLoadingText('権限を確認しています...');
     await ensureApiToken(mode);
@@ -445,34 +439,11 @@ async function ensureApiToken(mode, force) {
 }
 
 async function handleAuthFailure(e, mode) {
-  const idx = chiefAuthIndex();
-  const canFallback = (mode === 'chief') && (idx + 1 < CHIEF_AUTHORITIES.length) && looksLikeAuthorityError(e);
-  if (!canFallback) {
-    sessionStorage.removeItem('loginMode');
-    sessionStorage.removeItem('apiToken');
-    clearMsalInteractionState();
-    showLogin();
-    showLoginError('ログインできませんでした。\n' + (e && e.message ? e.message : String(e)));
-    return;
-  }
-  sessionStorage.setItem('chiefAuthIdx', String(idx + 1));
-  localStorage.removeItem('chiefAuthIdxOk');
-  setLoadingText('接続先を切り替えて再試行しています...');
-  showLoading();
-  try {
-    await buildInstance('chief');
-    await msalInstance.loginRedirect({ scopes: modeConfig('chief').scopes });
-  } catch (e2) {
-    sessionStorage.removeItem('loginMode');
-    showLogin();
-    showLoginError('ログインできませんでした。\n' + (e2 && e2.message ? e2.message : String(e2)));
-  }
-}
-
-function looksLikeAuthorityError(e) {
-  const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
-  if (msg.indexOf('user_cancelled') >= 0 || msg.indexOf('access_denied') >= 0) return false;
-  return /aadsts900023|aadsts90002|aadsts700016|aadsts50194|unauthorized_client|invalid_request|endpoints_resolution_error|openid_config_error|untrusted_authority/.test(msg);
+  sessionStorage.removeItem('loginMode');
+  sessionStorage.removeItem('apiToken');
+  clearMsalInteractionState();
+  showLogin();
+  showLoginError('ログインできませんでした。\n' + (e && e.message ? e.message : String(e)));
 }
 function isInteractionInProgress(e) {
   const msg = ((e && (e.errorCode || '')) + ' ' + (e && e.message ? e.message : String(e))).toLowerCase();
@@ -498,7 +469,6 @@ async function doLogout() {
   if (msalInstance) { try { await msalInstance.logoutRedirect(); return; } catch (e) {} }
   sessionStorage.removeItem('postLogout');
   sessionStorage.removeItem('loginMode');
-  sessionStorage.removeItem('chiefAuthIdx');
   clearMsalInteractionState();
   location.reload();
 }
