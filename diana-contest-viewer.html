@@ -1948,7 +1948,17 @@ function printDetail() {
     ${memberHtml}
     <h2>初回採寸データ</h2>
     ${measureHtml}
-    <script>window.onload=function(){window.print();}<\/script>
+    <script>
+      // 画像の読み込み完了を待ってから印刷ダイアログを開く
+      window.onload = function() {
+        var imgs = Array.prototype.slice.call(document.images);
+        var remain = imgs.filter(function(i){ return !i.complete; }).length;
+        if (remain === 0) { window.print(); return; }
+        var done = function() { if (--remain <= 0) window.print(); };
+        imgs.forEach(function(i){ if (!i.complete) { i.addEventListener('load', done); i.addEventListener('error', done); } });
+        setTimeout(function(){ window.print(); }, 8000); // 取得に失敗した場合の保険
+      };
+    <\/script>
     </body></html>`;
 
   const w = window.open('', '_blank');
