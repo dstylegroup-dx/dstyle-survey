@@ -249,6 +249,13 @@
         <select id="fEntry" onchange="applyFilter()" style="display:none"></select>
         <select id="fDivision" onchange="applyFilter()" style="display:none"></select>
         <select id="fGender" onchange="applyFilter()" style="display:none"></select>
+        <select id="fStatus" onchange="applyFilter()">
+          <option value="">提出状況（すべて）</option>
+          <option value="complete">✅ 両方提出済</option>
+          <option value="member_only">👤 チーフ未提出</option>
+          <option value="chief_only">👑 メンバー未提出</option>
+          <option value="unkeyed">⚠️ 要確認</option>
+        </select>
         <button class="btn btn-light" onclick="clearFilter()">クリア</button>
         <span class="filter-count" id="filterCount"></span>
       </div>
@@ -581,6 +588,16 @@ const FILTER_DEFS = [
 function buildFilters() {
   document.getElementById('filterCard').style.display = entries.length > 0 ? 'block' : 'none';
 
+  // 該当する応募が無い提出状況は選択肢から外す
+  const statusSel = document.getElementById('fStatus');
+  const present = {};
+  entries.forEach(function(e) { present[e.status] = true; });
+  Array.prototype.forEach.call(statusSel.options, function(opt) {
+    if (!opt.value) return;
+    opt.hidden = !present[opt.value];
+  });
+  if (statusSel.value && !present[statusSel.value]) statusSel.value = '';
+
   FILTER_DEFS.forEach(function(def) {
     const sel = document.getElementById(def.id);
     const values = [];
@@ -599,6 +616,7 @@ function buildFilters() {
 function applyFilter() {
   const name  = (document.getElementById('fName').value || '').trim().toLowerCase();
   const diana = (document.getElementById('fDiana').value || '').trim().toLowerCase();
+  const status = document.getElementById('fStatus').value;
 
   filtered = entries.filter(function(e) {
     if (name) {
@@ -609,6 +627,7 @@ function applyFilter() {
       const code = ((e.memberCode || '') + ' ' + answerByKeywords(e, ['ダイアナコード'])).toLowerCase();
       if (code.indexOf(diana) < 0) return false;
     }
+    if (status && e.status !== status) return false;
     for (const def of FILTER_DEFS) {
       const sel = document.getElementById(def.id);
       if (!sel || sel.style.display === 'none' || !sel.value) continue;
@@ -628,6 +647,7 @@ function applyFilter() {
 function clearFilter() {
   document.getElementById('fName').value = '';
   document.getElementById('fDiana').value = '';
+  document.getElementById('fStatus').value = '';
   FILTER_DEFS.forEach(function(def) { document.getElementById(def.id).value = ''; });
   applyFilter();
 }
