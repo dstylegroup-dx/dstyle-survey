@@ -723,8 +723,11 @@ function renderDetail() {
       return { label: questionLabels[k] || k, value: (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v) };
     })
     .filter(function(a) { return a.value !== ''; });
-  const shorts = list.filter(function(a) { return shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
-  const longs  = list.filter(function(a) { return !shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
+
+  // メンバー用とチーフ用で同じ設問がある場合、値が一致していればチーフ側を隠す
+  const deduped = dedupeChiefAnswers(list);
+  const shorts = deduped.filter(function(a) { return shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
+  const longs  = deduped.filter(function(a) { return !shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
 
   const imgs = (e.files || []).filter(function(f) { return f.kind === 'image'; });
   const others = (e.files || []).filter(function(f) { return f.kind !== 'image'; });
@@ -741,12 +744,16 @@ function renderDetail() {
   html += '<div class="sec-title">📝 応募内容</div>';
   if (shorts.length > 0) {
     html += '<div class="ans-grid">' + shorts.map(function(a) {
-      return '<div class="ans-item"><div class="ans-lbl">' + esc(a.label) + '</div><div class="ans-val">' + esc(a.value) + '</div></div>';
+      return '<div class="ans-item"' + (a.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : '') + '>'
+           + '<div class="ans-lbl">' + esc(a.label) + (a.mismatch ? ' <span style="color:#e65100;">⚠️ 相違</span>' : '') + '</div>'
+           + '<div class="ans-val">' + esc(a.value) + '</div></div>';
     }).join('') + '</div>';
   }
   if (longs.length > 0) {
     html += '<div style="margin-top:10px">' + longs.map(function(a) {
-      return '<div class="ans-long"><div class="ans-lbl">' + esc(a.label) + '</div><div class="ans-val">' + esc(a.value) + '</div></div>';
+      return '<div class="ans-long"' + (a.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : '') + '>'
+           + '<div class="ans-lbl">' + esc(a.label) + (a.mismatch ? ' <span style="color:#e65100;">⚠️ メンバー回答と相違</span>' : '') + '</div>'
+           + '<div class="ans-val">' + esc(a.value) + '</div></div>';
     }).join('') + '</div>';
   }
   if (shorts.length === 0 && longs.length === 0) html += '<div class="note">回答内容がありません。</div>';
@@ -770,6 +777,47 @@ function renderDetail() {
   }
 
   document.getElementById('mBody').innerHTML = html;
+}
+
+// ============================================================
+// メンバー用・チーフ用の重複回答をまとめる
+// ============================================================
+// ラベルから【チーフ】や「応募者」などを取り除いて比較用のキーにする
+function baseLabel(label) {
+  return String(label || '')
+    .replace(/^【チーフ】/, '')
+    .replace(/^(応募者|メンバーの|メンバー)\s*/, '')
+    .replace(/[\s　]/g, '');
+}
+
+function normalizeValue(v) {
+  return String(v == null ? '' : v)
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+    .replace(/[\s　]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+// 値が一致していればチーフ側を隠し、食い違う場合は両方残して目印を付ける
+function dedupeChiefAnswers(list) {
+  const memberByBase = {};
+  list.forEach(function(a) {
+    if (a.label.indexOf('【チーフ】') === 0) return;
+    const b = baseLabel(a.label);
+    if (b && memberByBase[b] === undefined) memberByBase[b] = a.value;
+  });
+
+  return list.filter(function(a) {
+    if (a.label.indexOf('【チーフ】') !== 0) return true;
+    const b = baseLabel(a.label);
+    if (!(b in memberByBase)) return true;                          // メンバー側に無い設問は残す
+    return normalizeValue(memberByBase[b]) !== normalizeValue(a.value); // 一致していれば隠す
+  }).map(function(a) {
+    if (a.label.indexOf('【チーフ】') === 0 && (baseLabel(a.label) in memberByBase)) {
+      return { label: a.label, value: a.value, mismatch: true };
+    }
+    return a;
+  });
 }
 
 // ============================================================
