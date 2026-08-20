@@ -324,7 +324,6 @@ let contests = [];
 let entries = [];
 let filtered = [];
 let questionLabels = {};
-let measureCache = {};
 let detailIndex = -1;
 
 function savedMode() { return sessionStorage.getItem('loginMode'); }
@@ -560,7 +559,6 @@ async function loadEntries() {
     const data = await apiGet(path);
     entries = data.entries || [];
     questionLabels = data.questionLabels || {};
-    measureCache = {};
     if (myRole === 'staff') {
       mySalon = data.salonCode;
       document.getElementById('salonNote').textContent = 'サロン ' + data.salonCode + ' の応募状況を表示しています。';
@@ -699,7 +697,7 @@ function row(k, v) {
 // ============================================================
 // 詳細モーダル
 // ============================================================
-async function openDetail(i) {
+function openDetail(i) {
   detailIndex = i;
   const e = filtered[i];
   if (!e) return;
@@ -707,8 +705,6 @@ async function openDetail(i) {
   document.getElementById('mKana').textContent = kanaOf(e) || '';
   document.getElementById('detailModal').classList.add('show');
   renderDetail();
-  await loadMeasure(e);
-  if (detailIndex === i) renderDetail();
 }
 
 function renderDetail() {
@@ -773,134 +769,7 @@ function renderDetail() {
     }
   }
 
-  html += '<div class="sec-title">📐 採寸データ</div>' + measureHtml(e);
-
   document.getElementById('mBody').innerHTML = html;
-}
-
-// ============================================================
-// 採寸データ（PostgreSQL照合）
-// ============================================================
-async function loadMeasure(e) {
-  if (!e.memberCode) { measureCache[e.id] = { error: 'nokey' }; return; }
-  if (measureCache[e.id] !== undefined) return;
-  measureCache[e.id] = { loading: true };
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(function() { controller.abort(); }, 120000); // 初回起動が遅いため長め
-    const res = await fetch(BASE_URL + '/api/diana-member', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken || '' },
-      body: JSON.stringify({ salon_code: e.salonCode, dia_cd: e.memberCode }),
-      signal: controller.signal
-    });
-    clearTimeout(timer);
-    if (res.ok) measureCache[e.id] = { data: await res.json() };
-    else if (res.status === 404) measureCache[e.id] = { error: 'notfound' };
-    else measureCache[e.id] = { error: 'http' + res.status };
-  } catch (err) {
-    measureCache[e.id] = { error: 'timeout' };
-  }
-}
-
-function measureHtml(e) {
-  const c = measureCache[e.id];
-  if (!c) return '<div class="note">読み込み中...</div>';
-  if (c.loading) return '<div class="note"><span class="spinner spinner-sm"></span> 採寸データを照合しています（初回は時間がかかります）...</div>';
-  if (c.error === 'nokey') return '<div class="warn">ダイアナコードが未入力のため、採寸データを照合できません。</div>';
-  if (c.error === 'notfound') return '<div class="warn">ダイアナコードとサロンコードに一致する会員データが見つかりませんでした。入力内容をご確認ください。</div>';
-  if (c.error) return '<div class="warn">採寸データを取得できませんでした（' + esc(c.error) + '）。時間をおいて「更新」をお試しください。</div>';
-
-  const m = c.data || {};
-  let html = '<div class="ans-grid" style="margin-bottom:14px">'
-    + block('生年月日', m.b_day ? fmtDate(m.b_day) : null)
-    + block('年齢', m.age != null ? m.age + '歳' : null)
-    + block('性別', m.gender)
-    + block('ダイアナ歴', m.diana_years != null ? m.diana_years + '年' : null)
-    + block('サロン名', m.salon_name)
-    + block('身長', (m.first_height || m.latest_height) ? (m.first_height || m.latest_height) + 'cm' : null)
-    + block('ボディチェック回数', m.total_body_check != null ? m.total_body_check + '回' : null)
-    + block('最終BC日', m.last_body_check_date ? fmtDate(m.last_body_check_date) : null)
-    + block('GP倶楽部', m.gp_club_type == null ? null : (String(m.gp_club_type) === '001' ? 'あり' : 'なし'))
-    + '</div>';
-
-  if (!m.first_check_date) {
-    html += '<div class="warn">ボディチェックの採寸データが登録されていません。</div>';
-    return html;
-  }
-
-  html += '<div style="overflow-x:auto"><table class="m"><thead><tr>'
-    + '<th style="text-align:left">項目</th><th>理想値</th>'
-    + '<th>初回<br><span style="font-size:11px;font-weight:normal">' + esc(fmtDate(m.first_check_date)) + '</span></th>'
-    + '<th>現在<br><span style="font-size:11px;font-weight:normal">' + esc(fmtDate(m.latest_check_date)) + '</span></th>'
-    + '<th>理想値との差</th></tr></thead><tbody>'
-    + measureRows(m)
-    + '</tbody></table></div>'
-    + '<div class="note" style="margin-top:8px">＊印は審査対象項目です。</div>';
-  return html;
-}
-
-function measureRows(m) {
-  const rows = [];
-  rows.push(mrow('身長', 'cm', null, m.first_height, m.latest_height, false));
-  if (m.gender === '男性') {
-    rows.push(mrow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
-    rows.push(mrow('肩周囲', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, true));
-    rows.push(mrow('胸囲', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, true));
-    rows.push(mrow('腹囲', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, true));
-    rows.push(mrow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
-    rows.push(mrow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
-    rows.push(mrow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
-    rows.push(mrow('ふくらはぎ左', 'cm', null, m.first_calf_l, m.latest_calf_l, false));
-    rows.push(mrow('ふくらはぎ右', 'cm', null, m.first_calf_r, m.latest_calf_r, false));
-    rows.push(mrow('アーム左', 'cm', null, m.first_arm_l, m.latest_arm_l, false));
-    rows.push(mrow('アーム右', 'cm', null, m.first_arm_r, m.latest_arm_r, false));
-    rows.push(mrow('体脂肪率', '%', null, m.first_fat, m.latest_fat, true));
-    rows.push(mrow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
-  } else {
-    rows.push(mrow('体重', 'kg', m.ideal_weight, m.first_weight, m.latest_weight, true));
-    rows.push(mrow('トップバスト', 'cm', m.ideal_top_bust, m.first_top_bust, m.latest_top_bust, true));
-    rows.push(mrow('アンダーバスト', 'cm', m.ideal_under_bust, m.first_under_bust, m.latest_under_bust, true));
-    rows.push(mrow('ウエスト', 'cm', m.ideal_waist, m.first_waist, m.latest_waist, true));
-    rows.push(mrow('ミドルヒップ', 'cm', m.ideal_mid_hip, m.first_mid_hip, m.latest_mid_hip, true));
-    rows.push(mrow('ヒップ', 'cm', m.ideal_hip, m.first_hip, m.latest_hip, true));
-    rows.push(mrow('太もも左', 'cm', m.ideal_thigh_l, m.first_thigh_l, m.latest_thigh_l, true));
-    rows.push(mrow('太もも右', 'cm', m.ideal_thigh_r, m.first_thigh_r, m.latest_thigh_r, true));
-    rows.push(mrow('ふくらはぎ左', 'cm', m.ideal_calf_l, m.first_calf_l, m.latest_calf_l, true));
-    rows.push(mrow('ふくらはぎ右', 'cm', m.ideal_calf_r, m.first_calf_r, m.latest_calf_r, true));
-    rows.push(mrow('アーム左', 'cm', m.ideal_arm_l, m.first_arm_l, m.latest_arm_l, true));
-    rows.push(mrow('アーム右', 'cm', m.ideal_arm_r, m.first_arm_r, m.latest_arm_r, true));
-    rows.push(mrow('体脂肪率', '%', m.ideal_fat, m.first_fat, m.latest_fat, false));
-    rows.push(mrow('PI', '', null, m.first_pi, m.latest_pi, false));
-    rows.push(mrow('BMI', '', null, m.first_bmi, m.latest_bmi, false));
-  }
-  return rows.join('');
-}
-
-function mrow(label, unit, ideal, first, latest, required) {
-  const fmt = function(v) {
-    return (v != null && v !== '')
-      ? '<strong>' + esc(String(v)) + '</strong><span style="font-size:11px;color:#888">' + unit + '</span>'
-      : '<span style="color:#ccc">-</span>';
-  };
-  let diff = '<span style="color:#ccc">-</span>';
-  if (latest != null && latest !== '' && ideal != null && ideal !== '') {
-    const d = Math.round((parseFloat(latest) - parseFloat(ideal)) * 10) / 10;
-    const color = d < 0 ? '#27ae60' : d > 0 ? '#e74c3c' : '#888';
-    diff = '<span style="color:' + color + ';font-weight:bold">' + (d > 0 ? '+' : '') + d + '<span style="font-size:11px">' + unit + '</span></span>';
-  }
-  const lab = required ? esc(label) + '<span style="color:#e53935;font-weight:bold"> ＊</span>' : esc(label);
-  return '<tr style="border-bottom:1px solid #f5f0f3">'
-    + '<td style="padding:8px 10px;color:#555;white-space:nowrap">' + lab + '</td>'
-    + '<td style="padding:8px 10px;text-align:center;background:#fdf8fb">' + fmt(ideal) + '</td>'
-    + '<td style="padding:8px 10px;text-align:center;background:#f8fffe">' + fmt(first) + '</td>'
-    + '<td style="padding:8px 10px;text-align:center;background:#f0f8ff">' + fmt(latest) + '</td>'
-    + '<td style="padding:8px 10px;text-align:center;background:#fffdf0">' + diff + '</td></tr>';
-}
-
-function block(label, val) {
-  return '<div class="ans-item"><div class="ans-lbl">' + esc(label) + '</div><div class="ans-val">'
-    + (val != null && val !== '' ? esc(String(val)) : '<span style="color:#ccc">-</span>') + '</div></div>';
 }
 
 // ============================================================

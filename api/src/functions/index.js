@@ -2412,22 +2412,16 @@ app.http('diana-member', {
             if (!tokenDoc) {
                 return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
             }
+            // 採寸データは管理画面（アワード閲覧ページ）専用。
+            // チーフ用画面では表示しないため、chief / staff トークンは受け付けない
             const callerRole = tokenDoc.role || 'admin';
-            if (['admin', 'chief', 'staff'].indexOf(callerRole) < 0) {
+            if (callerRole !== 'admin') {
                 return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'この操作は許可されていません' } };
             }
 
             const body = await request.json().catch(() => ({}));
             const { salon_code, sldsslcd, dia_cd, b_day } = body;
-            let salonCode = salon_code || sldsslcd; // 旧パラメータ名(sldsslcd)も後方互換で受付
-
-            // チーフは自サロン固定。リクエストで指定された値は採用しない
-            if (callerRole === 'chief') {
-                salonCode = String(tokenDoc.salonCode || '');
-                if (!isSalonCode(salonCode)) {
-                    return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'サロンコードが取得できません' } };
-                }
-            }
+            const salonCode = salon_code || sldsslcd; // 旧パラメータ名(sldsslcd)も後方互換で受付
 
             if (!dia_cd || !salonCode) {
                 return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'dia_cd と salon_code の両方が必須です' } };
