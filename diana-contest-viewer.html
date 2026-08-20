@@ -1825,9 +1825,24 @@ function toggleLayout() {
 // ============================================================
 // 印刷（応募者 詳細1名分）
 // ============================================================
-function printDetail() {
+async function printDetail() {
   const r = filteredResponses[currentDetailIndex];
   if (!r) { alert('印刷するデータがありません'); return; }
+
+  // 応募写真（SAS URLの取得に時間がかかるため、先に取得しておく）
+  let photoHtml = '';
+  try {
+    const printImgs = (await getImageUrls(r)).filter(img => img.kind === 'image');
+    if (printImgs.length > 0) {
+      photoHtml = '<h2>応募写真</h2><div class="photo-grid">'
+        + printImgs.map(img =>
+            '<div class="photo-cell">'
+          + '<img src="' + esc(img.url) + '" alt="">'
+          + '<div class="cap">' + esc(img.label) + '</div>'
+          + '</div>').join('')
+        + '</div>';
+    }
+  } catch (e) { photoHtml = ''; }
 
   const fmt = (v) => (v == null || v === '') ? '-' : esc(String(v));
   const name = getAnswerByKey(r, ['応募者氏名','氏名','名前','お名前']) || '（氏名なし）';
@@ -1938,10 +1953,15 @@ function printDetail() {
       table.measure th { background: #f5eef2; text-align: center; }
       table.measure td { text-align: center; }
       .none { color: #999; font-size: 12px; }
+      .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+      .photo-cell { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; page-break-inside: avoid; }
+      .photo-cell img { width: 100%; height: 62mm; object-fit: contain; background: #fafafa; display: block; }
+      .photo-cell .cap { font-size: 10px; color: #666; padding: 3px 6px; border-top: 1px solid #eee; }
       @media print { @page { size: A4 portrait; margin: 12mm; } }
     </style></head><body>
     <h1>${esc(name)}</h1>
     <div class="kana">${esc(kana)}　／　${esc(currentContest ? currentContest.title : '')}</div>
+    ${photoHtml}
     <h2>応募内容</h2>
     <table class="kv">${answerRows}</table>
     <h2>会員情報（DBから取得）</h2>
