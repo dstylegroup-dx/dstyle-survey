@@ -189,7 +189,7 @@
       <button class="btn-chief" id="chiefBtn" onclick="startLogin('chief')"><span>👑</span> チーフとしてログイン</button>
       <div class="hint-box">
         <div><span class="k">ID</span>サロンコード（5桁）</div>
-        <div><span class="k">パスワード</span>サロンのパスワード</div>
+        <div><span class="k">パスワード</span>サロンAIチャットボットと同じパスワード</div>
       </div>
       <div class="login-error" id="loginError"></div>
       <div class="divider"><span>または</span></div>
@@ -703,7 +703,6 @@ function renderList() {
       + '</div>'
       + '<div class="app-foot">'
       +   '<span class="chip" style="background:' + meta.bg + ';border:1px solid ' + meta.bd + ';color:' + meta.color + '">' + meta.icon + ' ' + meta.label + '</span>'
-      +   (e.resubmit ? '<span class="chip" style="background:#f3e8f7;border:1px solid #d9b8e6;color:#7B4F6E">🔁 再提出</span>' : '')
       +   '<span style="margin-left:auto">詳細 ›</span>'
       + '</div>'
       + '</div>';
@@ -756,7 +755,6 @@ function renderDetail() {
 
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
         + '<span class="chip" style="background:' + meta.bg + ';border:1px solid ' + meta.bd + ';color:' + meta.color + '">' + meta.icon + ' ' + meta.label + '</span>'
-        + (e.resubmit ? '<span class="chip" style="background:#f3e8f7;border:1px solid #d9b8e6;color:#7B4F6E">🔁 再提出あり</span>' : '')
         + '</div>';
   html += '<div class="note">メンバー提出：' + esc(fmtDateTime(e.memberAt) || '未提出')
         + '　／　チーフ提出：' + esc(fmtDateTime(e.chiefAt) || '未提出') + '</div>';

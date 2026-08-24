@@ -1824,7 +1824,6 @@ async function verifyIdToken(idToken, metadataUrl, allowedIssuers, expectedAudie
 // ----------------------------------------------------
 // 🔤 コンテスト回答のマージ（閲覧ページと同じロジック）
 // ----------------------------------------------------
-const KEY_SALON_LABELS       = ['サロンコード'];
 const KEY_DIANA_LABELS       = ['応募者 ダイアナコード', 'ダイアナコード'];
 const KEY_DIANA_LABELS_CHIEF = ['メンバーのダイアナコード', 'メンバー ダイアナコード', '応募者 ダイアナコード', 'ダイアナコード'];
 
@@ -1855,7 +1854,18 @@ function pickAnswer(answers, labelMap, keywords) {
     return '';
 }
 
-function surveyRole(s) { return s.contestRole === 'chief' ? 'chief' : 'member'; }
+// 応募区分の判定に使う設問ラベル
+const ROLE_MARKER_CHIEF  = 'ダイアナスタート前の全身写真';
+const ROLE_MARKER_MEMBER = 'サクセスストーリー';
+
+// アンケートの設問構成から応募区分を自動判定する
+// （手動設定 contestRole が入っている場合はそちらを優先）
+function surveyRole(s) {
+    const labels = (s.questions || []).map(q => String(q.label || ''));
+    if (labels.some(l => l.includes(ROLE_MARKER_CHIEF)))  return 'chief';
+    if (labels.some(l => l.includes(ROLE_MARKER_MEMBER))) return 'member';
+    return s.contestRole === 'chief' ? 'chief' : 'member';
+}
 function surveyGroupId(s) { return s.contestGroupId || ('single_' + s.id); }
 
 // parts: [{ survey, role, labelMap, responses }]
@@ -1866,13 +1876,12 @@ function mergeContestResponses(parts) {
 
     parts.forEach(p => {
         (p.responses || []).forEach(r => {
-            const salon = pickAnswer(r.answers, p.labelMap, KEY_SALON_LABELS);
+            // 照合はダイアナコードのみ（応募フォームからサロンコード欄を廃止したため）
             const diana = pickAnswer(r.answers, p.labelMap, p.role === 'chief' ? KEY_DIANA_LABELS_CHIEF : KEY_DIANA_LABELS);
-            const ns = normalizeCode(salon), nd = normalizeCode(diana);
-            if (!multi || !ns || !nd) { unkeyed.push({ r, role: p.role, salon: ns, diana: nd }); return; }
-            const key = ns + '|' + nd;
-            if (!map.has(key)) map.set(key, { key, salonCode: ns, memberCode: nd, member: [], chief: [] });
-            map.get(key)[p.role].push(r);
+            const nd = normalizeCode(diana);
+            if (!multi || !nd) { unkeyed.push({ r, role: p.role, diana: nd }); return; }
+            if (!map.has(nd)) map.set(nd, { key: nd, memberCode: nd, member: [], chief: [] });
+            map.get(nd)[p.role].push(r);
         });
     });
 
@@ -1886,7 +1895,7 @@ function mergeContestResponses(parts) {
         return {
             id: 'merged_' + g.key,
             key: g.key,
-            salonCode: g.salonCode,
+            salonCode: '',   // 後段でPostgreSQLから解決する
             memberCode: g.memberCode,
             status: (m && c) ? 'complete' : (m ? 'member_only' : 'chief_only'),
             createdAt: (m && m.createdAt) || (c && c.createdAt) || null,
@@ -1901,7 +1910,7 @@ function mergeContestResponses(parts) {
         entries.push({
             id: u.r.id,
             key: null,
-            salonCode: u.salon || '',
+            salonCode: '',
             memberCode: u.diana || '',
             status: multi ? 'unkeyed' : 'single',
             createdAt: u.r.createdAt || null,
@@ -1969,6 +1978,34 @@ function buildFileList(answers, labels) {
         });
     });
     return files;
+}
+
+// ----------------------------------------------------
+// 🐘 ダイアナコード → サロンコードの一括解決
+// 応募フォームからサロンコード欄を廃止したため、
+// customer_master を参照して応募者の所属サロンを特定する
+// ----------------------------------------------------
+async function resolveSalonCodes(dianaCodes, context) {
+    const result = {};
+    const codes = [...new Set((dianaCodes || []).map(c => String(c || '').trim()).filter(Boolean))];
+    if (codes.length === 0 || !process.env.PG_HOST) return result;
+
+    const schema = process.env.PG_SCHEMA || 'public';
+    try {
+        const pool = getPgPool();
+        const { rows } = await pool.query(
+            `SELECT TRIM(diana_code::text) AS diana_code, TRIM(salon_code::text) AS salon_code
+             FROM ${schema}.customer_master
+             WHERE transfer_delete_flag::text = '0'
+               AND TRIM(diana_code::text) = ANY($1::text[])`,
+            [codes]
+        );
+        rows.forEach(r => { if (r.diana_code) result[r.diana_code] = r.salon_code || ''; });
+        if (context) context.log(`[resolveSalonCodes] ${codes.length}件中 ${rows.length}件を解決`);
+    } catch (e) {
+        if (context) context.log('[resolveSalonCodes] エラー: ' + e.message);
+    }
+    return result;
 }
 
 // ----------------------------------------------------
@@ -2177,11 +2214,19 @@ app.http('contestEntries', {
 
             const all = mergeContestResponses(parts);
 
+            // ---- 応募者の所属サロンをPostgreSQLから解決 ----
+            // 応募フォームにサロンコード欄が無いため、ダイアナコードから引く
+            const salonMap = await resolveSalonCodes(all.map(e => e.memberCode), context);
+            all.forEach(e => { e.salonCode = salonMap[normalizeCode(e.memberCode)] || salonMap[String(e.memberCode || '').trim()] || ''; });
+
             // ---- サロンで絞り込み（ここが情報分離の要）----
             const target = normalizeCode(salonCode);
             const entries = all
-                .filter(e => normalizeCode(e.salonCode) === target)
+                .filter(e => e.salonCode && normalizeCode(e.salonCode) === target)
                 .map(e => Object.assign({}, e, { files: buildFileList(e.answers, questionLabels) }));
+
+            // サロンを特定できなかった応募の件数（DB未登録・コード誤りの可能性）
+            const unresolved = all.filter(e => !e.salonCode).length;
 
             // 誰がどのサロンを閲覧したかを記録
             await container.items.create({
@@ -2208,7 +2253,8 @@ app.http('contestEntries', {
                 groupTitle: group.title,
                 contests,
                 questionLabels,
-                entries
+                entries,
+                unresolved   // サロンを特定できなかった応募の件数
             });
 
         } catch (e) {
@@ -2423,8 +2469,8 @@ app.http('diana-member', {
             const { salon_code, sldsslcd, dia_cd, b_day } = body;
             const salonCode = salon_code || sldsslcd; // 旧パラメータ名(sldsslcd)も後方互換で受付
 
-            if (!dia_cd || !salonCode) {
-                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'dia_cd と salon_code の両方が必須です' } };
+            if (!dia_cd) {
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'dia_cd は必須です' } };
             }
 
             const schema = process.env.PG_SCHEMA || 'public';
@@ -2456,12 +2502,15 @@ app.http('diana-member', {
             `;
             const params = [];
 
-            // ダイアナコード＋サロンコードの両方一致で検索（取り違え防止のためAND条件）
+            // ダイアナコードで検索。サロンコードが指定された場合のみAND条件を追加する
+            // （応募フォームからサロンコード欄を廃止したため、ダイアナコード単独でも照合できるようにしている）
             // ※前後の空白は無視して比較
             params.push(String(dia_cd).trim());
             custQuery += ` AND TRIM(diana_code::text) = $${params.length}`;
-            params.push(String(salonCode).trim());
-            custQuery += ` AND TRIM(salon_code::text) = $${params.length}`;
+            if (salonCode) {
+                params.push(String(salonCode).trim());
+                custQuery += ` AND TRIM(salon_code::text) = $${params.length}`;
+            }
             custQuery += ' LIMIT 1';
 
             context.log(`[diana-member] customer_masterクエリ開始: ${Date.now() - t0}ms`);
