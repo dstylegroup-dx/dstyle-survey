@@ -764,14 +764,14 @@ function renderDetail() {
     html += '<div class="ans-grid">' + shorts.map(function(a) {
       return '<div class="ans-item"' + (a.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : '') + '>'
            + '<div class="ans-lbl">' + esc(a.label) + (a.mismatch ? ' <span style="color:#e65100;">⚠️ 相違</span>' : '') + '</div>'
-           + '<div class="ans-val">' + esc(a.value) + '</div></div>';
+           + '<div class="ans-val">' + (a.value ? esc(a.value) : '<span style="color:#c8c8c8">未入力</span>') + '</div></div>';
     }).join('') + '</div>';
   }
   if (longs.length > 0) {
     html += '<div style="margin-top:10px">' + longs.map(function(a) {
       return '<div class="ans-long"' + (a.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : '') + '>'
            + '<div class="ans-lbl">' + esc(a.label) + (a.mismatch ? ' <span style="color:#e65100;">⚠️ メンバー回答と相違</span>' : '') + '</div>'
-           + '<div class="ans-val">' + esc(a.value) + '</div></div>';
+           + '<div class="ans-val">' + (a.value ? esc(a.value) : '<span style="color:#c8c8c8">未入力</span>') + '</div></div>';
     }).join('') + '</div>';
   }
   if (shorts.length === 0 && longs.length === 0) html += '<div class="note">回答内容がありません。</div>';

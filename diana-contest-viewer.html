@@ -769,7 +769,10 @@ async function onContestChange() {
 // ============================================================
 // 回答データ取得
 // ============================================================
-let questionLabelMap = {}; // { q_XXXXXXXXX: '氏名' } のマップ
+let questionLabelMap = {};
+// 両フォームの全設問を、フォームの並び順で保持する
+// （どちらか一方が未提出でも、同じ項目が空欄で並ぶようにするため）
+let questionOrder = []; // { q_XXXXXXXXX: '氏名' } のマップ
 
 // ── マージキー（サロンコード＋ダイアナコード）─────────────────
 // 照合はダイアナコードのみ（応募フォームからサロンコード欄を廃止したため）
@@ -881,12 +884,18 @@ async function loadResponses() {
 
     // 質問ラベルマップを構築（複数アンケートの場合、チーフ側は【チーフ】を接頭）
     questionLabelMap = {};
-    parts.forEach(p => {
+    questionOrder = [];
+    // メンバー用 → チーフ用 の順に並べる
+    const ordered = parts.slice().sort((a, b) => (a.role === 'member' ? 0 : 1) - (b.role === 'member' ? 0 : 1));
+    ordered.forEach(p => {
       Object.entries(p.labelMap).forEach(([qid, label]) => {
-        questionLabelMap[qid] = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
+        const shown = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
+        questionLabelMap[qid] = shown;
+        questionOrder.push({ qid, label: shown, role: p.role });
       });
     });
 
+    fileQuestionIds = null;   // 添付ファイル設問の判定をリセット
     allResponses = mergeContestResponses(parts);
 
     // ※採寸データは詳細を開いた時に個別取得（遅延読み込み）
@@ -968,26 +977,48 @@ function getBirthday(r) {
 
 function getAnswerEntries(r) {
   const answers = r.answers || {};
-  // 上部表示する写真ラベル
-  const topPhotoLabels = ['ダイアナスタート前の全身写真', '現在の全身写真', '現在の顔写真'];
 
-  const entries = Object.entries(answers)
+  // 両フォームの全設問を並べる（未提出側は空欄で表示）
+  // 設問の並びが取れない場合は、回答に含まれるものだけを使う
+  const source = questionOrder.length > 0
+    ? questionOrder.map(q => [q.qid, answers[q.qid]])
+    : Object.entries(answers);
+
+  const entries = source
     .filter(([k, v]) => {
-      const label = questionLabelMap[k] || k;
       // 画像パスは応募内容から除外（応募写真・上部写真セクションで表示）
       if (typeof v === 'string' && isBlobPath(v)) return false;
       if (typeof v === 'string' && /\.(png|jpg|jpeg|gif|webp)/i.test(v)) return false;
+      // 添付ファイル設問は、未回答でも応募内容には出さない
+      if (v === undefined && isFileQuestion(k)) return false;
       return true;
     })
     .map(([k, v]) => {
       const label = questionLabelMap[k] || k;
-      const value = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v || '');
+      const value = (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v);
       return { key: label, rawKey: k, value };
     });
 
   // メンバー用とチーフ用で同じ設問がある場合、値が一致していればチーフ側を隠す
   // （値が食い違う場合は、確認できるよう両方表示する）
   return dedupeChiefAnswers(entries);
+}
+
+// 添付ファイルの設問かどうかを、他の応募者の回答から推定する
+// （未提出の場合は自分の回答に値が無いため、全体を見て判断する）
+let fileQuestionIds = null;
+function isFileQuestion(qid) {
+  if (fileQuestionIds === null) {
+    fileQuestionIds = new Set();
+    (allResponses || []).forEach(r => {
+      Object.entries(r.answers || {}).forEach(([k, v]) => {
+        if (typeof v === 'string' && (isBlobPath(v) || /\.(png|jpg|jpeg|gif|webp|pdf|xlsx?|docx?)/i.test(v))) {
+          fileQuestionIds.add(k);
+        }
+      });
+    });
+  }
+  return fileQuestionIds.has(qid);
 }
 
 // ラベルから【チーフ】と表記ゆれを取り除いて比較用のキーにする
@@ -1018,12 +1049,18 @@ function dedupeChiefAnswers(entries) {
   return entries.filter(e => {
     if (e.key.indexOf('【チーフ】') !== 0) return true;
     const b = baseLabel(e.key);
-    if (!(b in memberByBase)) return true;                      // メンバー側に無い設問はそのまま表示
-    return normalizeValue(memberByBase[b]) !== normalizeValue(e.value); // 一致していれば隠す
+    if (!(b in memberByBase)) return true;   // メンバー側に無い設問はそのまま表示
+    const mv = normalizeValue(memberByBase[b]);
+    const cv = normalizeValue(e.value);
+    if (!cv) return false;                   // チーフ側が未入力なら隠す（メンバー側に同じ項目がある）
+    return mv !== cv;                        // 一致していれば隠す
   }).map(e => {
-    // 食い違って残ったチーフ側の項目には目印を付ける
-    if (e.key.indexOf('【チーフ】') === 0 && (baseLabel(e.key) in memberByBase)) {
-      return Object.assign({}, e, { mismatch: true });
+    // 値が食い違って残ったチーフ側の項目にだけ目印を付ける（どちらかが空欄の場合は付けない）
+    if (e.key.indexOf('【チーフ】') === 0) {
+      const b = baseLabel(e.key);
+      if ((b in memberByBase) && normalizeValue(memberByBase[b]) && normalizeValue(e.value)) {
+        return Object.assign({}, e, { mismatch: true });
+      }
     }
     return e;
   });
@@ -1437,7 +1474,7 @@ async function renderModal() {
         ${shortEntries.map(e => `
           <div class="answer-item-short"${e.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : ''}>
             <div class="answer-lbl">${esc(e.key)}${e.mismatch ? ' <span style="color:#e65100;">⚠️ 相違</span>' : ''}</div>
-            <div class="answer-val">${esc(e.value)}</div>
+            <div class="answer-val">${e.value ? esc(e.value) : '<span style="color:#c8c8c8">未入力</span>'}</div>
           </div>`).join('')}
       </div>` : '') +
     (longEntries.length > 0 ? `
@@ -1445,13 +1482,15 @@ async function renderModal() {
         ${longEntries.map(e => `
           <div class="answer-item"${e.mismatch ? ' style="border:1.5px solid #ffcc80;background:#fff8e6;"' : ''}>
             <div class="answer-lbl">${esc(e.key)}${e.mismatch ? ' <span style="color:#e65100;">⚠️ メンバー回答と相違</span>' : ''}</div>
-            <div class="answer-val">${esc(e.value)}</div>
+            <div class="answer-val">${e.value ? esc(e.value) : '<span style="color:#c8c8c8">未入力</span>'}</div>
           </div>`).join('')}
       </div>` : '');
 
   // customer_master情報セクション
   const customerHtml = m && m.salon_code ? `
     <div class="measure-grid">
+      ${mBlock('サロンコード', m.salon_code || null, '')}
+      ${mBlock('ダイアナコード', m.dia_cd || null, '')}
       ${mBlock('生年月日', m.b_day ? fmtDate(m.b_day) : null, '')}
       ${mBlock('ダイアナ歴', m.diana_years !== null && m.diana_years !== undefined ? m.diana_years + '年' : null, '')}
       ${mBlock('年齢', m.age !== null && m.age !== undefined ? m.age + '歳' : null, '')}
@@ -1872,6 +1911,8 @@ async function printDetail() {
   if (m && m.salon_code) {
     const gp = m.gp_club_type == null ? 'なし' : (String(m.gp_club_type) === '001' ? 'あり' : 'なし');
     const cells = [
+      ['サロンコード', m.salon_code || '-'],
+      ['ダイアナコード', m.dia_cd || '-'],
       ['生年月日', fmtDate(m.b_day) || '-'],
       ['ダイアナ歴', m.diana_years != null ? m.diana_years + '年' : '-'],
       ['年齢', m.age != null ? m.age + '歳' : '-'],
