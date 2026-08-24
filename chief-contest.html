@@ -735,13 +735,17 @@ function renderDetail() {
 
   // 回答内容（添付ファイルの設問は除外）
   const shortKeys = ['出場区分', '氏名', 'ふりがな', 'ダイアナコード', '生年月日', 'サロンコード', '都道府県', 'サロン名', 'チーフ名', 'サロン所在地'];
-  const list = Object.keys(e.answers || {})
+  // 両フォームの全設問を並べる（未提出側は空欄で表示）
+  // questionLabels にはメンバー用・チーフ用の全設問が含まれる
+  const qids = Object.keys(questionLabels).length > 0
+    ? Object.keys(questionLabels)
+    : Object.keys(e.answers || {});
+  const list = qids
     .filter(function(k) { return !fileQids[k]; })
     .map(function(k) {
-      const v = e.answers[k];
+      const v = (e.answers || {})[k];
       return { label: questionLabels[k] || k, value: (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v) };
-    })
-    .filter(function(a) { return a.value !== ''; });
+    });
 
   // メンバー用とチーフ用で同じ設問がある場合、値が一致していればチーフ側を隠す
   const deduped = dedupeChiefAnswers(list);
@@ -828,11 +832,17 @@ function dedupeChiefAnswers(list) {
   return list.filter(function(a) {
     if (a.label.indexOf('【チーフ】') !== 0) return true;
     const b = baseLabel(a.label);
-    if (!(b in memberByBase)) return true;                          // メンバー側に無い設問は残す
-    return normalizeValue(memberByBase[b]) !== normalizeValue(a.value); // 一致していれば隠す
+    if (!(b in memberByBase)) return true;   // メンバー側に無い設問は残す
+    const cv = normalizeValue(a.value);
+    if (!cv) return false;                   // チーフ側が未入力なら隠す（メンバー側に同じ項目がある）
+    return normalizeValue(memberByBase[b]) !== cv;
   }).map(function(a) {
-    if (a.label.indexOf('【チーフ】') === 0 && (baseLabel(a.label) in memberByBase)) {
-      return { label: a.label, value: a.value, mismatch: true };
+    // 値が食い違って残った項目にだけ目印を付ける（どちらかが空欄の場合は付けない）
+    if (a.label.indexOf('【チーフ】') === 0) {
+      const b = baseLabel(a.label);
+      if ((b in memberByBase) && normalizeValue(memberByBase[b]) && normalizeValue(a.value)) {
+        return { label: a.label, value: a.value, mismatch: true };
+      }
     }
     return a;
   });
