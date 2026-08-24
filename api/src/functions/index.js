@@ -2207,8 +2207,10 @@ app.http('contestEntries', {
             }
 
             // 質問ラベル（複数アンケートの場合、チーフ側は【チーフ】を接頭）
+            // メンバー用 → チーフ用 の順に並べる
             const questionLabels = {};
-            parts.forEach(p => {
+            const orderedParts = parts.slice().sort((a, b) => (a.role === 'member' ? 0 : 1) - (b.role === 'member' ? 0 : 1));
+            orderedParts.forEach(p => {
                 Object.entries(p.labelMap).forEach(([qid, label]) => {
                     questionLabels[qid] = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
                 });
