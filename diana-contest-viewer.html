@@ -693,8 +693,10 @@ const ROLE_MARKER_CHIEF  = 'ダイアナスタート前の全身写真';
 const ROLE_MARKER_MEMBER = 'サクセスストーリー';
 function surveyRole(s) {
   const labels = (s.questions || []).map(q => String(q.label || ''));
-  if (labels.some(l => l.includes(ROLE_MARKER_CHIEF)))  return 'chief';
+  // 「サクセスストーリー」を先に判定する
+  // （メンバー用フォームにも写真の設問があるため、写真だけでは区別できない）
   if (labels.some(l => l.includes(ROLE_MARKER_MEMBER))) return 'member';
+  if (labels.some(l => l.includes(ROLE_MARKER_CHIEF)))  return 'chief';
   return s.contestRole === 'chief' ? 'chief' : 'member';
 }
 
@@ -999,9 +1001,19 @@ function getAnswerEntries(r) {
       return { key: label, rawKey: k, value };
     });
 
+  // 同一ラベルの重複を除去する
+  // （同じ区分のアンケートがコンテストに複数登録されている場合など）
+  const seen = new Set();
+  const uniq = entries.filter(e => {
+    const k = e.key + '||' + normalizeValue(e.value);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
   // メンバー用とチーフ用で同じ設問がある場合、値が一致していればチーフ側を隠す
   // （値が食い違う場合は、確認できるよう両方表示する）
-  return dedupeChiefAnswers(entries);
+  return dedupeChiefAnswers(uniq);
 }
 
 // 添付ファイルの設問かどうかを、他の応募者の回答から推定する
