@@ -574,9 +574,6 @@ function statusChip(r) {
   if (meta && meta.label) {
     html += `<span class="status-chip" style="background:${meta.bg};border:1px solid ${meta.bd};color:${meta.color};">${meta.icon} ${meta.label}</span>`;
   }
-  if (r._resubmit) {
-    html += `<span class="status-chip" style="background:#f3e8f7;border:1px solid #d9b8e6;color:#7B4F6E;">🔁 再提出あり</span>`;
-  }
   return html;
 }
 
@@ -691,7 +688,15 @@ async function getAdminToken() {
 // ============================================================
 // アンケート定義 → コンテストグループID / 応募区分
 function surveyGroupId(s) { return s.contestGroupId || ('single_' + s.id); }
-function surveyRole(s)    { return s.contestRole === 'chief' ? 'chief' : 'member'; }
+// 応募区分は設問構成から自動判定する（手動設定があればそちらを優先）
+const ROLE_MARKER_CHIEF  = 'ダイアナスタート前の全身写真';
+const ROLE_MARKER_MEMBER = 'サクセスストーリー';
+function surveyRole(s) {
+  const labels = (s.questions || []).map(q => String(q.label || ''));
+  if (labels.some(l => l.includes(ROLE_MARKER_CHIEF)))  return 'chief';
+  if (labels.some(l => l.includes(ROLE_MARKER_MEMBER))) return 'member';
+  return s.contestRole === 'chief' ? 'chief' : 'member';
+}
 
 async function loadContestList() {
   try {
@@ -767,7 +772,7 @@ async function onContestChange() {
 let questionLabelMap = {}; // { q_XXXXXXXXX: '氏名' } のマップ
 
 // ── マージキー（サロンコード＋ダイアナコード）─────────────────
-const KEY_SALON_LABELS = ['サロンコード'];
+// 照合はダイアナコードのみ（応募フォームからサロンコード欄を廃止したため）
 // 優先度順に探す（チーフ用フォームは「メンバーのダイアナコード」を優先）
 const KEY_DIANA_LABELS       = ['応募者 ダイアナコード', 'ダイアナコード'];
 const KEY_DIANA_LABELS_CHIEF = ['メンバーのダイアナコード', 'メンバー ダイアナコード', '応募者 ダイアナコード', 'ダイアナコード'];
@@ -808,13 +813,11 @@ function mergeContestResponses(parts) {
 
   parts.forEach(p => {
     (p.responses || []).forEach(r => {
-      const salon = pickAnswer(r.answers, p.labelMap, KEY_SALON_LABELS);
       const diana = pickAnswer(r.answers, p.labelMap, p.role === 'chief' ? KEY_DIANA_LABELS_CHIEF : KEY_DIANA_LABELS);
-      const ns = normalizeCode(salon), nd = normalizeCode(diana);
-      if (!ns || !nd) { unkeyed.push({ r, role: p.role }); return; }
-      const key = ns + '|' + nd;
-      if (!map.has(key)) map.set(key, { key, salon, diana, member: [], chief: [] });
-      map.get(key)[p.role].push(r);
+      const nd = normalizeCode(diana);
+      if (!nd) { unkeyed.push({ r, role: p.role }); return; }
+      if (!map.has(nd)) map.set(nd, { key: nd, diana, member: [], chief: [] });
+      map.get(nd)[p.role].push(r);
     });
   });
 
@@ -910,7 +913,7 @@ async function enrichWithMeasure() {
     const salonCode = getAnswerByKey(r, ['サロンコード']);
     const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
     const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
-    if (!salonCode || !dianaCode) return; // ダイアナコード＋サロンコード両方必須（AND照合）
+    if (!dianaCode) return; // ダイアナコードが必須（サロンコードは任意）
     const MAX_RETRY = 3;
     for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
       try {
@@ -1334,7 +1337,7 @@ async function fetchMeasureData(idx) {
   const salonCode = getAnswerByKey(r, ['サロンコード']);
   const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
   const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
-  if (!salonCode || !dianaCode) return; // ダイアナコード＋サロンコード両方必須（AND照合）
+  if (!dianaCode) return; // ダイアナコードが必須（サロンコードは任意）
 
   // ローディング表示（今表示中の応募者の場合のみ）
   const customerSection = document.querySelector('#modalBody .detail-section:nth-child(2) .detail-section-body');
