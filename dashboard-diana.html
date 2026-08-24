@@ -347,20 +347,13 @@
                   <input type="text" id="contestGroupNewTitle" placeholder="例）2026 ダイアナゴールデンプロポーションアワード">
                 </div>
                 <div class="form-group" style="margin:0">
-                  <label>このアンケートの応募区分（自動判定）</label>
-                  <p style="font-size:12px;color:#8a6d1f;margin:4px 0 6px;line-height:1.7;">
-                    設問に「ダイアナスタート前の全身写真」があればチーフ用、<br>
-                    「サクセスストーリー」があればメンバー用として自動的に判定されます。<br>
-                    どちらも無い場合のみ、以下の選択が使われます。
+                  <label>このアンケートの応募区分</label>
+                  <div id="contestRoleResult" style="margin-top:6px;padding:10px 14px;border-radius:8px;font-size:14px;font-weight:bold;">-</div>
+                  <p style="font-size:12px;color:#8a6d1f;margin:6px 0 0;line-height:1.7;">
+                    設問の内容から自動で判定されます（手動での変更はできません）。<br>
+                    「応募者のサクセスストーリー」があれば 👤 メンバー用、<br>
+                    「ダイアナスタート前の全身写真」があれば 👑 チーフ用 と判定されます。
                   </p>
-                  <div style="display:flex;gap:20px;margin-top:6px;">
-                    <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
-                      <input type="radio" name="contestRole" value="member" checked style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> 👤 メンバー用
-                    </label>
-                    <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer">
-                      <input type="radio" name="contestRole" value="chief" style="width:16px;height:16px;-webkit-appearance:radio;appearance:radio;cursor:pointer"> 👑 チーフ用
-                    </label>
-                  </div>
                 </div>
                 <p style="font-size:12px;color:#8a6d1f;margin:0;line-height:1.7;">
                   同じコンテストを選んだ「メンバー用」と「チーフ用」の回答は、閲覧ページで<b>ダイアナコード</b>を照合して1件に統合表示されます。<br>
@@ -1057,12 +1050,9 @@
     document.getElementById('surveyDescription').value = currentSurvey.description || '';
     document.getElementById('surveyThanksMessage').value = currentSurvey.thanksMessage || '';
     document.getElementById('isContest').checked = currentSurvey.isContest === true;
-    var role = currentSurvey.contestRole === 'chief' ? 'chief' : 'member';
-    Array.prototype.forEach.call(document.querySelectorAll('input[name="contestRole"]'), function(rb) {
-      rb.checked = (rb.value === role);
-    });
     document.getElementById('contestGroupNewTitle').value = '';
     toggleContestUI();
+    renderContestRole();
     renderQuestions();
     updateSurveyUrl();
     document.getElementById('qrArea').style.display = 'none';
@@ -1089,6 +1079,34 @@
     });
     sel.innerHTML = opts.join('') + '<option value="__new__"' + (cur && groups[cur] ? '' : ' selected') + '>＋ 新しいコンテストを作成</option>';
     onContestGroupChange();
+  }
+
+  // 設問の内容から応募区分を判定する（閲覧ページ・APIと同じルール）
+  function detectContestRole() {
+    var labels = ((currentSurvey && currentSurvey.questions) || []).map(function(q) { return String(q.label || ''); });
+    var hasMember = labels.some(function(l) { return l.indexOf('サクセスストーリー') >= 0; });
+    var hasChief  = labels.some(function(l) { return l.indexOf('ダイアナスタート前の全身写真') >= 0; });
+    if (hasMember) return 'member';
+    if (hasChief)  return 'chief';
+    return null;
+  }
+
+  function renderContestRole() {
+    var el = document.getElementById('contestRoleResult');
+    if (!el) return;
+    var role = detectContestRole();
+    if (role === 'member') {
+      el.textContent = '👤 メンバー用';
+      el.style.background = '#f0f4fb'; el.style.border = '1.5px solid #b8cbe8'; el.style.color = '#1a4f8a';
+    } else if (role === 'chief') {
+      el.textContent = '👑 チーフ用';
+      el.style.background = '#faf3f8'; el.style.border = '1.5px solid #d9b8e6'; el.style.color = '#7B4F6E';
+    } else {
+      el.innerHTML = '⚠️ 判定できません<br><span style="font-weight:normal;font-size:12px;">' +
+        '「応募者のサクセスストーリー」または「ダイアナスタート前の全身写真」の設問を追加してください。' +
+        'このままではコンテストの統合表示が正しく動きません。</span>';
+      el.style.background = '#fdf0ef'; el.style.border = '1.5px solid #f5c6c2'; el.style.color = '#c0392b';
+    }
   }
 
   function onContestGroupChange() {
@@ -1143,8 +1161,7 @@
           var found = (allSurveys || []).find(function(s) { return s.contestGroupId === gsel; });
           contestGroupTitle = found ? (found.contestGroupTitle || found.title) : gsel;
         }
-        var checked = document.querySelector('input[name="contestRole"]:checked');
-        contestRole = checked ? checked.value : 'member';
+        contestRole = detectContestRole();   // 設問から自動判定（判定できない場合は null）
       }
       var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest, contestGroupId: contestGroupId, contestGroupTitle: contestGroupTitle, contestRole: contestRole }) });
       if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; currentSurvey.contestGroupId = contestGroupId; currentSurvey.contestGroupTitle = contestGroupTitle; currentSurvey.contestRole = contestRole; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
@@ -1192,7 +1209,22 @@
     if (!currentSurvey) return;
     try {
       var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, questions: currentSurvey.questions }) });
-      if (res.ok) { showStatus('questionsStatus', '✅ 保存しました', 'success'); }
+      if (res.ok) {
+        showStatus('questionsStatus', '✅ 保存しました', 'success');
+        // 設問が変わると応募区分の判定も変わるため、表示と保存値を更新する
+        renderContestRole();
+        if (currentSurvey.isContest) {
+          var newRole = detectContestRole();
+          if (newRole && newRole !== currentSurvey.contestRole) {
+            currentSurvey.contestRole = newRole;
+            await apiFetch(BASE_URL + '/api/surveys', {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, contestRole: newRole })
+            }).catch(function() {});
+            loadSurveys();
+          }
+        }
+      }
       else { showStatus('questionsStatus', '❌ 保存失敗', 'error'); }
     } catch (e) { showStatus('questionsStatus', '❌ エラー', 'error'); }
   }
