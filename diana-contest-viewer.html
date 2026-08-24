@@ -948,6 +948,15 @@ function getAnswerByKey(r, keywords) {
   return '';
 }
 
+// サロンコード：アンケート回答を優先し、無ければ customer_master の値を使う
+// 戻り値 { value: '23191', fromDb: true/false }
+function getSalonCode(r) {
+  const fromAnswer = getAnswerByKey(r, ['サロンコード']);
+  if (fromAnswer) return { value: String(fromAnswer).trim(), fromDb: false };
+  const fromDb = (r.measure && r.measure.salon_code) ? String(r.measure.salon_code).trim() : '';
+  return { value: fromDb, fromDb: !!fromDb };
+}
+
 // 生年月日：アンケート回答を優先し、無ければ customer_master の値を使う
 // 戻り値 { value: 'YYYY/MM/DD', fromDb: true/false }
 function getBirthday(r) {
@@ -1138,7 +1147,7 @@ async function applyFilter() {
   filteredResponses = allResponses.filter(r => {
     const nameVal  = (getAnswerByKey(r, ['応募者氏名', '氏名', 'ふりがな']) || '').toLowerCase();
     const kanaVal  = (getAnswerByKey(r, ['ふりがな']) || '').toLowerCase();
-    const salonVal = (getAnswerByKey(r, ['サロンコード']) || '').toLowerCase();
+    const salonVal = (getSalonCode(r).value || '').toLowerCase();
     const dianaVal = (getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']) || '').toLowerCase();
     const entryVal = getAnswerByKey(r, ['応募区分']) || '';
     const divVal   = getAnswerByKey(r, ['出場区分']) || '';
@@ -1228,7 +1237,8 @@ async function renderGrid() {
     const idx = globalStart + localIdx;
     const name    = esc(getAnswerByKey(r, ['応募者氏名', '氏名', '名前', 'お名前']) || '（氏名なし）');
     const kana    = esc(getAnswerByKey(r, ['ふりがな', 'フリガナ', 'カナ', 'かな']));
-    const salon   = esc(getAnswerByKey(r, ['サロンコード']));
+    const salonObj = getSalonCode(r);
+    const salon   = esc(salonObj.value) + (salonObj.fromDb ? '<span style="font-size:10px;color:#aaa;margin-left:4px;">DB</span>' : '');
     const diana   = esc(getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']));
     const bdayObj = getBirthday(r);
     const bday    = esc(bdayObj.value) + (bdayObj.fromDb ? '<span style="font-size:10px;color:#aaa;margin-left:4px;">DB</span>' : '');
@@ -1245,7 +1255,7 @@ async function renderGrid() {
         ${kana ? '<div class="card-kana">' + kana + '</div>' : ''}
       </div>
       <div class="card-body">
-        <div class="card-row"><span class="key">サロンコード</span><span class="val">${salon || '-'}</span></div>
+        <div class="card-row"><span class="key">サロンコード</span><span class="val">${salonObj.value ? salon : '-'}</span></div>
         <div class="card-row"><span class="key">ダイアナコード</span><span class="val">${diana || '-'}</span></div>
         <div class="card-row"><span class="key">生年月日</span><span class="val">${bdayObj.value ? bday : '-'}</span></div>
         ${dianaYears !== null && dianaYears !== undefined ? `<div class="card-row"><span class="key">ダイアナ歴</span><span class="val">${dianaYears}年</span></div>` : ''}
@@ -1334,7 +1344,7 @@ async function fetchMeasureData(idx) {
   const r = filteredResponses[idx];
   if (!r || !dbConnected || r.measure) return;
 
-  const salonCode = getAnswerByKey(r, ['サロンコード']);
+  const salonCode = getSalonCode(r).value;
   const dianaCode = getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']);
   const bday      = getAnswerByKey(r, ['応募者 生年月日', '生年月日']);
   if (!dianaCode) return; // ダイアナコードが必須（サロンコードは任意）
@@ -1675,6 +1685,7 @@ function closeLightbox() { document.getElementById('lightbox').classList.remove(
 
 // DB会員・採寸データのCSVカラム定義（ヘッダー名 → 値の取り出し関数）
 const MEASURE_CSV_COLUMNS = [
+  ['サロンコード(DB)',      m => m.salon_code || ''],
   ['生年月日',              m => fmtDate(m.b_day)],
   ['ダイアナ歴(年)',        m => m.diana_years],
   ['年齢',                  m => m.age],
@@ -2000,7 +2011,7 @@ function printList() {
   const rows = filteredResponses.map((r, i) => {
     const name  = getAnswerByKey(r, ['応募者氏名','氏名','名前','お名前']) || '（氏名なし）';
     const kana  = getAnswerByKey(r, ['ふりがな','フリガナ','カナ','かな']);
-    const salon = getAnswerByKey(r, ['サロンコード']);
+    const salon = getSalonCode(r).value;
     const diana = getAnswerByKey(r, ['応募者 ダイアナコード','ダイアナコード']);
     const pref  = getAnswerByKey(r, ['応募者 都道府県','都道府県']);
     const div   = getAnswerByKey(r, ['出場区分']);
