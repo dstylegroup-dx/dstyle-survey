@@ -1862,8 +1862,10 @@ const ROLE_MARKER_MEMBER = 'サクセスストーリー';
 // （手動設定 contestRole が入っている場合はそちらを優先）
 function surveyRole(s) {
     const labels = (s.questions || []).map(q => String(q.label || ''));
-    if (labels.some(l => l.includes(ROLE_MARKER_CHIEF)))  return 'chief';
+    // 「サクセスストーリー」を先に判定する
+    // （メンバー用フォームにも写真の設問があるため、写真だけでは区別できない）
     if (labels.some(l => l.includes(ROLE_MARKER_MEMBER))) return 'member';
+    if (labels.some(l => l.includes(ROLE_MARKER_CHIEF)))  return 'chief';
     return s.contestRole === 'chief' ? 'chief' : 'member';
 }
 function surveyGroupId(s) { return s.contestGroupId || ('single_' + s.id); }
