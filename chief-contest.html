@@ -693,6 +693,7 @@ function renderList() {
       +   (kanaOf(e) ? '<div class="app-kana">' + esc(kanaOf(e)) + '</div>' : '')
       + '</div>'
       + '<div class="app-body">'
+      +   row('氏名カナ', kanaOf(e) || '-')
       +   row('ダイアナコード', e.memberCode || '-')
       +   row('提出日', fmtDateTime(e.createdAt))
       +   ((imgs.length + others.length) > 0
@@ -764,6 +765,17 @@ function renderDetail() {
         + '</div>';
   html += '<div class="note">メンバー提出：' + esc(fmtDateTime(e.memberAt) || '未提出')
         + '　／　チーフ提出：' + esc(fmtDateTime(e.chiefAt) || '未提出') + '</div>';
+
+  // 会員データベースから取得した情報
+  if (e.nameKanji || e.nameKana || e.salonCode) {
+    html += '<div class="sec-title">👤 会員情報（DBから取得）</div>'
+          + '<div class="ans-grid">'
+          + dbItem('氏名', e.nameKanji)
+          + dbItem('氏名カナ', e.nameKana)
+          + dbItem('サロンコード', e.salonCode)
+          + dbItem('ダイアナコード', e.memberCode)
+          + '</div>';
+  }
 
   html += '<div class="sec-title">📝 応募内容</div>';
   if (shorts.length > 0) {
@@ -848,6 +860,12 @@ function dedupeChiefAnswers(list) {
     }
     return a;
   });
+}
+
+// 会員情報の1項目を描画する
+function dbItem(label, value) {
+  return '<div class="ans-item"><div class="ans-lbl">' + esc(label) + '</div>'
+       + '<div class="ans-val">' + (value ? esc(value) : '<span style="color:#c8c8c8">-</span>') + '</div></div>';
 }
 
 // ============================================================
