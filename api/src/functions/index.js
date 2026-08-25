@@ -1988,6 +1988,7 @@ function buildFileList(answers, labels) {
 // customer_master を参照して応募者の所属サロンを特定する
 // ----------------------------------------------------
 async function resolveSalonCodes(dianaCodes, context) {
+    // { ダイアナコード: { salonCode, nameKanji, nameKana } }
     const result = {};
     const codes = [...new Set((dianaCodes || []).map(c => String(c || '').trim()).filter(Boolean))];
     if (codes.length === 0 || !process.env.PG_HOST) return result;
@@ -1996,13 +1997,23 @@ async function resolveSalonCodes(dianaCodes, context) {
     try {
         const pool = getPgPool();
         const { rows } = await pool.query(
-            `SELECT TRIM(diana_code::text) AS diana_code, TRIM(salon_code::text) AS salon_code
+            `SELECT TRIM(diana_code::text) AS diana_code,
+                    TRIM(salon_code::text) AS salon_code,
+                    last_name_kanji, first_name_kanji,
+                    last_name_kana,  first_name_kana
              FROM ${schema}.customer_master
              WHERE transfer_delete_flag::text = '0'
                AND TRIM(diana_code::text) = ANY($1::text[])`,
             [codes]
         );
-        rows.forEach(r => { if (r.diana_code) result[r.diana_code] = r.salon_code || ''; });
+        rows.forEach(r => {
+            if (!r.diana_code) return;
+            result[r.diana_code] = {
+                salonCode: r.salon_code || '',
+                nameKanji: ((r.last_name_kanji || '') + ' ' + (r.first_name_kanji || '')).trim(),
+                nameKana:  ((r.last_name_kana  || '') + ' ' + (r.first_name_kana  || '')).trim()
+            };
+        });
         if (context) context.log(`[resolveSalonCodes] ${codes.length}件中 ${rows.length}件を解決`);
     } catch (e) {
         if (context) context.log('[resolveSalonCodes] エラー: ' + e.message);
@@ -2221,7 +2232,12 @@ app.http('contestEntries', {
             // ---- 応募者の所属サロンをPostgreSQLから解決 ----
             // 応募フォームにサロンコード欄が無いため、ダイアナコードから引く
             const salonMap = await resolveSalonCodes(all.map(e => e.memberCode), context);
-            all.forEach(e => { e.salonCode = salonMap[normalizeCode(e.memberCode)] || salonMap[String(e.memberCode || '').trim()] || ''; });
+            all.forEach(e => {
+                const info = salonMap[normalizeCode(e.memberCode)] || salonMap[String(e.memberCode || '').trim()] || null;
+                e.salonCode = info ? info.salonCode : '';
+                e.nameKanji = info ? info.nameKanji : '';
+                e.nameKana  = info ? info.nameKana  : '';
+            });
 
             // ---- サロンで絞り込み（ここが情報分離の要）----
             const target = normalizeCode(salonCode);

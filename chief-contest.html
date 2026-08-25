@@ -244,7 +244,7 @@
     <div class="card" id="filterCard" style="display:none">
       <div class="filter-wrap">
         <label>🔍 絞り込み</label>
-        <input type="text" class="txt" id="fName" placeholder="応募者氏名・ふりがな" oninput="applyFilter()">
+        <input type="text" class="txt" id="fName" placeholder="応募者氏名・かな" oninput="applyFilter()">
         <input type="text" class="txt" id="fDiana" placeholder="ダイアナコード" oninput="applyFilter()">
         <select id="fEntry" onchange="applyFilter()" style="display:none"></select>
         <select id="fDivision" onchange="applyFilter()" style="display:none"></select>
@@ -620,8 +620,10 @@ function applyFilter() {
 
   filtered = entries.filter(function(e) {
     if (name) {
-      const hay = ((nameOf(e) || '') + ' ' + (kanaOf(e) || '')).toLowerCase();
-      if (hay.indexOf(name) < 0) return false;
+      const hay  = ((nameOf(e) || '') + ' ' + (e.nameKanji || '')).toLowerCase();
+      const kana = normalizeKana((kanaOf(e) || '') + (e.nameKana || ''));
+      const q    = normalizeKana(name);
+      if (hay.indexOf(name) < 0 && !(q && kana.indexOf(q) >= 0)) return false;
     }
     if (diana) {
       const code = ((e.memberCode || '') + ' ' + answerByKeywords(e, ['ダイアナコード'])).toLowerCase();
@@ -865,8 +867,41 @@ function answerByKeywords(e, keywords) {
   }
   return '';
 }
-function nameOf(e) { return answerByKeywords(e, ['応募者氏名', '氏名', 'お名前', '名前']); }
-function kanaOf(e) { return answerByKeywords(e, ['ふりがな', 'フリガナ', 'カナ']); }
+// 氏名：回答を優先し、無ければDB（customer_master）の値を使う
+function nameOf(e) {
+  const fromAnswer = answerByKeywords(e, ['応募者氏名', '氏名', 'お名前', '名前']);
+  if (fromAnswer) return fromAnswer;
+  return (e.nameKanji || '').trim();
+}
+// 検索用のかな正規化
+// ひらがな→カタカナに揃え、全角/半角カナ・空白の違いを吸収する
+// （DBの氏名カナはカタカナのため、ひらがなで入力してもヒットするようにする）
+function normalizeKana(str) {
+  if (!str) return '';
+  let s = String(str);
+  // 半角カナ → 全角カナ
+  const HALF = 'ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ';
+  const FULL = 'ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン';
+  s = s.replace(/[ｦ-ﾝ]/g, c => FULL.charAt(HALF.indexOf(c)) || c)
+       .replace(/ﾞ/g, '゛').replace(/ﾟ/g, '゜');
+  // 濁点・半濁点の結合
+  const DAKUTEN = { 'カ':'ガ','キ':'ギ','ク':'グ','ケ':'ゲ','コ':'ゴ','サ':'ザ','シ':'ジ','ス':'ズ','セ':'ゼ','ソ':'ゾ',
+                    'タ':'ダ','チ':'ヂ','ツ':'ヅ','テ':'デ','ト':'ド','ハ':'バ','ヒ':'ビ','フ':'ブ','ヘ':'ベ','ホ':'ボ','ウ':'ヴ' };
+  const HANDAKU = { 'ハ':'パ','ヒ':'ピ','フ':'プ','ヘ':'ペ','ホ':'ポ' };
+  s = s.replace(/(.)[゛]/g, (m, c) => DAKUTEN[c] || m)
+       .replace(/(.)[゜]/g, (m, c) => HANDAKU[c] || m);
+  // ひらがな → カタカナ
+  s = s.replace(/[ぁ-ん]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  // 空白を除去
+  return s.replace(/[\s\u3000]/g, '');
+}
+
+// 氏名カナ：回答を優先し、無ければDB（customer_master）の値を使う
+function kanaOf(e) {
+  const fromAnswer = answerByKeywords(e, ['ふりがな', 'フリガナ', 'カナ']);
+  if (fromAnswer) return fromAnswer;
+  return (e.nameKana || '').trim();
+}
 
 function kindIcon(kind) {
   return kind === 'pdf' ? '📕' : kind === 'excel' ? '📊' : kind === 'word' ? '📄' : kind === 'image' ? '🖼️' : '📎';

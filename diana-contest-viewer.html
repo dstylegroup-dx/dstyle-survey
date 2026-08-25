@@ -456,7 +456,7 @@
       <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:10px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span style="font-size:13px;font-weight:bold;color:#555;white-space:nowrap;">🔍 絞り込み</span>
-          <input type="text" class="search-input" id="searchName" placeholder="氏名・ふりがな..." oninput="applyFilter()" style="width:160px;">
+          <input type="text" class="search-input" id="searchName" placeholder="氏名・かな..." oninput="applyFilter()" style="width:160px;">
           <input type="text" class="search-input" id="searchSalon" placeholder="サロンコード..." oninput="applyFilter()" style="width:140px;">
           <input type="text" class="search-input" id="searchSalonName" placeholder="サロン名..." oninput="applyFilter()" style="width:140px;">
           <input type="text" class="search-input" id="searchDiana" placeholder="ダイアナコード..." oninput="applyFilter()" style="width:150px;">
@@ -959,6 +959,38 @@ function getAnswerByKey(r, keywords) {
   return '';
 }
 
+// 検索用のかな正規化
+// ひらがな→カタカナに揃え、全角/半角カナ・空白の違いを吸収する
+// （DBの氏名カナはカタカナのため、ひらがなで入力してもヒットするようにする）
+function normalizeKana(str) {
+  if (!str) return '';
+  let s = String(str);
+  // 半角カナ → 全角カナ
+  const HALF = 'ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ';
+  const FULL = 'ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン';
+  s = s.replace(/[ｦ-ﾝ]/g, c => FULL.charAt(HALF.indexOf(c)) || c)
+       .replace(/ﾞ/g, '゛').replace(/ﾟ/g, '゜');
+  // 濁点・半濁点の結合
+  const DAKUTEN = { 'カ':'ガ','キ':'ギ','ク':'グ','ケ':'ゲ','コ':'ゴ','サ':'ザ','シ':'ジ','ス':'ズ','セ':'ゼ','ソ':'ゾ',
+                    'タ':'ダ','チ':'ヂ','ツ':'ヅ','テ':'デ','ト':'ド','ハ':'バ','ヒ':'ビ','フ':'ブ','ヘ':'ベ','ホ':'ボ','ウ':'ヴ' };
+  const HANDAKU = { 'ハ':'パ','ヒ':'ピ','フ':'プ','ヘ':'ペ','ホ':'ポ' };
+  s = s.replace(/(.)[゛]/g, (m, c) => DAKUTEN[c] || m)
+       .replace(/(.)[゜]/g, (m, c) => HANDAKU[c] || m);
+  // ひらがな → カタカナ
+  s = s.replace(/[ぁ-ん]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  // 空白を除去
+  return s.replace(/[\s\u3000]/g, '');
+}
+
+// 氏名カナ：アンケート回答を優先し、無ければ customer_master の値を使う
+// 戻り値 { value: 'アイバ トシコ', fromDb: true/false }
+function getKana(r) {
+  const fromAnswer = getAnswerByKey(r, ['ふりがな', 'フリガナ', 'カナ', 'かな']);
+  if (fromAnswer) return { value: String(fromAnswer).trim(), fromDb: false };
+  const fromDb = (r.measure && r.measure.name_kana) ? String(r.measure.name_kana).trim() : '';
+  return { value: fromDb, fromDb: !!fromDb };
+}
+
 // サロンコード：アンケート回答を優先し、無ければ customer_master の値を使う
 // 戻り値 { value: '23191', fromDb: true/false }
 function getSalonCode(r) {
@@ -1195,7 +1227,8 @@ async function applyFilter() {
 
   filteredResponses = allResponses.filter(r => {
     const nameVal  = (getAnswerByKey(r, ['応募者氏名', '氏名', 'ふりがな']) || '').toLowerCase();
-    const kanaVal  = (getAnswerByKey(r, ['ふりがな']) || '').toLowerCase();
+    const kanaVal  = normalizeKana(getKana(r).value);
+    const nameKanaVal = normalizeKana((r.measure && r.measure.name_kanji) || '');
     const salonVal = (getSalonCode(r).value || '').toLowerCase();
     const dianaVal = (getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']) || '').toLowerCase();
     const entryVal = getAnswerByKey(r, ['応募区分']) || '';
@@ -1203,7 +1236,12 @@ async function applyFilter() {
     const prefVal  = getAnswerByKey(r, ['応募者 都道府県', '都道府県']) || '';
     const genderVal = r.measure?.gender || '';
 
-    if (name   && !nameVal.includes(name) && !kanaVal.includes(name)) return false;
+    if (name) {
+      const nameKana = normalizeKana(name);
+      const dbKanji  = ((r.measure && r.measure.name_kanji) || '').toLowerCase();
+      const hit = nameVal.includes(name) || dbKanji.includes(name) || (nameKana && kanaVal.includes(nameKana));
+      if (!hit) return false;
+    }
     if (salon  && !salonVal.includes(salon)) return false;
     const salonNameVal = (r.measure?.salon_name || '').toLowerCase();
     if (salonName && !salonNameVal.includes(salonName)) return false;
@@ -1285,7 +1323,7 @@ async function renderGrid() {
     const r = pageData[localIdx];
     const idx = globalStart + localIdx;
     const name    = esc(getAnswerByKey(r, ['応募者氏名', '氏名', '名前', 'お名前']) || '（氏名なし）');
-    const kana    = esc(getAnswerByKey(r, ['ふりがな', 'フリガナ', 'カナ', 'かな']));
+    const kana    = esc(getKana(r).value);
     const salonObj = getSalonCode(r);
     const salon   = esc(salonObj.value) + (salonObj.fromDb ? '<span style="font-size:10px;color:#aaa;margin-left:4px;">DB</span>' : '');
     const diana   = esc(getAnswerByKey(r, ['応募者 ダイアナコード', 'ダイアナコード']));
@@ -1457,7 +1495,7 @@ async function renderModal() {
 
   const total = filteredResponses.length;
   const name  = getAnswerByKey(r, ['応募者氏名', '氏名','名前','お名前']) || '（氏名なし）';
-  const kana  = getAnswerByKey(r, ['ふりがな', 'フリガナ','カナ','かな']);
+  const kana  = getKana(r).value;
 
   document.getElementById('modalSubtitle').textContent = `${currentDetailIndex + 1} / ${total}`;
   document.getElementById('modalName').textContent = name;
@@ -1501,6 +1539,8 @@ async function renderModal() {
   // customer_master情報セクション
   const customerHtml = m && m.salon_code ? `
     <div class="measure-grid">
+      ${mBlock('氏名（DB）', m.name_kanji || null, '')}
+      ${mBlock('氏名カナ（DB）', m.name_kana || null, '')}
       ${mBlock('サロンコード', m.salon_code || null, '')}
       ${mBlock('サロン名', m.salon_name || null, '')}
       ${mBlock('ダイアナコード', m.dia_cd || null, '')}
@@ -1910,7 +1950,7 @@ async function printDetail() {
 
   const fmt = (v) => (v == null || v === '') ? '-' : esc(String(v));
   const name = getAnswerByKey(r, ['応募者氏名','氏名','名前','お名前']) || '（氏名なし）';
-  const kana = getAnswerByKey(r, ['ふりがな','フリガナ','カナ','かな']);
+  const kana = getKana(r).value;
   const m = r.measure || {};
 
   // 応募内容（画像・添付以外の回答）
@@ -1922,6 +1962,8 @@ async function printDetail() {
   if (m && m.salon_code) {
     const gp = m.gp_club_type == null ? 'なし' : (String(m.gp_club_type) === '001' ? 'あり' : 'なし');
     const cells = [
+      ['氏名（DB）', fmt(m.name_kanji)],
+      ['氏名カナ（DB）', fmt(m.name_kana)],
       ['サロンコード', m.salon_code || '-'],
       ['サロン名', fmt(m.salon_name)],
       ['ダイアナコード', m.dia_cd || '-'],
@@ -2061,7 +2103,7 @@ function printList() {
   const fmt = (v) => (v == null || v === '') ? '-' : esc(String(v));
   const rows = filteredResponses.map((r, i) => {
     const name  = getAnswerByKey(r, ['応募者氏名','氏名','名前','お名前']) || '（氏名なし）';
-    const kana  = getAnswerByKey(r, ['ふりがな','フリガナ','カナ','かな']);
+    const kana  = getKana(r).value;
     const salon = getSalonCode(r).value;
     const diana = getAnswerByKey(r, ['応募者 ダイアナコード','ダイアナコード']);
     const pref  = getAnswerByKey(r, ['応募者 都道府県','都道府県']);
