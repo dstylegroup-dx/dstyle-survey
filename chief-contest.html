@@ -236,7 +236,7 @@
       <div class="bar">
         <label>🏆 コンテスト</label>
         <select id="contestSelect" onchange="onContestChange()"></select>
-        <button class="btn btn-light ml-auto" onclick="loadEntries()">🔄 更新</button>
+        <button class="btn btn-light ml-auto" onclick="loadEntries(true)">🔄 更新</button>
       </div>
     </div>
 
@@ -550,11 +550,12 @@ function applySalon() {
   loadEntries();
 }
 
-async function loadEntries() {
+async function loadEntries(forceRefresh) {
   const groupId = document.getElementById('contestSelect').value;
   if (!groupId) return;
 
   let path = '/api/contest-entries?groupId=' + encodeURIComponent(groupId);
+  if (forceRefresh) path += '&refresh=1';   // サーバー側のキャッシュを使わず最新を取得
   if (myRole === 'staff') {
     const salon = sessionStorage.getItem('staffSalon');
     if (!salon) { showEmpty('サロンコードを入力して「表示」を押してください。'); return; }
