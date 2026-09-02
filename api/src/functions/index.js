@@ -1983,6 +1983,48 @@ function buildFileList(answers, labels) {
 }
 
 // ----------------------------------------------------
+// 🗄️ 簡易キャッシュ（アクセス集中時の負荷軽減）
+//
+// ・Functionsのインスタンスごとにメモリ上で保持する
+// ・同じ処理が同時に何度も走らないよう、実行中のPromiseを共有する
+//   （案内メール送信直後など、一斉アクセス時にDBへ殺到するのを防ぐ）
+// ----------------------------------------------------
+const _cache = new Map();       // key -> { value, expires }
+const _inFlight = new Map();    // key -> Promise（実行中の処理）
+
+async function cached(key, ttlMs, producer) {
+    const now = Date.now();
+    const hit = _cache.get(key);
+    if (hit && hit.expires > now) return hit.value;
+
+    // 同じキーの処理が実行中なら、その完了を待つ（重複実行を防ぐ）
+    const running = _inFlight.get(key);
+    if (running) return running;
+
+    const promise = (async () => {
+        try {
+            const value = await producer();
+            _cache.set(key, { value, expires: Date.now() + ttlMs });
+            // 上限を超えたら古いものから捨てる
+            if (_cache.size > 200) {
+                const oldest = [..._cache.entries()].sort((a, b) => a[1].expires - b[1].expires)[0];
+                if (oldest) _cache.delete(oldest[0]);
+            }
+            return value;
+        } finally {
+            _inFlight.delete(key);
+        }
+    })();
+
+    _inFlight.set(key, promise);
+    return promise;
+}
+
+function clearCache(prefix) {
+    [..._cache.keys()].forEach(k => { if (!prefix || k.startsWith(prefix)) _cache.delete(k); });
+}
+
+// ----------------------------------------------------
 // 🐘 ダイアナコード → サロンコードの一括解決
 // 応募フォームからサロンコード欄を廃止したため、
 // customer_master を参照して応募者の所属サロンを特定する
@@ -1992,6 +2034,15 @@ async function resolveSalonCodes(dianaCodes, context) {
     const result = {};
     const codes = [...new Set((dianaCodes || []).map(c => String(c || '').trim()).filter(Boolean))];
     if (codes.length === 0 || !process.env.PG_HOST) return result;
+
+    // 既にキャッシュにあるコードは問い合わせ対象から除く
+    const missing = [];
+    codes.forEach(c => {
+        const hit = _cache.get('salon:' + c);
+        if (hit && hit.expires > Date.now()) result[c] = hit.value;
+        else missing.push(c);
+    });
+    if (missing.length === 0) return result;
 
     const schema = process.env.PG_SCHEMA || 'public';
     try {
@@ -2004,17 +2055,20 @@ async function resolveSalonCodes(dianaCodes, context) {
              FROM ${schema}.customer_master
              WHERE transfer_delete_flag::text = '0'
                AND TRIM(diana_code::text) = ANY($1::text[])`,
-            [codes]
+            [missing]
         );
+        const ttl = 30 * 60 * 1000;   // 会員マスタは頻繁に変わらないため30分保持
         rows.forEach(r => {
             if (!r.diana_code) return;
-            result[r.diana_code] = {
+            const info = {
                 salonCode: r.salon_code || '',
                 nameKanji: ((r.last_name_kanji || '') + ' ' + (r.first_name_kanji || '')).trim(),
                 nameKana:  ((r.last_name_kana  || '') + ' ' + (r.first_name_kana  || '')).trim()
             };
+            result[r.diana_code] = info;
+            _cache.set('salon:' + r.diana_code, { value: info, expires: Date.now() + ttl });
         });
-        if (context) context.log(`[resolveSalonCodes] ${codes.length}件中 ${rows.length}件を解決`);
+        if (context) context.log(`[resolveSalonCodes] 問い合わせ${missing.length}件 / 解決${rows.length}件（キャッシュ利用 ${codes.length - missing.length}件）`);
     } catch (e) {
         if (context) context.log('[resolveSalonCodes] エラー: ' + e.message);
     }
@@ -2165,11 +2219,14 @@ app.http('contestEntries', {
 
             const container = await getContainer();
 
-            // ---- コンテスト対象アンケートを取得 ----
-            const { resources: surveys } = await container.items.query({
-                query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true",
-                parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }]
-            }).fetchAll();
+            // ---- コンテスト対象アンケートを取得（60秒キャッシュ）----
+            const surveys = await cached('contestSurveys', 60 * 1000, async () => {
+                const { resources } = await container.items.query({
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true",
+                    parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }]
+                }).fetchAll();
+                return resources || [];
+            });
 
             // グループ単位にまとめる
             const groupMap = new Map();
@@ -2205,7 +2262,13 @@ app.http('contestEntries', {
             const group = groups.find(g => g.groupId === groupId);
             if (!group) return { status: 404, headers: SECURITY_HEADERS, jsonBody: { error: '指定のコンテストが見つかりません' } };
 
-            // ---- 回答を取得してマージ ----
+            // ---- 回答を取得してマージ（コンテスト単位でキャッシュ）----
+            // 一斉アクセス時に全員分がDBへ問い合わせるのを防ぐ。
+            // サロンでの絞り込みはキャッシュ後に行うため、他サロンのデータが混ざることはない。
+            const refresh = url.searchParams.get('refresh') === '1';
+            if (refresh) clearCache('contest:' + groupId);
+
+            const built = await cached('contest:' + groupId, 60 * 1000, async () => {
             const parts = [];
             for (const s of group.surveys) {
                 const { resources: responses } = await container.items.query({
@@ -2238,6 +2301,12 @@ app.http('contestEntries', {
                 e.nameKanji = info ? info.nameKanji : '';
                 e.nameKana  = info ? info.nameKana  : '';
             });
+
+            return { all, questionLabels };
+            });
+
+            const all = built.all;
+            const questionLabels = built.questionLabels;
 
             // ---- サロンで絞り込み（ここが情報分離の要）----
             const target = normalizeCode(salonCode);
@@ -2438,7 +2507,9 @@ function getPgPool() {
             user:                    process.env.PG_USER,
             password:                process.env.PG_PASS,
             ssl:                     process.env.PG_SSLMODE === 'require' ? { rejectUnauthorized: false } : false,
-            max:                     5,
+            // 一斉アクセスに備えて拡大（キャッシュにより実際の同時接続はこれより少ない）
+            // ※PostgreSQLは別サブスクリプションの共用DBのため、増やす際は管理部門と要調整
+            max:                     20,
             idleTimeoutMillis:       30000,
             connectionTimeoutMillis: 30000,
         });
@@ -2494,6 +2565,14 @@ app.http('diana-member', {
             }
 
             const schema = process.env.PG_SCHEMA || 'public';
+
+            // 同じ応募者の照会が繰り返されるため、結果を10分キャッシュする
+            // （閲覧ページは全応募者を自動照合するので、閲覧者が増えるほど効果が大きい）
+            const pgCacheKey = 'member:' + String(dia_cd).trim() + '|' + String(salonCode || '').trim();
+            const cachedBody = _cache.get(pgCacheKey);
+            if (cachedBody && cachedBody.expires > Date.now()) {
+                return { status: 200, headers: SECURITY_HEADERS, jsonBody: cachedBody.value };
+            }
 
             // ⏱ どのステップで時間がかかっているか特定するためのログ
             const t0 = Date.now();
@@ -2612,10 +2691,7 @@ app.http('diana-member', {
                 return Math.round((parseFloat(latest) - parseFloat(first)) * 10) / 10;
             };
 
-            return {
-                status: 200,
-                headers: SECURITY_HEADERS,
-                jsonBody: {
+            const responseBody = {
                     // 顧客情報（customer_masterから取得）
                     salon_code:        cust.salon_code,
                     salon_name:        salonName,
@@ -2702,8 +2778,12 @@ app.http('diana-member', {
                     ideal_arm_l:       latestCheck?.['理想値_アーム左'] || null,
                     ideal_arm_r:       latestCheck?.['理想値_アーム右'] || null,
                     ideal_fat:         latestCheck?.['理想値_体脂肪率'] || null,
-                }
             };
+
+            // 10分間キャッシュ（同じ応募者への繰り返し照会を減らす）
+            _cache.set(pgCacheKey, { value: responseBody, expires: Date.now() + 10 * 60 * 1000 });
+
+            return { status: 200, headers: SECURITY_HEADERS, jsonBody: responseBody };
 
         } catch (e) {
             context.log(`[diana-member] エラー: ${e.message}`);
