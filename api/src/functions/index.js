@@ -414,7 +414,7 @@ app.http('surveys', {
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, confirmEnabled, gpCheckEnabled, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
+                const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, confirmEnabled, gpCheckEnabled, gpExcludeDivisions, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!tenant || !title) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と title は必須です' } };
                 const newSurvey = {
                     id: 'survey_' + crypto.randomUUID(),
@@ -430,6 +430,7 @@ app.http('surveys', {
                     contestRole: contestRole || null,
                     confirmEnabled: confirmEnabled === true,     // 送信前の確認画面
                     gpCheckEnabled: gpCheckEnabled === true,     // 確認画面でGP倶楽部を照会
+                    gpExcludeDivisions: gpExcludeDivisions || null,  // GP照会の対象外とする応募区分
                     aiSuggestionEnabled: aiSuggestionEnabled || false,
                     aiOutputFormat: aiOutputFormat || 'text',
                     aiPrompt: aiPrompt || '',
@@ -443,7 +444,7 @@ app.http('surveys', {
 
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
-                const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, confirmEnabled, gpCheckEnabled, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
+                const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, confirmEnabled, gpCheckEnabled, gpExcludeDivisions, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
@@ -459,6 +460,7 @@ app.http('surveys', {
                     contestRole: contestRole !== undefined ? contestRole : (existing.contestRole || null),
                     confirmEnabled: confirmEnabled !== undefined ? confirmEnabled : (existing.confirmEnabled || false),
                     gpCheckEnabled: gpCheckEnabled !== undefined ? gpCheckEnabled : (existing.gpCheckEnabled || false),
+                    gpExcludeDivisions: gpExcludeDivisions !== undefined ? gpExcludeDivisions : (existing.gpExcludeDivisions || null),
                     aiSuggestionEnabled: aiSuggestionEnabled !== undefined ? aiSuggestionEnabled : (existing.aiSuggestionEnabled || false),
                     aiOutputFormat: aiOutputFormat !== undefined ? aiOutputFormat : (existing.aiOutputFormat || 'text'),
                     aiPrompt: aiPrompt !== undefined ? aiPrompt : (existing.aiPrompt || ''),
