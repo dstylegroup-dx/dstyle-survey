@@ -100,6 +100,13 @@ input[type="number"]::-webkit-inner-spin-button,
     .cf-gp-ok   { background: #eafaf0; border: 1px solid #b7e4c7; color: #2e7d32; }
     .cf-gp-warn { background: #fff8e6; border: 1px solid #ffcc80; color: #8a5a00; }
     .cf-gp-wait { background: #f4f6f8; border: 1px solid #e0e4e8; color: #888; font-weight: normal; }
+    .cf-thumbs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .cf-thumb { width: 110px; }
+    .cf-thumb img { width: 110px; height: 140px; object-fit: cover; border-radius: 8px; border: 1px solid #e0e0e0; display: block; background: #fafafa; }
+    .cf-thumb-file { display: flex; flex-direction: column; align-items: center; justify-content: center;
+      width: 110px; height: 140px; border-radius: 8px; border: 1px solid #e0e0e0; background: #f7f7f7; }
+    .cf-thumb-icon { font-size: 30px; }
+    .cf-thumb-name { font-size: 11px; color: #888; margin-top: 4px; word-break: break-all; line-height: 1.5; }
     .privacy-notice { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin: 16px 0 12px; font-size: 13px; color: #666; line-height: 1.7; }
     .privacy-notice a { color: #2980B9; text-decoration: underline; }
     .privacy-notice a:hover { opacity: 0.8; }
@@ -721,6 +728,24 @@ input[type="number"]::-webkit-inner-spin-button,
         if (section && section.getAttribute('data-hidden') === 'true') return '';
         var val = answers[q.id];
         if (val === undefined || val === null || val === '') val = '（未入力）';
+        // ファイル設問は、パスの代わりに画像のサムネイルを表示する
+        if (q.type === 'file') {
+          var files = fileUploadMap[q.id] || [];
+          if (!files.length) {
+            return '<div class="cf-row"><div class="cf-label">' + esc(q.label) + '</div>' +
+                   '<div class="cf-value" style="color:#c8c8c8">（未添付）</div></div>';
+          }
+          var thumbs = files.map(function(f) {
+            if (f.previewUrl) {
+              return '<div class="cf-thumb"><img src="' + esc(f.previewUrl) + '" alt="">' +
+                     '<div class="cf-thumb-name">' + esc(f.fileName) + '</div></div>';
+            }
+            return '<div class="cf-thumb cf-thumb-file"><div class="cf-thumb-icon">📎</div>' +
+                   '<div class="cf-thumb-name">' + esc(f.fileName) + '</div></div>';
+          }).join('');
+          return '<div class="cf-row"><div class="cf-label">' + esc(q.label) + '</div>' +
+                 '<div class="cf-thumbs">' + thumbs + '</div></div>';
+        }
         // 承諾書は本文を再掲せず、同意の有無だけ表示する
         if (q.type === 'consent') {
           var agreed = String(val) === '同意';
@@ -904,7 +929,11 @@ input[type="number"]::-webkit-inner-spin-button,
   }
 
   function removeFile(qId, idx) {
-    if (fileUploadMap[qId]) fileUploadMap[qId].splice(idx, 1);
+    if (fileUploadMap[qId]) {
+      var removed = fileUploadMap[qId].splice(idx, 1)[0];
+      // プレビュー用URLを解放してメモリを無駄にしない
+      if (removed && removed.previewUrl) { try { URL.revokeObjectURL(removed.previewUrl); } catch (e) {} }
+    }
     renderFilePreview(qId);
   }
 
@@ -944,7 +973,9 @@ input[type="number"]::-webkit-inner-spin-button,
           body: file
         });
         if (!putRes.ok) throw new Error('アップロード失敗 (' + putRes.status + ')');
-        fileUploadMap[qId].push({ blobName: sasData.blobName, fileName: file.name, size: file.size });
+        // 確認画面で画像を表示するため、選択したファイルからプレビュー用URLを作る
+        var previewUrl = (file.type || '').indexOf('image/') === 0 ? URL.createObjectURL(file) : null;
+        fileUploadMap[qId].push({ blobName: sasData.blobName, fileName: file.name, size: file.size, previewUrl: previewUrl });
         renderFilePreview(qId);
         uploadingCount--;
         if (statusEl) {
