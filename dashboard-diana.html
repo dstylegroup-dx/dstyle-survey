@@ -361,6 +361,24 @@
                 </p>
               </div>
               <p style="font-size:12px;color:#888;">チェックをつけると ダイアナゴールデンプロポーションアワード 閲覧ページの選択肢に表示されます。</p>
+
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border:1.5px solid #e0e0e0;border-radius:8px;margin-top:14px;">
+                <input type="checkbox" id="confirmEnabled" onchange="toggleConfirmUI()" style="width:18px;height:18px;min-width:18px;accent-color:#7B4F6E;cursor:pointer;padding:0;border:none;appearance:auto;-webkit-appearance:checkbox;border-radius:0;">
+                <span style="font-weight:bold;">📋 送信前に確認画面を表示する</span>
+              </label>
+              <p style="font-size:12px;color:#888;">送信ボタンを押すと入力内容の一覧が表示され、確認したうえで送信できます。</p>
+
+              <div id="gpCheckBox" style="display:none;padding:12px 16px;border:1.5px solid #ffc107;border-radius:8px;background:#fffdf3;margin-top:10px;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                  <input type="checkbox" id="gpCheckEnabled" style="width:18px;height:18px;min-width:18px;accent-color:#7B4F6E;cursor:pointer;padding:0;border:none;appearance:auto;-webkit-appearance:checkbox;border-radius:0;">
+                  <span style="font-weight:bold;">🎫 確認画面でGP倶楽部の資格を表示する</span>
+                </label>
+                <p style="font-size:12px;color:#8a6d1f;margin:6px 0 0;line-height:1.7;">
+                  確認画面でダイアナコードから会員データベースを照会し、GP倶楽部の有無を表示します。<br>
+                  資格が無い場合や該当が無い場合は注意を表示しますが、応募はそのまま可能です。<br>
+                  ⚠️ メンズコンテスト・Dstyleコンテスト向けの機能です。
+                </p>
+              </div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveSurveyInfo()">💾 基本情報を保存</button>
@@ -855,6 +873,14 @@
           <option value="10">10段階</option>
         </select>
       </div>
+      <div class="form-group" id="maxLengthGroup" style="display:none">
+        <label>文字数制限（任意）</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="number" id="qMaxLength" placeholder="例）1000" style="flex:1" min="1">
+          <span style="color:#888;font-size:13px;white-space:nowrap">文字以内</span>
+        </div>
+        <p style="font-size:12px;color:#888;margin:4px 0 0;">回答欄の下に「○ / ○○○ 文字」と表示され、超えて入力できなくなります。</p>
+      </div>
       <div class="form-group" id="numberRangeGroup" style="display:none">
         <label>入力範囲（任意）</label>
         <div style="display:flex;gap:12px;align-items:center">
@@ -1050,6 +1076,9 @@
     document.getElementById('surveyDescription').value = currentSurvey.description || '';
     document.getElementById('surveyThanksMessage').value = currentSurvey.thanksMessage || '';
     document.getElementById('isContest').checked = currentSurvey.isContest === true;
+    document.getElementById('confirmEnabled').checked = currentSurvey.confirmEnabled === true;
+    document.getElementById('gpCheckEnabled').checked = currentSurvey.gpCheckEnabled === true;
+    toggleConfirmUI();
     document.getElementById('contestGroupNewTitle').value = '';
     toggleContestUI();
     renderContestRole();
@@ -1060,6 +1089,13 @@
   }
 
   // ── コンテスト設定 ────────────────────────────────
+  // 確認画面がONのときだけGP倶楽部の設定を出す
+  function toggleConfirmUI() {
+    var on = document.getElementById('confirmEnabled').checked;
+    document.getElementById('gpCheckBox').style.display = on ? 'block' : 'none';
+    if (!on) document.getElementById('gpCheckEnabled').checked = false;
+  }
+
   function toggleContestUI() {
     var on = document.getElementById('isContest').checked;
     document.getElementById('contestDetail').style.display = on ? 'flex' : 'none';
@@ -1148,6 +1184,8 @@
     try {
       var thanksMessage = document.getElementById('surveyThanksMessage').value.trim();
       var isContest = document.getElementById('isContest').checked;
+      var confirmEnabled = document.getElementById('confirmEnabled').checked;
+      var gpCheckEnabled = confirmEnabled && document.getElementById('gpCheckEnabled').checked;
       var contestGroupId = null, contestGroupTitle = null, contestRole = null;
       if (isContest) {
         var gsel = document.getElementById('contestGroupSelect').value;
@@ -1163,8 +1201,8 @@
         }
         contestRole = detectContestRole();   // 設問から自動判定（判定できない場合は null）
       }
-      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest, contestGroupId: contestGroupId, contestGroupTitle: contestGroupTitle, contestRole: contestRole }) });
-      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; currentSurvey.contestGroupId = contestGroupId; currentSurvey.contestGroupTitle = contestGroupTitle; currentSurvey.contestRole = contestRole; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
+      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest, contestGroupId: contestGroupId, contestGroupTitle: contestGroupTitle, contestRole: contestRole, confirmEnabled: confirmEnabled, gpCheckEnabled: gpCheckEnabled }) });
+      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; currentSurvey.contestGroupId = contestGroupId; currentSurvey.contestGroupTitle = contestGroupTitle; currentSurvey.contestRole = contestRole; currentSurvey.confirmEnabled = confirmEnabled; currentSurvey.gpCheckEnabled = gpCheckEnabled; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
       else { showStatus('infoStatus', '❌ 保存失敗', 'error'); }
     } catch (e) { showStatus('infoStatus', '❌ エラー: ' + e.message, 'error'); }
   }
@@ -1235,6 +1273,7 @@
     document.getElementById('qLabel').value = '';
     document.getElementById('qType').value = document.getElementById('newQuestionType').value;
     document.getElementById('qPlaceholder').value = '';
+    document.getElementById('qMaxLength').value = '';
     document.getElementById('qRequired').checked = false;
     currentQImageBase64 = '';
     document.getElementById('qImgPreviewWrap').style.display = 'none';
@@ -1258,6 +1297,7 @@
     document.getElementById('qLabel').value = q.label || '';
     document.getElementById('qType').value = q.type || 'text';
     document.getElementById('qPlaceholder').value = q.placeholder || '';
+    document.getElementById('qMaxLength').value = q.maxLength || '';
     document.getElementById('qRequired').checked = q.required || false;
     onQTypeChange();
     document.getElementById('optionsList').innerHTML = '';
@@ -1308,6 +1348,7 @@
     document.getElementById('placeholderGroup').style.display = needsPlaceholder ? '' : 'none';
     document.getElementById('ratingGroup').style.display = type === 'rating' ? '' : 'none';
     document.getElementById('numberRangeGroup').style.display = type === 'number' ? '' : 'none';
+    document.getElementById('maxLengthGroup').style.display = type === 'textarea' ? '' : 'none';
     document.getElementById('imageChoiceGroup').style.display = type === 'image_choice' ? '' : 'none';
     if (type === 'image_choice' && document.getElementById('imageChoiceList').children.length === 0) {
       addImageChoiceRow(); addImageChoiceRow();
@@ -1363,6 +1404,10 @@
     if (placeholder) q.placeholder = placeholder;
     if (type === 'rating') {
       q.maxStars = parseInt(document.getElementById('qMaxStars').value) || 5;
+    }
+    if (type === 'textarea') {
+      var maxLenVal = document.getElementById('qMaxLength').value;
+      if (maxLenVal !== '' && parseInt(maxLenVal) > 0) q.maxLength = parseInt(maxLenVal);
     }
     if (type === 'number') {
       var minVal = document.getElementById('qMin').value;

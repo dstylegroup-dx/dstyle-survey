@@ -414,7 +414,7 @@ app.http('surveys', {
 
             if (request.method === 'POST') {
                 const body = await request.json().catch(() => ({}));
-                const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
+                const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, confirmEnabled, gpCheckEnabled, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!tenant || !title) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant と title は必須です' } };
                 const newSurvey = {
                     id: 'survey_' + crypto.randomUUID(),
@@ -428,6 +428,8 @@ app.http('surveys', {
                     contestGroupId: contestGroupId || null,
                     contestGroupTitle: contestGroupTitle || null,
                     contestRole: contestRole || null,
+                    confirmEnabled: confirmEnabled === true,     // 送信前の確認画面
+                    gpCheckEnabled: gpCheckEnabled === true,     // 確認画面でGP倶楽部を照会
                     aiSuggestionEnabled: aiSuggestionEnabled || false,
                     aiOutputFormat: aiOutputFormat || 'text',
                     aiPrompt: aiPrompt || '',
@@ -441,7 +443,7 @@ app.http('surveys', {
 
             if (request.method === 'PUT') {
                 const body = await request.json().catch(() => ({}));
-                const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
+                const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole, confirmEnabled, gpCheckEnabled, aiSuggestionEnabled, aiOutputFormat, aiPrompt, aiSections } = body;
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
                 const { resource: existing } = await container.item(id, tenant).read();
                 const updated = {
@@ -455,6 +457,8 @@ app.http('surveys', {
                     contestGroupId: contestGroupId !== undefined ? contestGroupId : (existing.contestGroupId || null),
                     contestGroupTitle: contestGroupTitle !== undefined ? contestGroupTitle : (existing.contestGroupTitle || null),
                     contestRole: contestRole !== undefined ? contestRole : (existing.contestRole || null),
+                    confirmEnabled: confirmEnabled !== undefined ? confirmEnabled : (existing.confirmEnabled || false),
+                    gpCheckEnabled: gpCheckEnabled !== undefined ? gpCheckEnabled : (existing.gpCheckEnabled || false),
                     aiSuggestionEnabled: aiSuggestionEnabled !== undefined ? aiSuggestionEnabled : (existing.aiSuggestionEnabled || false),
                     aiOutputFormat: aiOutputFormat !== undefined ? aiOutputFormat : (existing.aiOutputFormat || 'text'),
                     aiPrompt: aiPrompt !== undefined ? aiPrompt : (existing.aiPrompt || ''),
@@ -2048,13 +2052,15 @@ async function resolveSalonCodes(dianaCodes, context) {
     try {
         const pool = getPgPool();
         const { rows } = await pool.query(
-            `SELECT TRIM(diana_code::text) AS diana_code,
-                    TRIM(salon_code::text) AS salon_code,
-                    last_name_kanji, first_name_kanji,
-                    last_name_kana,  first_name_kana
-             FROM ${schema}.customer_master
-             WHERE transfer_delete_flag::text = '0'
-               AND TRIM(diana_code::text) = ANY($1::text[])`,
+            `SELECT TRIM(c.diana_code::text) AS diana_code,
+                    TRIM(c.salon_code::text) AS salon_code,
+                    c.last_name_kanji, c.first_name_kanji,
+                    c.last_name_kana,  c.first_name_kana,
+                    m.gp_club_type
+             FROM ${schema}.customer_master c
+             LEFT JOIN ${schema}.member_tbl m ON TRIM(m.diana_cd::text) = TRIM(c.diana_code::text)
+             WHERE c.transfer_delete_flag::text = '0'
+               AND TRIM(c.diana_code::text) = ANY($1::text[])`,
             [missing]
         );
         const ttl = 30 * 60 * 1000;   // 会員マスタは頻繁に変わらないため30分保持
@@ -2063,7 +2069,8 @@ async function resolveSalonCodes(dianaCodes, context) {
             const info = {
                 salonCode: r.salon_code || '',
                 nameKanji: ((r.last_name_kanji || '') + ' ' + (r.first_name_kanji || '')).trim(),
-                nameKana:  ((r.last_name_kana  || '') + ' ' + (r.first_name_kana  || '')).trim()
+                nameKana:  ((r.last_name_kana  || '') + ' ' + (r.first_name_kana  || '')).trim(),
+                gpClub:    String(r.gp_club_type || '') === '001'
             };
             result[r.diana_code] = info;
             _cache.set('salon:' + r.diana_code, { value: info, expires: Date.now() + ttl });
@@ -2074,6 +2081,94 @@ async function resolveSalonCodes(dianaCodes, context) {
     }
     return result;
 }
+
+// ----------------------------------------------------
+// 🎫 【GP倶楽部の資格確認】応募フォームの確認画面から呼ばれる
+//
+// POST /api/gp-check   body: { dia_cd, tenant }
+//
+// ⚠️ 公開ページ（未認証）から呼ばれるため、以下の制限を設けている
+//   ・返すのは資格の有無のみ（氏名・生年月日などは一切返さない）
+//   ・ダイアナコードの形式が合わない場合は問い合わせない
+//   ・同一IPからの短時間の連続照会を制限する
+//   ・照会履歴をアクセスログに残す
+// ----------------------------------------------------
+const _gpRate = new Map();   // IP -> { count, resetAt }
+
+function checkRateLimit(ip, limit, windowMs) {
+    const now = Date.now();
+    const rec = _gpRate.get(ip);
+    if (!rec || rec.resetAt < now) {
+        _gpRate.set(ip, { count: 1, resetAt: now + windowMs });
+        return true;
+    }
+    rec.count++;
+    if (_gpRate.size > 5000) _gpRate.clear();   // 肥大化防止
+    return rec.count <= limit;
+}
+
+app.http('gpCheck', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'gp-check',
+    handler: async (request, context) => {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        try {
+            const body = await request.json().catch(() => ({}));
+            const diaCd = String(body.dia_cd || '').trim();
+
+            // 形式チェック（数字のみ・4〜12桁）。合わない場合は問い合わせない
+            if (!/^\d{4,12}$/.test(diaCd)) {
+                return secureJson({ status: 'invalid' });
+            }
+            // 1分あたり20回まで
+            if (!checkRateLimit(ip, 20, 60 * 1000)) {
+                return { status: 429, headers: SECURITY_HEADERS, jsonBody: { error: '照会が多すぎます。しばらく待ってからお試しください。' } };
+            }
+            if (!process.env.PG_HOST) return secureJson({ status: 'unavailable' });
+
+            const schema = process.env.PG_SCHEMA || 'public';
+            const result = await cached('gp:' + diaCd, 10 * 60 * 1000, async () => {
+                const pool = getPgPool();
+                const cust = await pool.query(
+                    `SELECT TRIM(diana_code::text) AS diana_code
+                     FROM ${schema}.customer_master
+                     WHERE transfer_delete_flag::text = '0' AND TRIM(diana_code::text) = $1 LIMIT 1`,
+                    [diaCd]
+                );
+                if (cust.rows.length === 0) return { status: 'notfound' };
+
+                const mem = await pool.query(
+                    `SELECT gp_club_type FROM ${schema}.member_tbl
+                     WHERE TRIM(diana_cd::text) = $1 LIMIT 1`,
+                    [diaCd]
+                );
+                const gp = mem.rows.length > 0 ? String(mem.rows[0].gp_club_type || '') : '';
+                return { status: 'ok', gpClub: gp === '001' };
+            });
+
+            // 照会履歴を記録（異常な連続照会を後から検知できるようにする）
+            try {
+                const container = await getContainer();
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'access_log',
+                    tenant: String(body.tenant || 'diana'),
+                    app: 'gp-check',
+                    result: result.status,
+                    ip,
+                    createdAt: new Date().toISOString()
+                }).catch(() => {});
+            } catch (e) {}
+
+            return secureJson(result);
+
+        } catch (e) {
+            context.log('[gp-check] エラー: ' + e.message);
+            return secureJson({ status: 'error' });
+        }
+    }
+});
 
 // ----------------------------------------------------
 // 🔐 【チーフ用認証】チーフ／社員のIDトークンを検証してロール付きトークンを発行
@@ -2300,6 +2395,7 @@ app.http('contestEntries', {
                 e.salonCode = info ? info.salonCode : '';
                 e.nameKanji = info ? info.nameKanji : '';
                 e.nameKana  = info ? info.nameKana  : '';
+                e.gpClub    = info ? info.gpClub    : null;   // null = 会員データなし
             });
 
             return { all, questionLabels };

@@ -61,6 +61,30 @@ input[type="number"]::-webkit-inner-spin-button,
       border-radius: 6px; padding: 10px 12px; margin: 4px 0 10px;
       font-size: 13px; line-height: 1.8; color: #555;
     }
+    .char-count { font-size: 12px; color: #999; text-align: right; margin-top: 4px; }
+    .char-count.over { color: #c0392b; font-weight: bold; }
+
+    /* 確認画面 */
+    .cf-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000;
+      display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .cf-box { background: #fff; border-radius: 14px; width: 100%; max-width: 620px; max-height: 92vh;
+      display: flex; flex-direction: column; overflow: hidden; }
+    .cf-head { color: #fff; padding: 18px 22px; }
+    .cf-title { font-size: 18px; font-weight: bold; }
+    .cf-sub { font-size: 13px; opacity: .9; margin-top: 4px; }
+    .cf-body { padding: 16px 22px; overflow-y: auto; }
+    .cf-row { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+    .cf-label { font-size: 12px; color: #999; margin-bottom: 3px; }
+    .cf-value { font-size: 15px; color: #333; white-space: pre-wrap; word-break: break-word; }
+    .cf-foot { padding: 14px 22px; border-top: 1px solid #eee; display: flex; gap: 10px; }
+    .cf-btn { flex: 1; padding: 14px; border: none; border-radius: 9px; font-size: 15px; font-weight: bold; cursor: pointer; font-family: inherit; }
+    .cf-back { background: #eee; color: #555; }
+    .cf-send { color: #fff; }
+    .cf-gp { border-radius: 9px; padding: 12px 15px; margin-bottom: 14px; font-size: 14px; font-weight: bold; line-height: 1.7; }
+    .cf-gp span { font-weight: normal; font-size: 13px; }
+    .cf-gp-ok   { background: #eafaf0; border: 1px solid #b7e4c7; color: #2e7d32; }
+    .cf-gp-warn { background: #fff8e6; border: 1px solid #ffcc80; color: #8a5a00; }
+    .cf-gp-wait { background: #f4f6f8; border: 1px solid #e0e4e8; color: #888; font-weight: normal; }
     .privacy-notice { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin: 16px 0 12px; font-size: 13px; color: #666; line-height: 1.7; }
     .privacy-notice a { color: #2980B9; text-decoration: underline; }
     .privacy-notice a:hover { opacity: 0.8; }
@@ -323,8 +347,8 @@ input[type="number"]::-webkit-inner-spin-button,
         showIfAttr = ' data-showif-qid="' + esc(q.showIf.questionId) + '" data-showif-val="' + esc(q.showIf.value) + '" data-hidden="true"';
         initialHidden = true;
       }
-      // 記入例：改行を含む場合はヒントブロックとして表示し、placeholder には出さない
-      // （placeholder 属性は改行が潰れて読めなくなるため）
+      // 記入例：改行を含む場合はヒントブロックとして表示する
+      // （placeholder属性は改行が潰れて読めなくなるため）
       var hintText = '';
       var phValue = q.placeholder || '';
       if (phValue.indexOf('\n') >= 0) { hintText = phValue; phValue = ''; }
@@ -377,7 +401,10 @@ input[type="number"]::-webkit-inner-spin-button,
         html += '<div class="star-selected-label" id="starLabel_' + esc(q.id) + '"></div>';
         if (q.required) html += '<div class="field-error-msg">評価を選択してください</div>';
       } else if (q.type === 'textarea') {
-        html += '<textarea id="q_' + q.id + '" placeholder="' + esc(phValue) + '"></textarea>';
+        var maxLen = parseInt(q.maxLength || 0, 10);
+        html += '<textarea id="q_' + esc(q.id) + '" placeholder="' + esc(phValue) + '"'
+              + (maxLen > 0 ? ' maxlength="' + maxLen + '" data-maxlen="' + maxLen + '"' : '') + '></textarea>';
+        if (maxLen > 0) html += '<div class="char-count" id="count_' + esc(q.id) + '">0 / ' + maxLen + ' 文字</div>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'select') {
         html += '<select id="q_' + q.id + '"><option value="">選択してください</option>';
@@ -478,6 +505,21 @@ input[type="number"]::-webkit-inner-spin-button,
       if (e.target.type !== 'radio' && e.target.tagName !== 'SELECT') { evaluateBranching(); }
     });
     evaluateBranching(); // 初期状態を評価
+
+    // 長文の文字数カウント
+    document.querySelectorAll('textarea[data-maxlen]').forEach(function(ta) {
+      var qid = ta.id.replace(/^q_/, '');
+      var max = parseInt(ta.dataset.maxlen, 10);
+      var label = document.getElementById('count_' + qid);
+      var update = function() {
+        if (!label) return;
+        var len = ta.value.length;
+        label.textContent = len + ' / ' + max + ' 文字';
+        label.classList.toggle('over', len >= max);
+      };
+      ta.addEventListener('input', update);
+      update();
+    });
     // ────────────────────────────────────────────────────
 
     form.addEventListener('keydown', function(e) { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault(); });
@@ -531,6 +573,20 @@ input[type="number"]::-webkit-inner-spin-button,
         }
         if (isEmpty && section) { section.classList.add('field-error'); hasError = true; }
       });
+      // 文字数制限のチェック（必須でない設問も対象）
+      survey.questions.forEach(function(q) {
+        if (q.type !== 'textarea') return;
+        var max = parseInt(q.maxLength || 0, 10);
+        if (!max) return;
+        var el = document.getElementById('q_' + q.id);
+        var section = document.getElementById('section_' + q.id);
+        if (section && section.getAttribute('data-hidden') === 'true') return;
+        if (el && el.value.length > max) {
+          if (section) section.classList.add('field-error');
+          hasError = true;
+        }
+      });
+
       if (hasError) {
         var firstError = document.querySelector('.field-error');
         if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -563,6 +619,23 @@ input[type="number"]::-webkit-inner-spin-button,
           try { answers[q.id] = JSON.parse(hidden.value || '[]').join(', ') || '（未アップロード）'; } catch(e) { answers[q.id] = '（未アップロード）'; }
         }
       });
+      // 確認画面が有効な場合は、ここでいったん止めて内容を確認してもらう
+      if (survey.confirmEnabled) {
+        btn.disabled = false;
+        btn.textContent = '送信する 📩';
+        await showConfirmScreen(survey, answers);
+        return;
+      }
+
+      await sendAnswers(survey, answers, btn, errorMsg);
+    });
+
+    // ────────────────────────────────────────────────────
+    // 送信処理（確認画面の有無にかかわらず共通）
+    // ────────────────────────────────────────────────────
+    async function sendAnswers(survey, answers, btn, errorMsg) {
+      btn.disabled = true;
+      btn.textContent = '送信中...';
       try {
         var res = await fetch(BASE_URL + '/api/response', {
           method: 'POST',
@@ -571,6 +644,7 @@ input[type="number"]::-webkit-inner-spin-button,
         });
         if (res.ok) {
           var resData = await res.json().catch(function() { return {}; });
+          closeConfirmScreen();
           document.getElementById('formArea').style.display = 'none';
           document.getElementById('thanksScreen').style.display = 'block';
           renderAiSuggestion(resData.aiSuggestion);
@@ -580,12 +654,106 @@ input[type="number"]::-webkit-inner-spin-button,
           throw new Error(err.error || '送信エラー');
         }
       } catch (err) {
+        closeConfirmScreen();
         errorMsg.textContent = '❌ エラー: ' + err.message;
         errorMsg.style.display = 'block';
+        errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
         btn.disabled = false;
         btn.textContent = '送信する 📩';
       }
-    });
+    }
+
+    // ────────────────────────────────────────────────────
+    // 確認画面
+    // ────────────────────────────────────────────────────
+    async function showConfirmScreen(survey, answers) {
+      var color = getColor();
+      var rows = survey.questions.map(function(q) {
+        var section = document.getElementById('section_' + q.id);
+        if (section && section.getAttribute('data-hidden') === 'true') return '';
+        var val = answers[q.id];
+        if (val === undefined || val === null || val === '') val = '（未入力）';
+        return '<div class="cf-row"><div class="cf-label">' + esc(q.label) + '</div>' +
+               '<div class="cf-value">' + esc(String(val)) + '</div></div>';
+      }).join('');
+
+      var html =
+        '<div class="cf-overlay" id="confirmOverlay">' +
+          '<div class="cf-box">' +
+            '<div class="cf-head" style="background:' + color + '">' +
+              '<div class="cf-title">入力内容の確認</div>' +
+              '<div class="cf-sub">この内容で送信してもよろしいですか？</div>' +
+            '</div>' +
+            '<div class="cf-body">' +
+              '<div id="gpResult"></div>' +
+              rows +
+            '</div>' +
+            '<div class="cf-foot">' +
+              '<button type="button" class="cf-btn cf-back" id="cfBack">修正する</button>' +
+              '<button type="button" class="cf-btn cf-send" id="cfSend" style="background:' + color + '">この内容で送信 📩</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      var wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      document.body.appendChild(wrap.firstChild);
+      document.body.style.overflow = 'hidden';
+
+      document.getElementById('cfBack').onclick = closeConfirmScreen;
+      document.getElementById('cfSend').onclick = function() {
+        sendAnswers(survey, answers, document.getElementById('submitBtn'), document.getElementById('errorMsg'));
+      };
+
+      // GP倶楽部の資格確認（設定が有効な場合のみ）
+      if (survey.gpCheckEnabled) await renderGpResult(survey, answers);
+    }
+
+    function closeConfirmScreen() {
+      var el = document.getElementById('confirmOverlay');
+      if (el) el.remove();
+      document.body.style.overflow = '';
+    }
+
+    // ダイアナコードからGP倶楽部の資格を確認して表示する
+    async function renderGpResult(survey, answers) {
+      var box = document.getElementById('gpResult');
+      if (!box) return;
+
+      // ダイアナコードの設問を探す
+      var codeQ = survey.questions.filter(function(q) {
+        var l = String(q.label || '');
+        return l.indexOf('ダイアナコード') >= 0;
+      })[0];
+      if (!codeQ) return;
+
+      var code = String(answers[codeQ.id] || '').replace(/[^0-9]/g, '');
+      if (!code) return;
+
+      box.innerHTML = '<div class="cf-gp cf-gp-wait">GP倶楽部の資格を確認しています...</div>';
+      try {
+        var res = await fetch(BASE_URL + '/api/gp-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dia_cd: code, tenant: TENANT })
+        });
+        var data = await res.json().catch(function() { return {}; });
+
+        if (data.status === 'ok' && data.gpClub) {
+          box.innerHTML = '<div class="cf-gp cf-gp-ok">✅ GP倶楽部：あり</div>';
+        } else if (data.status === 'ok') {
+          box.innerHTML = '<div class="cf-gp cf-gp-warn">⚠️ GP倶楽部：なし<br>' +
+            '<span>GP倶楽部の方ではないようですが、このまま応募してもよろしいでしょうか。</span></div>';
+        } else if (data.status === 'notfound') {
+          box.innerHTML = '<div class="cf-gp cf-gp-warn">⚠️ ダイアナコードが該当しません<br>' +
+            '<span>入力内容をご確認ください。このまま応募することもできます。</span></div>';
+        } else {
+          box.innerHTML = '';   // 照会できない場合は何も出さない
+        }
+      } catch (e) {
+        box.innerHTML = '';
+      }
+    }
   }
 
   function renderSurvey(survey, endDate, settings) {
