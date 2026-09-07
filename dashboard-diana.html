@@ -373,10 +373,15 @@
                   <input type="checkbox" id="gpCheckEnabled" style="width:18px;height:18px;min-width:18px;accent-color:#7B4F6E;cursor:pointer;padding:0;border:none;appearance:auto;-webkit-appearance:checkbox;border-radius:0;">
                   <span style="font-weight:bold;">🎫 確認画面でGP倶楽部の資格を表示する</span>
                 </label>
-                <p style="font-size:12px;color:#8a6d1f;margin:6px 0 0;line-height:1.7;">
+                <p style="font-size:12px;color:#8a6d1f;margin:6px 0 8px;line-height:1.7;">
                   確認画面でダイアナコードから会員データベースを照会し、GP倶楽部の有無を表示します。<br>
-                  資格が無い場合や該当が無い場合は注意を表示しますが、応募はそのまま可能です。<br>
-                  ⚠️ メンズコンテスト・Dstyleコンテスト向けの機能です。
+                  資格が無い場合や該当が無い場合は注意を表示しますが、応募はそのまま可能です。
+                </p>
+                <label style="font-size:13px;font-weight:bold;color:#555;">照会しない応募区分</label>
+                <input type="text" id="gpExcludeDivisions" placeholder="ゴールデンプロポーション" style="margin-top:4px;">
+                <p style="font-size:12px;color:#8a6d1f;margin:4px 0 0;line-height:1.7;">
+                  ここに入れた語を含む応募区分では、照会も注意表示も行いません。<br>
+                  複数指定する場合はカンマ区切り。未入力の場合は「ゴールデンプロポーション」が使われます。
                 </p>
               </div>
             </div>
@@ -1091,6 +1096,7 @@
     document.getElementById('isContest').checked = currentSurvey.isContest === true;
     document.getElementById('confirmEnabled').checked = currentSurvey.confirmEnabled === true;
     document.getElementById('gpCheckEnabled').checked = currentSurvey.gpCheckEnabled === true;
+    document.getElementById('gpExcludeDivisions').value = currentSurvey.gpExcludeDivisions || '';
     toggleConfirmUI();
     document.getElementById('contestGroupNewTitle').value = '';
     toggleContestUI();
@@ -1199,6 +1205,7 @@
       var isContest = document.getElementById('isContest').checked;
       var confirmEnabled = document.getElementById('confirmEnabled').checked;
       var gpCheckEnabled = confirmEnabled && document.getElementById('gpCheckEnabled').checked;
+      var gpExcludeDivisions = document.getElementById('gpExcludeDivisions').value.trim() || null;
       var contestGroupId = null, contestGroupTitle = null, contestRole = null;
       if (isContest) {
         var gsel = document.getElementById('contestGroupSelect').value;
@@ -1214,8 +1221,8 @@
         }
         contestRole = detectContestRole();   // 設問から自動判定（判定できない場合は null）
       }
-      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest, contestGroupId: contestGroupId, contestGroupTitle: contestGroupTitle, contestRole: contestRole, confirmEnabled: confirmEnabled, gpCheckEnabled: gpCheckEnabled }) });
-      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; currentSurvey.contestGroupId = contestGroupId; currentSurvey.contestGroupTitle = contestGroupTitle; currentSurvey.contestRole = contestRole; currentSurvey.confirmEnabled = confirmEnabled; currentSurvey.gpCheckEnabled = gpCheckEnabled; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
+      var res = await apiFetch(BASE_URL + '/api/surveys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentSurvey.id, tenant: TENANT, title: title, description: description, thanksMessage: thanksMessage, isContest: isContest, contestGroupId: contestGroupId, contestGroupTitle: contestGroupTitle, contestRole: contestRole, confirmEnabled: confirmEnabled, gpCheckEnabled: gpCheckEnabled, gpExcludeDivisions: gpExcludeDivisions }) });
+      if (res.ok) { currentSurvey.title = title; currentSurvey.description = description; currentSurvey.thanksMessage = thanksMessage; currentSurvey.isContest = isContest; currentSurvey.contestGroupId = contestGroupId; currentSurvey.contestGroupTitle = contestGroupTitle; currentSurvey.contestRole = contestRole; currentSurvey.confirmEnabled = confirmEnabled; currentSurvey.gpCheckEnabled = gpCheckEnabled; currentSurvey.gpExcludeDivisions = gpExcludeDivisions; showStatus('infoStatus', '✅ 保存しました', 'success'); loadSurveys(); }
       else { showStatus('infoStatus', '❌ 保存失敗', 'error'); }
     } catch (e) { showStatus('infoStatus', '❌ エラー: ' + e.message, 'error'); }
   }

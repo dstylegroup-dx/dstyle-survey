@@ -800,6 +800,23 @@ input[type="number"]::-webkit-inner-spin-button,
       var box = document.getElementById('gpResult');
       if (!box) return;
 
+      // 対象外の応募区分（GP倶楽部の資格が関係しないコンテスト）は照会しない
+      // 既定は「ゴールデンプロポーション」。管理画面で変更可能
+      var excludeWords = String(survey.gpExcludeDivisions || 'ゴールデンプロポーション')
+        .split(/[,、\n]/).map(function(w) { return w.trim(); }).filter(Boolean);
+
+      var divisionQ = survey.questions.filter(function(q) {
+        var l = String(q.label || '');
+        return l.indexOf('応募区分') >= 0 || l.indexOf('出場区分') >= 0;
+      })[0];
+      if (divisionQ) {
+        var divVal = String(answers[divisionQ.id] || '');
+        if (excludeWords.some(function(w) { return divVal.indexOf(w) >= 0; })) {
+          box.innerHTML = '';   // 対象外の区分なので何も表示しない
+          return;
+        }
+      }
+
       // ダイアナコードの設問を探す
       var codeQ = survey.questions.filter(function(q) {
         var l = String(q.label || '');
