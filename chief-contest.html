@@ -685,8 +685,11 @@ function renderList() {
 
   document.getElementById('appGrid').innerHTML = filtered.map(function(e, i) {
     const meta = STATUS_META[e.status] || STATUS_META.single;
-    const imgs = (e.files || []).filter(function(f) { return f.kind === 'image'; });
-    const others = (e.files || []).filter(function(f) { return f.kind !== 'image'; });
+    const shown = (e.files || []).filter(function(f) {
+      return !['出場申込書兼承諾書', '承諾書'].some(function(k) { return String(f.label || '').indexOf(k) >= 0; });
+    });
+    const imgs = shown.filter(function(f) { return f.kind === 'image'; });
+    const others = shown.filter(function(f) { return f.kind !== 'image'; });
     return '<div class="app-card" onclick="openDetail(' + i + ')">'
       + '<div class="app-head">'
       +   '<div class="app-no">No.' + (i + 1) + '</div>'
@@ -757,8 +760,12 @@ function renderDetail() {
   const shorts = deduped.filter(function(a) { return shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
   const longs  = deduped.filter(function(a) { return !shortKeys.some(function(k) { return a.label.indexOf(k) >= 0; }); });
 
-  const imgs = (e.files || []).filter(function(f) { return f.kind === 'image'; });
-  const others = (e.files || []).filter(function(f) { return f.kind !== 'image'; });
+  // 承諾書はチェック形式に変更したため、添付ファイルとして表示しない
+  const visibleFiles = (e.files || []).filter(function(f) {
+    return !['出場申込書兼承諾書', '承諾書'].some(function(k) { return String(f.label || '').indexOf(k) >= 0; });
+  });
+  const imgs = visibleFiles.filter(function(f) { return f.kind === 'image'; });
+  const others = visibleFiles.filter(function(f) { return f.kind !== 'image'; });
 
   let html = '';
 
