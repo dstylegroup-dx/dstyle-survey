@@ -1157,11 +1157,18 @@ async function getBlobUrl(blobPath) {
 }
 
 // 添付ファイルリストを取得（Blobパス→SAS URL変換済み、種別付き）
+// 添付ファイルとして表示しない設問（チェック形式に変更したため）
+const HIDDEN_FILE_LABELS = ['出場申込書兼承諾書', '承諾書'];
+function isHiddenFileLabel(label) {
+  return HIDDEN_FILE_LABELS.some(k => String(label || '').includes(k));
+}
+
 async function getImageUrls(r) {
   const answers = r.answers || {};
   const urls = [];
   for (const [k, v] of Object.entries(answers)) {
     const label = questionLabelMap[k] || k;
+    if (isHiddenFileLabel(label)) continue;   // 承諾書は添付ファイルとして表示しない
     if (typeof v === 'string' && isBlobPath(v)) {
       // Blob相対パス → SAS URL取得
       const url = v.startsWith('https://') ? v : await getBlobUrl(v);
