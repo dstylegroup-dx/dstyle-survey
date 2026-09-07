@@ -554,6 +554,7 @@
                 <option value="date">📅 日付選択</option>
                 <option value="image_choice">🖼️ 画像選択</option>
                 <option value="file">📎 ファイルアップロード</option>
+                <option value="consent">📜 同意（承諾書）</option>
               </select>
               <button class="btn btn-primary" onclick="openAddQuestion()">＋ 追加</button>
             </div>
@@ -796,6 +797,7 @@
           <option value="email">📧 メールアドレス</option>
           <option value="date">📅 日付選択</option>
           <option value="file">📎 ファイルアップロード</option>
+                <option value="consent">📜 同意（承諾書）</option>
         </select>
       </div>
       <div class="form-group" id="placeholderGroup">
@@ -872,6 +874,17 @@
           <option value="5">5段階（★★★★★）</option>
           <option value="10">10段階</option>
         </select>
+      </div>
+      <div class="form-group" id="consentGroup" style="display:none">
+        <label>承諾書の本文</label>
+        <textarea id="qConsentText" placeholder="承諾書の全文を貼り付けてください。改行はそのまま表示されます。" style="min-height:220px;resize:vertical;font-size:13px;line-height:1.8;"></textarea>
+        <p style="font-size:12px;color:#888;margin:4px 0 10px;line-height:1.7;">
+          応募フォームではスクロールできる枠に表示されます。<br>
+          <b>最後までスクロールするまでチェックできない</b>仕様のため、読んだことを担保できます。
+        </p>
+        <label>チェックボックスの文言</label>
+        <input type="text" id="qConsentLabel" placeholder="上記の内容を確認し、同意します">
+        <p style="font-size:12px;color:#888;margin:4px 0 0;">未入力の場合は「上記の内容を確認し、同意します」と表示されます。</p>
       </div>
       <div class="form-group" id="maxLengthGroup" style="display:none">
         <label>文字数制限（任意）</label>
@@ -1212,7 +1225,7 @@
     var list = document.getElementById('questionsList');
     var questions = currentSurvey.questions || [];
     if (questions.length === 0) { list.innerHTML = '<div class="empty">質問がありません。下の「＋ 追加」から追加してください。</div>'; return; }
-    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択', file: '📎ファイル' };
+    var typeLabels = { text: 'テキスト', textarea: '長文', radio: 'ラジオ', checkbox: 'チェック', select: 'プルダウン', rating: '★評価', number: '数値', tel: '電話番号', email: 'メール', date: '日付', image_choice: '🖼️画像選択', file: '📎ファイル', consent: '📜同意' };
     list.innerHTML = questions.map(function(q, i) {
       var opts = (q.options || []).map(function(o) { return '<span class="option-tag">' + o + '</span>'; }).join('');
       var branchBadge = q.showIf ? '<span style="font-size:11px;background:#f3e9f9;color:#7B4F6E;border:1px solid #d8b4f0;border-radius:4px;padding:1px 6px;margin-left:4px">🔀 分岐</span>' : '';
@@ -1274,6 +1287,8 @@
     document.getElementById('qType').value = document.getElementById('newQuestionType').value;
     document.getElementById('qPlaceholder').value = '';
     document.getElementById('qMaxLength').value = '';
+    document.getElementById('qConsentText').value = '';
+    document.getElementById('qConsentLabel').value = '';
     document.getElementById('qRequired').checked = false;
     currentQImageBase64 = '';
     document.getElementById('qImgPreviewWrap').style.display = 'none';
@@ -1298,6 +1313,8 @@
     document.getElementById('qType').value = q.type || 'text';
     document.getElementById('qPlaceholder').value = q.placeholder || '';
     document.getElementById('qMaxLength').value = q.maxLength || '';
+    document.getElementById('qConsentText').value = q.consentText || '';
+    document.getElementById('qConsentLabel').value = q.consentLabel || '';
     document.getElementById('qRequired').checked = q.required || false;
     onQTypeChange();
     document.getElementById('optionsList').innerHTML = '';
@@ -1349,6 +1366,7 @@
     document.getElementById('ratingGroup').style.display = type === 'rating' ? '' : 'none';
     document.getElementById('numberRangeGroup').style.display = type === 'number' ? '' : 'none';
     document.getElementById('maxLengthGroup').style.display = type === 'textarea' ? '' : 'none';
+    document.getElementById('consentGroup').style.display = type === 'consent' ? '' : 'none';
     document.getElementById('imageChoiceGroup').style.display = type === 'image_choice' ? '' : 'none';
     if (type === 'image_choice' && document.getElementById('imageChoiceList').children.length === 0) {
       addImageChoiceRow(); addImageChoiceRow();
@@ -1404,6 +1422,13 @@
     if (placeholder) q.placeholder = placeholder;
     if (type === 'rating') {
       q.maxStars = parseInt(document.getElementById('qMaxStars').value) || 5;
+    }
+    if (type === 'consent') {
+      var consentText = document.getElementById('qConsentText').value;
+      if (!consentText.trim()) { alert('承諾書の本文を入力してください'); return; }
+      q.consentText = consentText;
+      var cl = document.getElementById('qConsentLabel').value.trim();
+      if (cl) q.consentLabel = cl;
     }
     if (type === 'textarea') {
       var maxLenVal = document.getElementById('qMaxLength').value;
