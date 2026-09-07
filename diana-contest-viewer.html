@@ -1633,10 +1633,14 @@ async function renderModal() {
       </div>`;
   }
 
-  // 画像ギャラリー（ダウンロードボタン付き）
+  // その他の添付ファイル（上部の応募写真と承諾書を除いたもの）
+  // 添付が無い場合はセクション自体を表示しない
   const galleryHtml = imgs.length > 0
-    ? '<div class="img-gallery">' + imgs.map(galleryItemHtml).join('') + '</div>'
-    : '<div class="no-image">添付ファイルなし</div>';
+    ? `<div class="detail-section">
+         <div class="detail-section-header">📎 その他の添付ファイル</div>
+         <div class="detail-section-body"><div class="img-gallery">${imgs.map(galleryItemHtml).join('')}</div></div>
+       </div>`
+    : '';
 
   // 上部写真HTML
   const topPhotoHtml = topImgs.length > 0 ? `
@@ -1664,11 +1668,7 @@ async function renderModal() {
       <div class="detail-section-header">📐 初回採寸データ（DB自動取得）</div>
       <div class="detail-section-body">${measureHtml}</div>
     </div>
-
-    <div class="detail-section">
-      <div class="detail-section-header">📄 出場申込書兼承諾書</div>
-      <div class="detail-section-body">${galleryHtml}</div>
-    </div>
+    ${galleryHtml}
   `;
 }
 
