@@ -62,6 +62,21 @@ input[type="number"]::-webkit-inner-spin-button,
       font-size: 13px; line-height: 1.8; color: #555;
     }
     .char-count { font-size: 12px; color: #999; text-align: right; margin-top: 4px; }
+    .consent-box {
+      max-height: 240px; overflow-y: auto; border: 1.5px solid #ddd; border-radius: 8px;
+      padding: 14px 16px; background: #fafafa; font-size: 13.5px; line-height: 1.9;
+      white-space: pre-wrap; word-break: break-word; color: #444;
+      -webkit-overflow-scrolling: touch;
+    }
+    .consent-hint { font-size: 12px; color: #999; margin: 6px 0 8px; }
+    .consent-hint.done { color: #2e7d32; font-weight: bold; }
+    .consent-check {
+      display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px;
+      border: 1.5px solid #e0e0e0; border-radius: 8px; background: #f7f7f7;
+      font-size: 14px; color: #aaa; cursor: not-allowed; line-height: 1.7;
+    }
+    .consent-check.ready { background: #fff; color: #333; cursor: pointer; border-color: #bbb; }
+    .consent-check input { width: 20px; height: 20px; min-width: 20px; margin-top: 2px; cursor: inherit; }
     .char-count.over { color: #c0392b; font-weight: bold; }
 
     /* 確認画面 */
@@ -422,6 +437,14 @@ input[type="number"]::-webkit-inner-spin-button,
         (q.options || []).forEach(function(opt) { html += '<label class="radio-label"><input type="checkbox" name="q_' + esc(q.id) + '" value="' + esc(opt) + '"> ' + esc(opt) + '</label>'; });
         html += '</div>';
         if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
+      } else if (q.type === 'consent') {
+        // 承諾書：スクロールできる枠に本文を表示し、最後まで読むとチェック可能になる
+        html += '<div class="consent-box" id="consentBox_' + esc(q.id) + '">' + esc(q.consentText || '') + '</div>';
+        html += '<div class="consent-hint" id="consentHint_' + esc(q.id) + '">最後までお読みいただくとチェックできます</div>';
+        html += '<label class="consent-check" id="consentLabel_' + esc(q.id) + '">'
+              + '<input type="checkbox" id="q_' + esc(q.id) + '" disabled> '
+              + esc(q.consentLabel || '上記の内容を確認し、同意します') + '</label>';
+        if (q.required) html += '<div class="field-error-msg">同意が必要です</div>';
       } else if (q.type === 'file') {
         var accept = q.fileAccept || '*/*';
         var maxMb = q.fileMaxMb || 10;
@@ -506,6 +529,25 @@ input[type="number"]::-webkit-inner-spin-button,
     });
     evaluateBranching(); // 初期状態を評価
 
+    // 承諾書：最後までスクロールしたらチェックを有効にする
+    document.querySelectorAll('.consent-box').forEach(function(box) {
+      var qid = box.id.replace(/^consentBox_/, '');
+      var check = document.getElementById('q_' + qid);
+      var hint  = document.getElementById('consentHint_' + qid);
+      var label = document.getElementById('consentLabel_' + qid);
+      var unlock = function() {
+        if (!check || !check.disabled) return;
+        check.disabled = false;
+        if (label) label.classList.add('ready');
+        if (hint) { hint.textContent = '✅ 最後まで確認しました'; hint.classList.add('done'); }
+      };
+      // 本文が短くスクロールが不要な場合は最初から有効にする
+      if (box.scrollHeight <= box.clientHeight + 4) { unlock(); return; }
+      box.addEventListener('scroll', function() {
+        if (box.scrollTop + box.clientHeight >= box.scrollHeight - 8) unlock();
+      });
+    });
+
     // 長文の文字数カウント
     document.querySelectorAll('textarea[data-maxlen]').forEach(function(ta) {
       var qid = ta.id.replace(/^q_/, '');
@@ -567,6 +609,9 @@ input[type="number"]::-webkit-inner-spin-button,
         } else if (q.type === 'checkbox') {
           var checked = document.querySelectorAll('input[name="q_' + q.id + '"]:checked');
           if (!checked.length) isEmpty = true;
+        } else if (q.type === 'consent') {
+          var cb = document.getElementById('q_' + q.id);
+          if (!cb || !cb.checked) isEmpty = true;
         } else if (q.type === 'file') {
           var hidden = document.getElementById('q_' + q.id);
           try { if (!hidden || !JSON.parse(hidden.value || '[]').length) isEmpty = true; } catch(e) { isEmpty = true; }
@@ -614,6 +659,9 @@ input[type="number"]::-webkit-inner-spin-button,
         } else if (q.type === 'checkbox') {
           var checkedBoxes = document.querySelectorAll('input[name="q_' + q.id + '"]:checked');
           answers[q.id] = Array.from(checkedBoxes).map(function(c) { return c.value; }).join(', ');
+        } else if (q.type === 'consent') {
+          var cb = document.getElementById('q_' + q.id);
+          answers[q.id] = (cb && cb.checked) ? '同意' : '未同意';
         } else if (q.type === 'file') {
           var hidden = document.getElementById('q_' + q.id);
           try { answers[q.id] = JSON.parse(hidden.value || '[]').join(', ') || '（未アップロード）'; } catch(e) { answers[q.id] = '（未アップロード）'; }
@@ -673,6 +721,13 @@ input[type="number"]::-webkit-inner-spin-button,
         if (section && section.getAttribute('data-hidden') === 'true') return '';
         var val = answers[q.id];
         if (val === undefined || val === null || val === '') val = '（未入力）';
+        // 承諾書は本文を再掲せず、同意の有無だけ表示する
+        if (q.type === 'consent') {
+          var agreed = String(val) === '同意';
+          return '<div class="cf-row"><div class="cf-label">' + esc(q.label) + '</div>' +
+                 '<div class="cf-value" style="color:' + (agreed ? '#2e7d32' : '#c0392b') + ';font-weight:bold">' +
+                 (agreed ? '✅ 同意済み' : '未同意') + '</div></div>';
+        }
         return '<div class="cf-row"><div class="cf-label">' + esc(q.label) + '</div>' +
                '<div class="cf-value">' + esc(String(val)) + '</div></div>';
       }).join('');
