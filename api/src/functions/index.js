@@ -356,7 +356,9 @@ app.http('log', {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
-                await container.item(id, tenant).delete();
+                // 論理削除（データは残し、削除済みの印を付ける）
+                const delUser = await getTokenDoc(request.headers.get('x-admin-token'));
+                await softDelete(container, id, tenant, delUser ? (delUser.userName || delUser.userEmail) : '');
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
@@ -403,7 +405,7 @@ app.http('surveys', {
                     return { status: 200, headers: SECURITY_HEADERS, jsonBody: resource };
                 }
                 const { resources } = await container.items.query({
-                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' ORDER BY c.createdAt DESC",
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: tenant }]
                 }).fetchAll();
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
@@ -475,7 +477,9 @@ app.http('surveys', {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
-                await container.item(id, tenant).delete();
+                // 論理削除（データは残し、削除済みの印を付ける）
+                const delUser = await getTokenDoc(request.headers.get('x-admin-token'));
+                await softDelete(container, id, tenant, delUser ? (delUser.userName || delUser.userEmail) : '');
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
@@ -515,7 +519,7 @@ app.http('response', {
                     const todayJst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
                     const tomorrowJst = new Date(new Date(todayJst).getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
                     const { resources: dupCheck } = await container.items.query({
-                        query: "SELECT TOP 1 c.id FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' AND c.emailAddress = @email AND c.createdAt >= @today AND c.createdAt < @tomorrow",
+                        query: "SELECT TOP 1 c.id FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' AND c.emailAddress = @email AND c.createdAt >= @today AND c.createdAt < @tomorrow AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                         parameters: [
                             { name: "@tenant",   value: tenant },
                             { name: "@surveyId", value: surveyId },
@@ -619,7 +623,7 @@ app.http('response', {
                 const tenant = url.searchParams.get('tenant');
                 if (!surveyId || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'surveyId と tenant は必須です' } };
                 const { resources } = await container.items.query({
-                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' ORDER BY c.createdAt DESC",
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: tenant }, { name: "@surveyId", value: surveyId }]
                 }).fetchAll();
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
@@ -661,7 +665,9 @@ app.http('response', {
                 const id = url.searchParams.get('id');
                 const tenant = url.searchParams.get('tenant');
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
-                await container.item(id, tenant).delete();
+                // 論理削除（データは残し、削除済みの印を付ける）
+                const delUser = await getTokenDoc(request.headers.get('x-admin-token'));
+                await softDelete(container, id, tenant, delUser ? (delUser.userName || delUser.userEmail) : '');
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
@@ -720,7 +726,7 @@ app.http('responsecounts', {
             surveyIds.forEach(id => counts[id] = 0);
 
             const { resources } = await container.items.query({
-                query: "SELECT c.surveyId FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND ARRAY_CONTAINS(@ids, c.surveyId)",
+                query: "SELECT c.surveyId FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND ARRAY_CONTAINS(@ids, c.surveyId) AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                 parameters: [{ name: "@tenant", value: tenant }, { name: "@ids", value: surveyIds }]
             }).fetchAll();
 
@@ -814,7 +820,7 @@ app.http('diagnosislist', {
             if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
             const container = await getContainer();
             const { resources } = await container.items.query({
-                query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC",
+                query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.updatedAt DESC",
                 parameters: [{ name: "@tenant", value: tenant }]
             }).fetchAll();
             return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources };
@@ -846,7 +852,7 @@ app.http('diagnosis', {
                 }
                 try {
                     const { resources } = await container.items.query({
-                        query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC OFFSET 0 LIMIT 1",
+                        query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.updatedAt DESC OFFSET 0 LIMIT 1",
                         parameters: [{ name: "@tenant", value: tenant }]
                     }).fetchAll();
                     return { status: 200, headers: SECURITY_HEADERS, jsonBody: resources[0] || { questions: [], results: {} } };
@@ -882,7 +888,9 @@ app.http('diagnosis', {
                 const id = url.searchParams.get('id') || url.searchParams.get('diagId');
                 const tenant = url.searchParams.get('tenant');
                 if (!id || !tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'id と tenant は必須です' } };
-                await container.item(id, tenant).delete();
+                // 論理削除（データは残し、削除済みの印を付ける）
+                const delUser = await getTokenDoc(request.headers.get('x-admin-token'));
+                await softDelete(container, id, tenant, delUser ? (delUser.userName || delUser.userEmail) : '');
                 return { status: 200, headers: SECURITY_HEADERS, jsonBody: { status: 'deleted' } };
             }
 
@@ -1133,13 +1141,13 @@ app.http('groupstats', {
             for (const tenant of tenants) {
                 // アンケート定義取得
                 const { resources: surveys } = await container.items.query({
-                    query: "SELECT c.id, c.title, c.active FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' ORDER BY c.createdAt DESC",
+                    query: "SELECT c.id, c.title, c.active FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: tenant }]
                 }).fetchAll();
 
                 // 回答数取得
                 const { resources: responses } = await container.items.query({
-                    query: "SELECT c.surveyId FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND c.createdAt >= @since",
+                    query: "SELECT c.surveyId FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND c.createdAt >= @since AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                     parameters: [{ name: "@tenant", value: tenant }, { name: "@since", value: since }]
                 }).fetchAll();
 
@@ -1263,7 +1271,7 @@ app.timer('sendScheduledReports', {
                     // surveyIds が空 or ['all'] なら全アンケートを対象に
                     if (surveyIds.length === 0 || surveyIds[0] === 'all') {
                         const { resources: surveys } = await container.items.query({
-                            query: "SELECT c.id FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition'",
+                            query: "SELECT c.id FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                             parameters: [{ name: "@tenant", value: tenant }]
                         }).fetchAll();
                         surveyIds = surveys.map(s => s.id);
@@ -1433,7 +1441,7 @@ app.http('bulkmail', {
                 const tenant = url.searchParams.get('tenant');
                 if (!tenant) return secureJson({ error: 'tenant は必須です' }, 400);
                 const { resources } = await container.items.query({
-                    query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.tenant = @tenant ORDER BY c.scheduledAt ASC",
+                    query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.tenant = @tenant AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.scheduledAt ASC",
                     parameters: [{ name: "@tenant", value: tenant }]
                 }).fetchAll();
                 return secureJson(resources);
@@ -1519,11 +1527,13 @@ app.http('bulkmailDelete', {
             const container = await getContainer();
             // パーティションキーを特定するためにまず取得
             const { resources } = await container.items.query({
-                query: "SELECT * FROM c WHERE c.id = @id AND c.docType = 'scheduled_mail'",
+                query: "SELECT * FROM c WHERE c.id = @id AND c.docType = 'scheduled_mail' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                 parameters: [{ name: "@id", value: id }]
             }).fetchAll();
             if (resources.length === 0) return secureJson({ error: '見つかりません' }, 404);
-            await container.item(id, resources[0].tenant).delete();
+            // 論理削除（データは残し、削除済みの印を付ける）
+            const delUser2 = await getTokenDoc(request.headers.get('x-admin-token'));
+            await softDelete(container, id, resources[0].tenant, delUser2 ? (delUser2.userName || delUser2.userEmail) : '');
             return secureJson({ status: 'deleted' });
         } catch (e) {
             return secureJson({ error: e.message }, 500);
@@ -1542,7 +1552,7 @@ app.timer('sendScheduledMails', {
             const nowIso = new Date().toISOString();
             // 送信時刻を過ぎた pending の予約を取得
             const { resources: pendingMails } = await container.items.query({
-                query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.status = 'pending' AND c.scheduledAt <= @now",
+                query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.status = 'pending' AND c.scheduledAt <= @now AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                 parameters: [{ name: "@now", value: nowIso }]
             }).fetchAll();
 
@@ -1989,6 +1999,27 @@ function buildFileList(answers, labels) {
 }
 
 // ----------------------------------------------------
+// 🗑️ 論理削除
+//
+// ダッシュボードからの削除は、データを消さずに削除済みの印を付ける。
+// 誤操作からの復旧を容易にするため。
+//
+// 【復元方法】Cosmos DB のデータ エクスプローラーで対象ドキュメントを開き、
+//   "isDeleted": true → false（または項目自体を削除）に書き換えて保存する。
+//
+// 【完全に消す場合】同じくデータ エクスプローラーからドキュメントを削除する。
+// ----------------------------------------------------
+async function softDelete(container, id, partitionKey, userName) {
+    const { resource } = await container.item(id, partitionKey).read();
+    if (!resource) throw new Error('対象が見つかりません');
+    resource.isDeleted = true;
+    resource.deletedAt = new Date().toISOString();
+    resource.deletedBy = userName || 'unknown';
+    await container.items.upsert(resource);
+    return resource;
+}
+
+// ----------------------------------------------------
 // 🗄️ 簡易キャッシュ（アクセス集中時の負荷軽減）
 //
 // ・Functionsのインスタンスごとにメモリ上で保持する
@@ -2319,7 +2350,7 @@ app.http('contestEntries', {
             // ---- コンテスト対象アンケートを取得（60秒キャッシュ）----
             const surveys = await cached('contestSurveys', 60 * 1000, async () => {
                 const { resources } = await container.items.query({
-                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true",
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                     parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }]
                 }).fetchAll();
                 return resources || [];
@@ -2369,7 +2400,7 @@ app.http('contestEntries', {
             const parts = [];
             for (const s of group.surveys) {
                 const { resources: responses } = await container.items.query({
-                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' ORDER BY c.createdAt DESC",
+                    query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.createdAt DESC",
                     parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }, { name: "@surveyId", value: s.id }]
                 }).fetchAll();
                 const labelMap = {};
