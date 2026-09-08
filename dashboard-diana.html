@@ -821,7 +821,7 @@
       </div>
       <div class="form-group" id="questionImageGroup">
         <label>質問画像（任意）</label>
-        <p style="font-size:12px;color:#888;margin-bottom:6px">質問文の下に表示される画像です。PNG・JPG（1MB以内）</p>
+        <p style="font-size:12px;color:#888;margin-bottom:6px">サンプル写真などを表示できます。PNG・JPG（1MB以内）</p>
         <div id="qImgPreviewWrap" class="img-preview-wrap" style="display:none">
           <img id="qImgPreview" src="" alt="質問画像">
           <button class="img-preview-remove" onclick="removeQuestionImage()">✕</button>
@@ -831,6 +831,24 @@
           <div style="font-size:12px;color:#888">クリックして画像を選択</div>
         </div>
         <input type="file" id="qImgFileInput" accept="image/*" style="display:none" onchange="onQuestionImageSelected(event)">
+        <div style="display:flex;gap:12px;margin-top:10px;">
+          <div style="flex:1">
+            <label style="font-size:13px;">表示位置</label>
+            <select id="qImagePosition">
+              <option value="bottom">説明文の下（既定）</option>
+              <option value="right">説明文の右側</option>
+              <option value="left">説明文の左側</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label style="font-size:13px;">大きさ</label>
+            <select id="qImageSize">
+              <option value="small">小</option>
+              <option value="medium" selected>中（既定）</option>
+              <option value="large">大</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div class="form-group" id="optionsGroup" style="display:none">
@@ -1296,6 +1314,8 @@
     document.getElementById('qMaxLength').value = '';
     document.getElementById('qConsentText').value = '';
     document.getElementById('qConsentLabel').value = '';
+    document.getElementById('qImagePosition').value = 'bottom';
+    document.getElementById('qImageSize').value = 'medium';
     document.getElementById('qRequired').checked = false;
     currentQImageBase64 = '';
     document.getElementById('qImgPreviewWrap').style.display = 'none';
@@ -1333,6 +1353,8 @@
     }
     // 質問画像復元
     currentQImageBase64 = q.imageBase64 || '';
+    document.getElementById('qImagePosition').value = q.imagePosition || 'bottom';
+    document.getElementById('qImageSize').value = q.imageSize || 'medium';
     if (currentQImageBase64) {
       document.getElementById('qImgPreview').src = currentQImageBase64;
       document.getElementById('qImgPreviewWrap').style.display = 'block';
@@ -1447,7 +1469,11 @@
       if (minVal !== '') q.min = parseInt(minVal);
       if (maxVal !== '') q.max = parseInt(maxVal);
     }
-    if (currentQImageBase64) q.imageBase64 = currentQImageBase64;
+    if (currentQImageBase64) {
+      q.imageBase64 = currentQImageBase64;
+      q.imagePosition = document.getElementById('qImagePosition').value;
+      q.imageSize = document.getElementById('qImageSize').value;
+    }
     if (type === 'image_choice') q.imageChoices = getImageChoices();
     if (type === 'file') { q.fileMaxMb = parseInt(document.getElementById('qFileMaxMb').value)||10; q.fileAccept = document.getElementById('qFileAccept').value; q.fileMultiple = document.getElementById('qFileMultiple').checked; }
     // 分岐設定を保存
