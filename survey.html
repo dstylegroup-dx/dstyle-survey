@@ -54,7 +54,26 @@ input[type="number"]::-webkit-inner-spin-button,
     .image-choice-item.selected { border-color: #4A5D4E; background: #e8f5e9; }
     .image-choice-item img { width: 100%; max-height: 90px; object-fit: contain; border-radius: 6px; margin-bottom: 6px; }
     .image-choice-item span { font-size: 13px; color: #333; display: block; }
-    .question-image { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin: 8px 0 12px; border: 1px solid #eee; }
+    .question-image { width: 100%; object-fit: contain; border-radius: 8px; margin: 8px 0 12px; border: 1px solid #eee; }
+    .question-image.size-small  { max-height: 110px; }
+    .question-image.size-medium { max-height: 200px; }
+    .question-image.size-large  { max-height: 320px; }
+
+    /* 説明文と質問画像を横に並べる */
+    .q-media { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 10px; }
+    .q-media.media-left { flex-direction: row-reverse; }
+    .q-media-text { flex: 1; min-width: 0; }
+    .q-media-text .question-hint { margin-top: 0; }
+    .q-media-img { flex: 0 0 auto; }
+    .q-media-img .question-image { margin: 0; width: auto; }
+    .q-media-img .size-small  { max-width: 110px; }
+    .q-media-img .size-medium { max-width: 170px; }
+    .q-media-img .size-large  { max-width: 240px; }
+    @media (max-width: 560px) {
+      /* 狭い画面では縦に並べる（画像が潰れないように） */
+      .q-media, .q-media.media-left { flex-direction: column; }
+      .q-media-img { align-self: center; }
+    }
     .question-hint {
       white-space: pre-wrap; word-break: break-word;
       background: #f7f9fb; border: 1px solid #e3e9ee; border-left: 3px solid #b9c7d3;
@@ -381,8 +400,25 @@ input[type="number"]::-webkit-inner-spin-button,
       html += esc(q.label);
       if (q.required) html += '<span class="required">※必須</span>';
       html += '</div>';
-      if (q.imageBase64) html += '<img src="' + q.imageBase64 + '" class="question-image" alt="質問画像">';
-      if (hintText) html += '<div class="question-hint">' + esc(hintText) + '</div>';
+      // 見出し（説明文）と質問画像
+      // imagePosition: 'left' | 'right' | 'bottom'（既定は bottom＝従来どおり上下に並ぶ）
+      // imageSize:     'small' | 'medium' | 'large'（既定は medium）
+      var imgPos  = q.imagePosition || 'bottom';
+      var imgSize = q.imageSize || 'medium';
+      var hintHtml = hintText ? '<div class="question-hint">' + esc(hintText) + '</div>' : '';
+      var imgHtml  = q.imageBase64
+        ? '<img src="' + q.imageBase64 + '" class="question-image size-' + esc(imgSize) + '" alt="質問画像">'
+        : '';
+
+      if (imgHtml && (imgPos === 'left' || imgPos === 'right')) {
+        // 画像を横に並べる（説明文と2列）。狭い画面では自動的に縦並びになる
+        html += '<div class="q-media ' + (imgPos === 'left' ? 'media-left' : 'media-right') + '">'
+              + '<div class="q-media-text">' + hintHtml + '</div>'
+              + '<div class="q-media-img">' + imgHtml + '</div>'
+              + '</div>';
+      } else {
+        html += hintHtml + imgHtml;
+      }
       if (q.type === 'text') {
         html += '<input type="text" id="q_' + esc(q.id) + '" placeholder="' + esc(phValue) + '">';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
