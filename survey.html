@@ -393,11 +393,17 @@ input[type="number"]::-webkit-inner-spin-button,
         showIfAttr = ' data-showif-qid="' + esc(q.showIf.questionId) + '" data-showif-val="' + esc(q.showIf.value) + '" data-hidden="true"';
         initialHidden = true;
       }
-      // 記入例：改行を含む場合はヒントブロックとして表示する
-      // （placeholder属性は改行が潰れて読めなくなるため）
-      var hintText = '';
+      // 質問文の下に表示する説明文
+      // ① 専用項目 noteTop があればそれを使う
+      // ② 無い場合は、改行を含む記入例をヒントとして扱う（従来の設定との互換のため）
       var phValue = q.placeholder || '';
-      if (phValue.indexOf('\n') >= 0) { hintText = phValue; phValue = ''; }
+      var hintText = '';
+      if (q.noteTop) {
+        hintText = q.noteTop;
+      } else if (phValue.indexOf('\n') >= 0) {
+        hintText = phValue;
+        phValue = '';
+      }
 
       html += '<div class="section" id="section_' + q.id + '"' + showIfAttr + '>';
       html += '<div class="section-label" style="color:' + color + '">';
