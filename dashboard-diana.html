@@ -805,12 +805,21 @@
                 <option value="consent">📜 同意（承諾書）</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>質問文の下に表示する説明（任意）</label>
+        <textarea id="qNoteTop" placeholder="例）全身が写るように、明るい場所で撮影してください。" style="min-height:80px;resize:vertical;"></textarea>
+        <p style="font-size:12px;color:#888;margin:4px 0 0;line-height:1.7;">
+          質問文のすぐ下に、枠付きの説明ブロックとして表示されます。改行できます。<br>
+          回答する前に読んでほしい案内に向いています。
+        </p>
+      </div>
+
       <div class="form-group" id="placeholderGroup">
         <label>記入例（任意）</label>
-        <textarea id="qPlaceholder" placeholder="例）山田 花子" style="min-height:80px;resize:vertical;"></textarea>
+        <input type="text" id="qPlaceholder" placeholder="例）山田 花子">
         <p style="font-size:12px;color:#888;margin:4px 0 0;line-height:1.7;">
-          1行だけの場合は入力欄の中に薄く表示されます。<br>
-          改行を入れると、質問文の下に説明ブロックとして表示されます（長い記入例向け）。
+          入力欄の中に薄い文字で表示されます（1行のみ）。<br>
+          長い案内文は「質問文の下に表示する説明」をお使いください。
         </p>
       </div>
       <div class="form-group" id="qRequiredGroup">
@@ -1321,6 +1330,7 @@
     document.getElementById('qType').value = document.getElementById('newQuestionType').value;
     document.getElementById('qPlaceholder').value = '';
     document.getElementById('qMaxLength').value = '';
+    document.getElementById('qNoteTop').value = '';
     document.getElementById('qNoteBelow').value = '';
     document.getElementById('qConsentText').value = '';
     document.getElementById('qConsentLabel').value = '';
@@ -1350,6 +1360,7 @@
     document.getElementById('qType').value = q.type || 'text';
     document.getElementById('qPlaceholder').value = q.placeholder || '';
     document.getElementById('qMaxLength').value = q.maxLength || '';
+    document.getElementById('qNoteTop').value = q.noteTop || '';
     document.getElementById('qNoteBelow').value = q.noteBelow || '';
     document.getElementById('qConsentText').value = q.consentText || '';
     document.getElementById('qConsentLabel').value = q.consentLabel || '';
@@ -1463,6 +1474,8 @@
     if (type === 'rating') {
       q.maxStars = parseInt(document.getElementById('qMaxStars').value) || 5;
     }
+    var noteTop = document.getElementById('qNoteTop').value.trim();
+    if (noteTop) q.noteTop = noteTop;
     var noteBelow = document.getElementById('qNoteBelow').value.trim();
     if (noteBelow) q.noteBelow = noteBelow;
 
