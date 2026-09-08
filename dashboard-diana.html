@@ -898,6 +898,15 @@
           <option value="10">10段階</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>入力欄の下に表示する説明（任意）</label>
+        <textarea id="qNoteBelow" placeholder="例）写真は全身が写るように撮影してください。" style="min-height:70px;resize:vertical;"></textarea>
+        <p style="font-size:12px;color:#888;margin:4px 0 0;line-height:1.7;">
+          回答欄の下に小さめの文字で表示されます。改行できます。<br>
+          ファイル添付など、入力した後に読んでほしい注意書きに向いています。
+        </p>
+      </div>
+
       <div class="form-group" id="consentGroup" style="display:none">
         <label>承諾書の本文</label>
         <textarea id="qConsentText" placeholder="承諾書の全文を貼り付けてください。改行はそのまま表示されます。" style="min-height:220px;resize:vertical;font-size:13px;line-height:1.8;"></textarea>
@@ -1312,6 +1321,7 @@
     document.getElementById('qType').value = document.getElementById('newQuestionType').value;
     document.getElementById('qPlaceholder').value = '';
     document.getElementById('qMaxLength').value = '';
+    document.getElementById('qNoteBelow').value = '';
     document.getElementById('qConsentText').value = '';
     document.getElementById('qConsentLabel').value = '';
     document.getElementById('qImagePosition').value = 'bottom';
@@ -1340,6 +1350,7 @@
     document.getElementById('qType').value = q.type || 'text';
     document.getElementById('qPlaceholder').value = q.placeholder || '';
     document.getElementById('qMaxLength').value = q.maxLength || '';
+    document.getElementById('qNoteBelow').value = q.noteBelow || '';
     document.getElementById('qConsentText').value = q.consentText || '';
     document.getElementById('qConsentLabel').value = q.consentLabel || '';
     document.getElementById('qRequired').checked = q.required || false;
@@ -1452,6 +1463,9 @@
     if (type === 'rating') {
       q.maxStars = parseInt(document.getElementById('qMaxStars').value) || 5;
     }
+    var noteBelow = document.getElementById('qNoteBelow').value.trim();
+    if (noteBelow) q.noteBelow = noteBelow;
+
     if (type === 'consent') {
       var consentText = document.getElementById('qConsentText').value;
       if (!consentText.trim()) { alert('承諾書の本文を入力してください'); return; }

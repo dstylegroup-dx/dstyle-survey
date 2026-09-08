@@ -74,6 +74,11 @@ input[type="number"]::-webkit-inner-spin-button,
       .q-media, .q-media.media-left { flex-direction: column; }
       .q-media-img { align-self: center; }
     }
+    .question-note {
+      white-space: pre-wrap; word-break: break-word;
+      font-size: 12.5px; line-height: 1.8; color: #777;
+      margin-top: 8px; padding-left: 2px;
+    }
     .question-hint {
       white-space: pre-wrap; word-break: break-word;
       background: #f7f9fb; border: 1px solid #e3e9ee; border-left: 3px solid #b9c7d3;
@@ -502,6 +507,8 @@ input[type="number"]::-webkit-inner-spin-button,
         html += '<input type="hidden" id="q_' + esc(q.id) + '" value="">'; // アップロード済みblobNames（JSON配列）
         if (q.required) html += '<div class="field-error-msg">ファイルをアップロードしてください</div>';
       }
+      // 入力欄の下に表示する説明文（任意）
+      if (q.noteBelow) html += '<div class="question-note">' + esc(q.noteBelow) + '</div>';
       html += '</div>';
       if (i === survey.questions.length - 2) html += '<hr class="divider">';
     });
