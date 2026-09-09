@@ -166,17 +166,17 @@ async function getContainer() {
     return client.database(process.env.COSMOS_DATABASE).container(process.env.COSMOS_CONTAINER);
 }
 
-async function issueToken(tenant) {
+async function issueToken(tenant, info) {
     const container = await getContainer();
     const token = crypto.randomBytes(16).toString('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await container.items.upsert({
+    await container.items.upsert(Object.assign({
         id: 'token_' + token,
         docType: 'auth_token',
         tenant,
         token,
         expiresAt
-    });
+    }, info || {}));   // 利用者名などを併せて保存（削除者の記録に使う）
     return token;
 }
 
@@ -270,7 +270,8 @@ app.http('auth', {
             const container = await getContainer();
 
             if (password === correctPW) {
-                const token = await issueToken('auth_token');
+                // パスワード認証は個人が特定できないため、テナント名を記録する
+                const token = await issueToken('auth_token', { userName: tenant + '（パスワード認証）' });
                 await container.items.create({
                     id: crypto.randomUUID(),
                     docType: 'access_log',
@@ -1735,10 +1736,10 @@ app.http('msalauth', {
                 return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'このダッシュボードへのアクセス権限がありません' } };
             }
 
-            const token = await issueToken('auth_token');
-            const container = await getContainer();
             const userName = payload.name || payload.preferred_username || payload.upn || 'unknown';
             const userEmail = payload.preferred_username || payload.upn || payload.email || 'unknown';
+            const token = await issueToken('auth_token', { userName, userEmail });
+            const container = await getContainer();
             await container.items.create({
                 id: crypto.randomUUID(),
                 docType: 'access_log',
