@@ -125,12 +125,13 @@ input[type="number"]::-webkit-inner-spin-button,
     .cf-gp-warn { background: #fff8e6; border: 1px solid #ffcc80; color: #8a5a00; }
     .cf-gp-wait { background: #f4f6f8; border: 1px solid #e0e4e8; color: #888; font-weight: normal; }
     .cf-thumbs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
-    .cf-thumb { width: 110px; }
-    .cf-thumb img { width: 110px; height: 140px; object-fit: cover; border-radius: 8px; border: 1px solid #e0e0e0; display: block; background: #fafafa; }
+    .cf-thumb { width: 96px; }
+    /* contain で全体を表示（縦長・横長のどちらでも切り取られない） */
+    .cf-thumb img { width: 96px; height: 120px; object-fit: contain; border-radius: 8px; border: 1px solid #e0e0e0; display: block; background: #fafafa; }
     .cf-thumb-file { display: flex; flex-direction: column; align-items: center; justify-content: center;
-      width: 110px; height: 140px; border-radius: 8px; border: 1px solid #e0e0e0; background: #f7f7f7; }
+      width: 96px; height: 120px; border-radius: 8px; border: 1px solid #e0e0e0; background: #f7f7f7; }
     .cf-thumb-icon { font-size: 30px; }
-    .cf-thumb-name { font-size: 11px; color: #888; margin-top: 4px; word-break: break-all; line-height: 1.5; }
+    .cf-thumb-name { font-size: 10.5px; color: #888; margin-top: 3px; word-break: break-all; line-height: 1.5; }
     .privacy-notice { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin: 16px 0 12px; font-size: 13px; color: #666; line-height: 1.7; }
     .privacy-notice a { color: #2980B9; text-decoration: underline; }
     .privacy-notice a:hover { opacity: 0.8; }
