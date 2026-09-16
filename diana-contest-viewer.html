@@ -1363,8 +1363,8 @@ async function renderGrid() {
         <span class="card-date">📅 ${date}</span>
         ${statusChip(r)}
         ${r.measure ? (String(r.measure.gp_club_type) === '001'
-            ? '<span class="status-chip" style="background:#eafaf0;border:1px solid #b7e4c7;color:#2e7d32;">🎟️ GP倶楽部</span>'
-            : '<span class="status-chip" style="background:#f2f2f2;border:1px solid #ddd;color:#888;">GP倶楽部なし</span>') : ''}
+            ? '<span class="status-chip" style="background:#eafaf0;border:1px solid #b7e4c7;color:#2e7d32;">✅ GP倶楽部</span>'
+            : '<span class="status-chip" style="background:#fff3e0;border:1px solid #ffcc80;color:#e65100;">GP倶楽部なし</span>') : ''}
         <span>${hasCustomer ? '<span class="measure-chip">✅ DB照合済</span>' : '<span class="no-measure-chip">📋 DB照合なし</span>'}</span>
         <span class="card-arrow">›</span>
       </div>
