@@ -373,7 +373,7 @@
       Microsoftアカウントでログイン
     </button>
     <div class="login-error" id="loginError"></div>
-    <div class="login-note">ディライトテクノロジーズ事業部・Diana グループのメンバーのみ閲覧できます</div>
+    <div class="login-note">ディライトテクノロジーズ事業部・ダイアナ・全社連絡用のいずれかに所属している方が閲覧できます</div>
   </div>
 </div>
 
@@ -534,9 +534,12 @@ const MSAL_CONFIG = {
   },
   cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
 };
+// 閲覧できるグループ
+// ⚠️ サーバー側（api/src/functions/index.js の ALLOWED_GROUPS.diana）と同じ内容にすること
 const ALLOWED_GROUPS = [
   '560396ae-5774-4b3e-b451-9602d140f921', // 株式会社ダイアナ
-  '6e4af16e-cfe1-49a6-968e-05b8cef847d8'  // ディライトテクノロジーズ事業部
+  '6e4af16e-cfe1-49a6-968e-05b8cef847d8', // ディライトテクノロジーズ事業部
+  '84b52c84-a162-43e0-a4be-30bc13ff36b0'  // 全社連絡用
 ];
 const TENANT = 'diana';
 const BASE_URL = location.hostname === 'localhost'
@@ -641,7 +644,7 @@ async function checkAccessAndShow() {
     const data = await res.json();
     const userGroups = (data.value || []).map(g => g.id.toLowerCase());
     const hasAccess = ALLOWED_GROUPS.some(g => userGroups.includes(g.toLowerCase()));
-    if (!hasAccess) { showLoginError('アクセス権限がありません。<br>ディライトテクノロジーズ事業部またはDianaグループのメンバーのみ閲覧できます。'); showLogin(); return; }
+    if (!hasAccess) { showLoginError('アクセス権限がありません。<br>閲覧できるグループに所属しているかご確認ください。<br>解決しない場合はICTへお問い合わせください。'); showLogin(); return; }
     document.getElementById('userBadge').textContent = currentAccount.name || currentAccount.username;
     hideLoading();
     showMain();
