@@ -20,7 +20,7 @@
     .required { color: #c0392b; font-size: 12px; margin-left: 4px; }
     /* プルダウン専用スタイル */
     .select-wrap { position: relative; }
-    .select-wrap::after { content: "▼"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #4A5D4E; font-size: 12px; pointer-events: none; }
+    .select-wrap::after { content: "▼"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #888; font-size: 13px; pointer-events: none; }
     .select-wrap select { padding-right: 36px; -webkit-appearance: none; appearance: none; }
 
     /* 星評価 */
@@ -477,9 +477,10 @@ input[type="number"]::-webkit-inner-spin-button,
         if (maxLen > 0) html += '<div class="char-count" id="count_' + esc(q.id) + '">0 / ' + maxLen + ' 文字</div>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'select') {
-        html += '<select id="q_' + q.id + '"><option value="">選択してください</option>';
+        // ▼ を表示するため select-wrap で囲む
+        html += '<div class="select-wrap"><select id="q_' + esc(q.id) + '"><option value="">選択してください</option>';
         (q.options || []).forEach(function(opt) { html += '<option value="' + esc(opt) + '">' + esc(opt) + '</option>'; });
-        html += '</select>';
+        html += '</select></div>';
         if (q.required) html += '<div class="field-error-msg">この項目は必須です</div>';
       } else if (q.type === 'radio') {
         var cols = (q.options || []).length <= 4 ? ' two-col' : '';
@@ -904,6 +905,7 @@ input[type="number"]::-webkit-inner-spin-button,
   }
 
   function renderSurvey(survey, endDate, settings) {
+    currentSurvey = survey;
     settings = settings || {};
     var template = document.getElementById('surveyTemplate');
     var app = document.getElementById('app');
@@ -968,7 +970,52 @@ input[type="number"]::-webkit-inner-spin-button,
   // ============================================================
   // ファイルアップロード処理
   // ============================================================
+  var currentSurvey = null;   // 表示中のアンケート定義（ファイル名の組み立てに使う）
   var fileUploadMap = {}; // qId -> [{ blobName, fileName }]
+
+  // 保存用のファイル名を組み立てる
+  // 形式：応募区分_氏名_【写真の種類】
+  // 例）ゴールデンプロポーションコンテスト_秋葉薫_【スタート前全身】
+  var PHOTO_KINDS = [
+    { match: ['スタート前', 'ダイアナスタート前'], label: 'スタート前全身' },
+    { match: ['現在の全身'],                    label: '現在全身' },
+    { match: ['現在の顔'],                      label: '現在顔' }
+  ];
+
+  function answerByLabel(keywords) {
+    if (!currentSurvey || !currentSurvey.questions) return '';
+    for (var i = 0; i < currentSurvey.questions.length; i++) {
+      var q = currentSurvey.questions[i];
+      var label = String(q.label || '');
+      if (!keywords.some(function(k) { return label.indexOf(k) >= 0; })) continue;
+      var el = document.getElementById('q_' + q.id);
+      if (el && el.value) return String(el.value).trim();
+    }
+    return '';
+  }
+
+  function buildFileDisplayName(qId) {
+    var q = (currentSurvey.questions || []).filter(function(x) { return x.id === qId; })[0];
+    var qLabel = q ? String(q.label || '').replace(/^【チーフ】\s*/, '') : '';
+
+    // 写真の種類（該当しない場合は設問名をそのまま使う）
+    var kind = qLabel;
+    for (var i = 0; i < PHOTO_KINDS.length; i++) {
+      if (PHOTO_KINDS[i].match.some(function(k) { return qLabel.indexOf(k) >= 0; })) {
+        kind = PHOTO_KINDS[i].label;
+        break;
+      }
+    }
+
+    var division = answerByLabel(['応募区分']);
+    var name     = answerByLabel(['応募者氏名', '氏名', 'お名前']);
+
+    var parts = [];
+    if (division) parts.push(division);
+    if (name) parts.push(name);
+    parts.push('【' + kind + '】');
+    return parts.join('_');
+  }
   var uploadingCount = 0;
 
   function formatFileSize(bytes) {
@@ -1029,7 +1076,7 @@ input[type="number"]::-webkit-inner-spin-button,
         var sasRes = await fetch(BASE_URL + '/api/fileupload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenant: TENANT, surveyId: SURVEY_ID, responseId: tempResponseId, fileName: file.name, contentType: file.type || 'application/octet-stream' })
+          body: JSON.stringify({ tenant: TENANT, surveyId: SURVEY_ID, responseId: tempResponseId, fileName: file.name, contentType: file.type || 'application/octet-stream', displayName: buildFileDisplayName(qId) })
         });
         if (!sasRes.ok) throw new Error('SAS URL取得失敗');
         var sasData = await sasRes.json();

@@ -2494,12 +2494,16 @@ app.http('fileupload', {
     handler: async (request, context) => {
         try {
             const body = await request.json().catch(() => ({}));
-            const { tenant, surveyId, responseId, fileName, contentType } = body;
+            const { tenant, surveyId, responseId, fileName, contentType, displayName } = body;
             if (!tenant || !surveyId || !responseId || !fileName) {
                 return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, surveyId, responseId, fileName は必須です' } };
             }
             // ファイル名をサニタイズ
-            const safeName = fileName.replace(/[^a-zA-Z0-9.\-_\u3040-\u9FFF\uFF00-\uFFEF]/g, '_');
+            // 拡張子を保ったまま、分かりやすいファイル名で保存する
+            // displayName 例：「ゴールデンプロポーションコンテスト_秋葉薫_【スタート前全身】」
+            const ext = (fileName.match(/\.[^.]+$/) || [''])[0];
+            const baseName = displayName ? (displayName + ext) : fileName;
+            const safeName = baseName.replace(/[^a-zA-Z0-9.\-_\u3040-\u9FFF\uFF00-\uFFEF【】]/g, '_');
             const blobName = `${tenant}/${surveyId}/${responseId}/${Date.now()}_${safeName}`;
             const uploadUrl = generateSasUrl(blobName, 'cw', 30); // create + write, 30分
             return { status: 200, headers: SECURITY_HEADERS, jsonBody: { uploadUrl, blobName } };
