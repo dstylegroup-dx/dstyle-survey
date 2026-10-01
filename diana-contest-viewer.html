@@ -1208,8 +1208,12 @@ async function downloadImage(blobName, label) {
     const blob = await imgRes.blob();
     const blobUrl = URL.createObjectURL(blob);
 
-    // ファイル名を取得（元のパスの末尾）
-    const fileName = label || blobName.split('/').pop() || 'image';
+    // 保存時のファイル名を優先する（応募区分_氏名_【種類】の形式）
+    // 先頭のタイムスタンプ（1790818_）は取り除く
+    let fileName = (blobName || '').split('/').pop() || '';
+    fileName = fileName.replace(/^\d{10,}_/, '');
+    // 取得できない場合のみ設問名を使う（古いデータ向け）
+    if (!fileName) fileName = label || 'image';
 
     const a = document.createElement('a');
     a.href = blobUrl;
