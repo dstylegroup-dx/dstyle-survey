@@ -494,12 +494,23 @@ input[type="number"]::-webkit-inner-spin-button,
         html += '</div>';
         if (q.required) html += '<div class="field-error-msg">1つ以上選択してください</div>';
       } else if (q.type === 'consent') {
-        // 承諾書：スクロールできる枠に本文を表示し、最後まで読むとチェック可能になる
-        html += '<div class="consent-box" id="consentBox_' + esc(q.id) + '">' + esc(q.consentText || '') + '</div>';
-        html += '<div class="consent-hint" id="consentHint_' + esc(q.id) + '">最後までお読みいただくとチェックできます</div>';
-        html += '<label class="consent-check" id="consentLabel_' + esc(q.id) + '">'
-              + '<input type="checkbox" id="q_' + esc(q.id) + '" disabled> '
-              + esc(q.consentLabel || '上記の内容を確認し、同意します') + '</label>';
+        // 承諾書
+        // ・本文が長い場合：スクロールできる枠に表示し、最後まで読むとチェック可能になる
+        // ・本文が短い場合：枠を出さず、チェックボックスの横に文言を表示する
+        var consentText = String(q.consentText || '').trim();
+        var isShort = consentText.length <= 60 && consentText.indexOf('\n') < 0;
+
+        if (isShort) {
+          html += '<label class="consent-check ready" id="consentLabel_' + esc(q.id) + '">'
+                + '<input type="checkbox" id="q_' + esc(q.id) + '"> '
+                + esc(q.consentLabel || consentText || '上記の内容を確認し、同意します') + '</label>';
+        } else {
+          html += '<div class="consent-box" id="consentBox_' + esc(q.id) + '">' + esc(consentText) + '</div>';
+          html += '<div class="consent-hint" id="consentHint_' + esc(q.id) + '">最後までお読みいただくとチェックできます</div>';
+          html += '<label class="consent-check" id="consentLabel_' + esc(q.id) + '">'
+                + '<input type="checkbox" id="q_' + esc(q.id) + '" disabled> '
+                + esc(q.consentLabel || '上記の内容を確認し、同意します') + '</label>';
+        }
         if (q.required) html += '<div class="field-error-msg">同意が必要です</div>';
       } else if (q.type === 'file') {
         var accept = q.fileAccept || '*/*';

@@ -920,12 +920,15 @@
         <label>承諾書の本文</label>
         <textarea id="qConsentText" placeholder="承諾書の全文を貼り付けてください。改行はそのまま表示されます。" style="min-height:220px;resize:vertical;font-size:13px;line-height:1.8;"></textarea>
         <p style="font-size:12px;color:#888;margin:4px 0 10px;line-height:1.7;">
-          応募フォームではスクロールできる枠に表示されます。<br>
-          <b>最後までスクロールするまでチェックできない</b>仕様のため、読んだことを担保できます。
+          <b>長い文章の場合</b>：スクロールできる枠に表示され、最後まで読むとチェックできるようになります。<br>
+          <b>短い文章（60文字以内・改行なし）の場合</b>：枠は表示されず、チェックボックスの横に文言として表示されます。
         </p>
-        <label>チェックボックスの文言</label>
+        <label>チェックボックスの文言（任意）</label>
         <input type="text" id="qConsentLabel" placeholder="上記の内容を確認し、同意します">
-        <p style="font-size:12px;color:#888;margin:4px 0 0;">未入力の場合は「上記の内容を確認し、同意します」と表示されます。</p>
+        <p style="font-size:12px;color:#888;margin:4px 0 0;line-height:1.7;">
+          未入力の場合、長い文章では「上記の内容を確認し、同意します」、<br>
+          短い文章では本文がそのままチェックボックスの文言になります。
+        </p>
       </div>
       <div class="form-group" id="maxLengthGroup" style="display:none">
         <label>文字数制限（任意）</label>
