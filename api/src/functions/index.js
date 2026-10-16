@@ -511,6 +511,24 @@ app.http('response', {
                 const { surveyId, tenant, answers, responseId } = body;
                 if (!surveyId || !tenant || !answers) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
 
+                // ── 氏名とダイアナコードの照合（ダイアナの応募フォームのみ）──
+                // 画面側でも確認しているが、画面を経由しない送信に備えてここでも確かめる
+                // 会員DBに問い合わせられない場合は止めない
+                if (tenant === 'diana') {
+                    try {
+                        const { resource: def } = await container.item(surveyId, tenant).read();
+                        const mq = findMemberCheckQuestions(def);
+                        if (mq && answers[mq.codeQ.id] !== undefined && answers[mq.nameQ.id] !== undefined) {
+                            const st = await matchMemberName(answers[mq.codeQ.id], answers[mq.nameQ.id]);
+                            if (st === 'notfound' || st === 'mismatch') {
+                                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: MEMBER_CHECK_MESSAGES[st] } };
+                            }
+                        }
+                    } catch (e) {
+                        context.log(`[氏名照合エラー] surveyId=${surveyId} error=${e.message}`);
+                    }
+                }
+
                 // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
                 const emailAnswer = Object.values(answers).find(v =>
                     typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
@@ -2199,6 +2217,96 @@ app.http('gpCheck', {
 
         } catch (e) {
             context.log('[gp-check] エラー: ' + e.message);
+            return secureJson({ status: 'error' });
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 🪪 【氏名とダイアナコードの照合】応募フォームの送信前に呼ばれる
+//
+// POST /api/member-check   body: { dia_cd, name, tenant }
+// 返す status: ok / mismatch / notfound / invalid / unavailable / error
+//
+// ⚠️ 公開ページ（未認証）から呼ばれるため、合否のみ返す（DB上の氏名は返さない）
+//    gp-check と同じ照会回数の制限を共有する
+// ----------------------------------------------------
+
+// 氏名の比較用：全角・半角をそろえ、空白を除き、カタカナをひらがなにする
+function normalizePersonName(v) {
+    return String(v == null ? '' : v)
+        .normalize('NFKC')
+        .replace(/[\s　・･]/g, '')
+        .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+        .toLowerCase();
+}
+
+// 照合の本体（応募の保存時にも同じ判定を使う）
+async function matchMemberName(diaCd, name) {
+    const code = String(diaCd == null ? '' : diaCd).normalize('NFKC').replace(/[^0-9]/g, '');
+    const input = normalizePersonName(name);
+    if (!/^\d{4,12}$/.test(code) || !input) return 'invalid';
+    if (!process.env.PG_HOST) return 'unavailable';
+
+    const schema = process.env.PG_SCHEMA || 'public';
+    const { rows } = await getPgPool().query(
+        `SELECT last_name_kanji, first_name_kanji, last_name_kana, first_name_kana
+         FROM ${schema}.customer_master
+         WHERE transfer_delete_flag::text = '0' AND TRIM(diana_code::text) = $1`,
+        [code]
+    );
+    if (rows.length === 0) return 'notfound';
+
+    // 漢字・カナのどちらで入力されても一致とみなす
+    const hit = rows.some(r =>
+        normalizePersonName((r.last_name_kanji || '') + (r.first_name_kanji || '')) === input ||
+        normalizePersonName((r.last_name_kana  || '') + (r.first_name_kana  || '')) === input
+    );
+    return hit ? 'ok' : 'mismatch';
+}
+
+const MEMBER_CHECK_MESSAGES = {
+    notfound: 'ダイアナコードが見つかりません。入力内容をご確認ください。',
+    mismatch: '応募者氏名とダイアナコードの組み合わせが登録内容と一致しません。入力内容をご確認ください。'
+};
+
+// アンケートから照合に使う設問を探す（両方そろっている場合のみ照合する）
+function findMemberCheckQuestions(survey) {
+    const qs = (survey && survey.questions) || [];
+    const codeQ = qs.find(q => String(q.label || '').includes('ダイアナコード'));
+    const nameQ = qs.find(q => String(q.label || '').includes('氏名'));
+    return (codeQ && nameQ) ? { codeQ, nameQ } : null;
+}
+
+app.http('memberCheck', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'member-check',
+    handler: async (request, context) => {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        try {
+            const body = await request.json().catch(() => ({}));
+            if (!checkRateLimit(ip, 20, 60 * 1000)) {
+                return { status: 429, headers: SECURITY_HEADERS, jsonBody: { error: '照会が多すぎます。しばらく待ってからお試しください。' } };
+            }
+            const status = await matchMemberName(body.dia_cd, body.name);
+
+            try {
+                const container = await getContainer();
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'access_log',
+                    tenant: String(body.tenant || 'diana'),
+                    app: 'member-check',
+                    result: status,
+                    ip,
+                    createdAt: new Date().toISOString()
+                }).catch(() => {});
+            } catch (e) {}
+
+            return secureJson({ status });
+        } catch (e) {
+            context.log('[member-check] エラー: ' + e.message);
             return secureJson({ status: 'error' });
         }
     }
