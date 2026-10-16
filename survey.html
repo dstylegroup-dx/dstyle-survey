@@ -194,6 +194,8 @@ input[type="number"]::-webkit-inner-spin-button,
     .field-error .radio-group .radio-label { border-color: #e74c3c; }
     .field-error-msg { color: #e74c3c; font-size: 13px; margin-top: 6px; display: none; }
     .field-error .field-error-msg { display: block; }
+    .member-error input { border-color: #e74c3c !important; background: #fff8f8 !important; }
+    .member-error-msg { color: #e74c3c; font-size: 13px; margin-top: 6px; }
     @media (min-width: 480px) { .radio-group.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } }
     /* ファイルアップロード */
     .file-upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 24px; text-align: center; background: #fafafa; cursor: pointer; transition: all 0.2s; }
@@ -643,7 +645,8 @@ input[type="number"]::-webkit-inner-spin-button,
       btn.textContent = '送信中...';
       errorMsg.style.display = 'none';
       // 全エラークリア
-      document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('field-error'); });
+      document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('field-error', 'member-error'); });
+      document.querySelectorAll('.member-error-msg').forEach(function(m) { m.remove(); });
 
       // バリデーション
       var hasError = false;
@@ -736,6 +739,13 @@ input[type="number"]::-webkit-inner-spin-button,
           try { answers[q.id] = JSON.parse(hidden.value || '[]').join(', ') || '（未アップロード）'; } catch(e) { answers[q.id] = '（未アップロード）'; }
         }
       });
+      // 応募者氏名とダイアナコードの組み合わせを会員DBと照合する
+      if (!await checkMemberName(survey, answers, errorMsg)) {
+        btn.disabled = false;
+        btn.textContent = '送信する 📩';
+        return;
+      }
+
       // 確認画面が有効な場合は、ここでいったん止めて内容を確認してもらう
       if (survey.confirmEnabled) {
         btn.disabled = false;
@@ -746,6 +756,51 @@ input[type="number"]::-webkit-inner-spin-button,
 
       await sendAnswers(survey, answers, btn, errorMsg);
     });
+
+    // ────────────────────────────────────────────────────
+    // 氏名とダイアナコードの照合（ダイアナの応募フォームのみ）
+    // 一致しない・コードが無い場合は false を返して送信を止める
+    // 会員DBに問い合わせられない場合は止めない（送信時にサーバー側でも確認する）
+    // ────────────────────────────────────────────────────
+    async function checkMemberName(survey, answers, errorMsg) {
+      if (TENANT !== 'diana') return true;
+      var codeQ = survey.questions.filter(function(q) { return String(q.label || '').indexOf('ダイアナコード') >= 0; })[0];
+      var nameQ = survey.questions.filter(function(q) { return String(q.label || '').indexOf('氏名') >= 0; })[0];
+      if (!codeQ || !nameQ) return true;
+      if (answers[codeQ.id] === undefined || answers[nameQ.id] === undefined) return true;   // 分岐で非表示
+
+      var data = {};
+      try {
+        var res = await fetch(BASE_URL + '/api/member-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dia_cd: answers[codeQ.id], name: answers[nameQ.id], tenant: TENANT })
+        });
+        data = await res.json().catch(function() { return {}; });
+      } catch (e) {
+        return true;
+      }
+      if (data.status !== 'notfound' && data.status !== 'mismatch') return true;
+
+      var msg = data.status === 'notfound'
+        ? 'ダイアナコードが見つかりません。入力内容をご確認ください。'
+        : '応募者氏名とダイアナコードの組み合わせが登録内容と一致しません。入力内容をご確認ください。';
+      [nameQ, codeQ].forEach(function(q) {
+        var section = document.getElementById('section_' + q.id);
+        if (!section) return;
+        section.classList.add('member-error');
+        if (q !== codeQ) return;   // メッセージは下側の欄にだけ出す
+        var m = document.createElement('div');
+        m.className = 'member-error-msg';
+        m.textContent = msg;
+        section.appendChild(m);
+      });
+      errorMsg.textContent = '❌ ' + msg;
+      errorMsg.style.display = 'block';
+      var first = document.getElementById('section_' + nameQ.id) || errorMsg;
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
 
     // ────────────────────────────────────────────────────
     // 送信処理（確認画面の有無にかかわらず共通）
