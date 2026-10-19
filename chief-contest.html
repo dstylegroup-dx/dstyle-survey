@@ -597,6 +597,7 @@ async function loadEntries(forceRefresh) {
   if (myRole === 'staff') {
     const salon = previewSalon || sessionStorage.getItem('staffSalon');
     if (salon) path += '&salon=' + encodeURIComponent(salon);
+    if (previewSalon) path += '&gpOnly=1';   // チーフと同じくGP倶楽部入会者だけにする
   }
 
   showEmpty('読み込んでいます...');

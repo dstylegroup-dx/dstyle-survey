@@ -2419,7 +2419,7 @@ app.http('chiefauth', {
 // ----------------------------------------------------
 // 📋 【チーフ用コンテスト取得】自サロン分のみ返す
 // GET /api/contest-entries              → コンテスト一覧
-// GET /api/contest-entries?groupId=xxx  → 応募一覧（マージ済み）
+// GET /api/contest-entries?groupId=xxx  → 応募一覧（マージ済み。チーフにはGP倶楽部入会者のみ）
 //   社員のみ &salon=12345 でサロンを指定できる（省略時は全サロン分）
 //   ※チーフのサロンコードは必ずトークンから取得し、クエリからは受け取らない
 // ----------------------------------------------------
@@ -2552,8 +2552,12 @@ app.http('contestEntries', {
             // このときはサロンを特定できなかった応募も含めて全件を返す。
             const showAll = role === 'staff' && !salonCode;
             const target = normalizeCode(salonCode);
+            // チーフにはGP倶楽部入会者だけを返す（会員DBの現在の状態で判定）。
+            // 社員は全員見られるが、チーフ表示で確認するときは gpOnly=1 で同じ絞り込みにする。
+            const gpOnly = role === 'chief' || url.searchParams.get('gpOnly') === '1';
             const entries = all
                 .filter(e => showAll || (e.salonCode && normalizeCode(e.salonCode) === target))
+                .filter(e => !gpOnly || e.gpClub === true)
                 .map(e => Object.assign({}, e, { files: buildFileList(e.answers, questionLabels) }));
 
             // サロンを特定できなかった応募の件数（DB未登録・コード誤りの可能性）
