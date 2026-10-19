@@ -2420,7 +2420,7 @@ app.http('chiefauth', {
 // 📋 【チーフ用コンテスト取得】自サロン分のみ返す
 // GET /api/contest-entries              → コンテスト一覧
 // GET /api/contest-entries?groupId=xxx  → 応募一覧（マージ済み）
-//   社員のみ &salon=12345 でサロンを指定できる
+//   社員のみ &salon=12345 でサロンを指定できる（省略時は全サロン分）
 //   ※チーフのサロンコードは必ずトークンから取得し、クエリからは受け取らない
 // ----------------------------------------------------
 app.http('contestEntries', {
@@ -2448,8 +2448,9 @@ app.http('contestEntries', {
                     return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'サロンコードが取得できません' } };
                 }
             } else {
+                // 空欄なら全サロン分を返す（社員のみ）
                 salonCode = String(url.searchParams.get('salon') || '').trim();
-                if (groupId && !isSalonCode(salonCode)) {
+                if (groupId && salonCode && !isSalonCode(salonCode)) {
                     return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'サロンコード（5桁）を指定してください' } };
                 }
             }
@@ -2547,9 +2548,12 @@ app.http('contestEntries', {
             const questionLabels = built.questionLabels;
 
             // ---- サロンで絞り込み（ここが情報分離の要）----
+            // 絞り込まないのは、社員がサロンを指定しなかった場合だけ。
+            // このときはサロンを特定できなかった応募も含めて全件を返す。
+            const showAll = role === 'staff' && !salonCode;
             const target = normalizeCode(salonCode);
             const entries = all
-                .filter(e => e.salonCode && normalizeCode(e.salonCode) === target)
+                .filter(e => showAll || (e.salonCode && normalizeCode(e.salonCode) === target))
                 .map(e => Object.assign({}, e, { files: buildFileList(e.answers, questionLabels) }));
 
             // サロンを特定できなかった応募の件数（DB未登録・コード誤りの可能性）
@@ -2563,7 +2567,7 @@ app.http('contestEntries', {
                 app: 'chief-contest',
                 result: 'view',
                 role,
-                salonCode,
+                salonCode: salonCode || 'all',
                 groupId,
                 count: entries.length,
                 ip: request.headers.get('x-forwarded-for') || 'unknown',

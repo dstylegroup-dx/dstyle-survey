@@ -470,7 +470,7 @@
             var user = l.userName || l.userEmail || '—';
             var role = l.role === 'chief' ? '👑' : l.role === 'staff' ? '🏢' : '';
             var app  = l.app ? (LOG_APP_LABEL[l.app] || l.app) : '管理画面';
-            var salon = l.salonCode ? esc(l.salonCode) + (l.count != null ? '（' + l.count + '件）' : '') : '—';
+            var salon = l.salonCode ? (l.salonCode === 'all' ? '全サロン' : esc(l.salonCode)) +(l.count != null ? '（' + l.count + '件）' : '') : '—';
             return '<tr>'
                 + '<td style="white-space:nowrap;color:#888">' + date + '</td>'
                 + '<td>' + esc(l.tenant || '—') + '</td>'
