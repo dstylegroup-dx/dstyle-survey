@@ -227,7 +227,7 @@
         <label>🏢 サロンコード</label>
         <input type="text" class="txt" id="salonInput" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="00000">
         <button class="btn btn-primary" onclick="applySalon()">表示</button>
-        <span class="note" id="salonNote">確認したいサロンコード（5桁）を入力してください。</span>
+        <span class="note" id="salonNote">空欄のまま「表示」を押すと全サロン分を表示します。</span>
       </div>
     </div>
 
@@ -516,10 +516,6 @@ async function startApp() {
     const data = await apiGet('/api/contest-entries');
     contests = data.contests || [];
     renderContestSelect();
-    if (myRole === 'staff' && !sessionStorage.getItem('staffSalon')) {
-      showEmpty('サロンコードを入力して「表示」を押してください。');
-      return;
-    }
     if (contests.length > 0) await loadEntries();
   } catch (e) {
     showError(e.message);
@@ -545,8 +541,10 @@ async function onContestChange() { await loadEntries(); }
 
 function applySalon() {
   const v = (document.getElementById('salonInput').value || '').trim();
-  if (!/^\d{5}$/.test(v)) { alert('サロンコードは5桁の数字で入力してください。'); return; }
-  sessionStorage.setItem('staffSalon', v);
+  // 空欄は全サロン表示
+  if (v && !/^\d{5}$/.test(v)) { alert('サロンコードは5桁の数字で入力してください。'); return; }
+  if (v) sessionStorage.setItem('staffSalon', v);
+  else sessionStorage.removeItem('staffSalon');
   loadEntries();
 }
 
@@ -558,8 +556,7 @@ async function loadEntries(forceRefresh) {
   if (forceRefresh) path += '&refresh=1';   // サーバー側のキャッシュを使わず最新を取得
   if (myRole === 'staff') {
     const salon = sessionStorage.getItem('staffSalon');
-    if (!salon) { showEmpty('サロンコードを入力して「表示」を押してください。'); return; }
-    path += '&salon=' + encodeURIComponent(salon);
+    if (salon) path += '&salon=' + encodeURIComponent(salon);
   }
 
   showEmpty('読み込んでいます...');
@@ -568,8 +565,10 @@ async function loadEntries(forceRefresh) {
     entries = data.entries || [];
     questionLabels = data.questionLabels || {};
     if (myRole === 'staff') {
-      mySalon = data.salonCode;
-      document.getElementById('salonNote').textContent = 'サロン ' + data.salonCode + ' の応募状況を表示しています。';
+      mySalon = data.salonCode || null;
+      document.getElementById('salonNote').textContent = mySalon
+        ? 'サロン ' + mySalon + ' の応募状況を表示しています。'
+        : '全サロンの応募状況を表示しています。サロンを絞るにはサロンコードを入力してください。';
     }
     buildFilters();
     applyFilter();
@@ -662,8 +661,8 @@ function renderList() {
   if (entries.length === 0) {
     dataArea.style.display = 'none';
     document.getElementById('filterCard').style.display = 'none';
-    showEmpty(myRole === 'staff'
-      ? 'サロン ' + (mySalon || '') + ' の応募はまだありません。'
+    showEmpty(myRole === 'staff' && mySalon
+      ? 'サロン ' + mySalon + ' の応募はまだありません。'
       : 'このコンテストへの応募はまだありません。');
     return;
   }
@@ -683,6 +682,9 @@ function renderList() {
   document.getElementById('cntPending').textContent = memberOnly + chiefOnly;
   document.getElementById('cntPendingSub').textContent = 'チーフ未' + memberOnly + ' / メンバー未' + chiefOnly;
 
+  // 社員が全サロン分を見ているときだけ、カードにサロンコードを出す
+  const allSalons = myRole === 'staff' && !mySalon;
+
   document.getElementById('appGrid').innerHTML = filtered.map(function(e, i) {
     const meta = STATUS_META[e.status] || STATUS_META.single;
     const shown = (e.files || []).filter(function(f) {
@@ -698,6 +700,7 @@ function renderList() {
       + '</div>'
       + '<div class="app-body">'
       +   row('氏名カナ', kanaOf(e) || '-')
+      +   (allSalons ? row('サロンコード', e.salonCode || '不明') : '')
       +   row('ダイアナコード', e.memberCode || '-')
       +   row('提出日', fmtDateTime(e.createdAt))
       +   ((imgs.length + others.length) > 0
