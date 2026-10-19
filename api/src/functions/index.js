@@ -2552,9 +2552,8 @@ app.http('contestEntries', {
             // このときはサロンを特定できなかった応募も含めて全件を返す。
             const showAll = role === 'staff' && !salonCode;
             const target = normalizeCode(salonCode);
-            // チーフにはGP倶楽部入会者だけを返す（会員DBの現在の状態で判定）。
-            // 社員は全員見られるが、チーフ表示で確認するときは gpOnly=1 で同じ絞り込みにする。
-            const gpOnly = role === 'chief' || url.searchParams.get('gpOnly') === '1';
+            // チーフにはGP倶楽部入会者だけを返す（会員DBの現在の状態で判定）。社員は全員見られる。
+            const gpOnly = role === 'chief';
             const entries = all
                 .filter(e => showAll || (e.salonCode && normalizeCode(e.salonCode) === target))
                 .filter(e => !gpOnly || e.gpClub === true)
