@@ -493,6 +493,27 @@ app.http('surveys', {
 // ----------------------------------------------------
 // 💬 【回答データ】※送信時にメール自動送信
 // ----------------------------------------------------
+// 氏名・ふりがなを保存前に整形する
+//   ・全角／半角をそろえる（半角カナ→全角、全角英数→半角）
+//   ・前後の空白を除き、姓と名の間の空白は全角スペース1つにする
+//   ・ふりがなはカタカナをひらがなにする
+function formatPersonName(v, toHiragana) {
+    let s = String(v).normalize('NFKC').trim().replace(/[\s　]+/g, '　');
+    if (toHiragana) s = s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+    return s;
+}
+
+// 設問名に「氏名」「ふりがな」を含む設問の回答を整形する（answers を直接書き換える）
+function formatNameAnswers(survey, answers) {
+    ((survey && survey.questions) || []).forEach(q => {
+        const label = String(q.label || '');
+        const isKana = label.includes('ふりがな');
+        if (!isKana && !label.includes('氏名')) return;
+        if (typeof answers[q.id] !== 'string') return;
+        answers[q.id] = formatPersonName(answers[q.id], isKana);
+    });
+}
+
 app.http('response', {
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     authLevel: 'anonymous',
@@ -510,6 +531,17 @@ app.http('response', {
                 const body = await request.json().catch(() => ({}));
                 const { surveyId, tenant, answers, responseId } = body;
                 if (!surveyId || !tenant || !answers) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'surveyId, tenant, answers は必須です' } };
+
+                // アンケート定義（氏名の整形・AI提案で使う）。読めなくても回答は保存する
+                let surveyDef = null;
+                try {
+                    ({ resource: surveyDef } = await container.item(surveyId, tenant).read());
+                } catch (e) {
+                    context.log(`[アンケート定義の取得エラー] tenant=${tenant} surveyId=${surveyId} error=${e.message}`);
+                }
+
+                // ── 氏名・ふりがなの整形（ダイアナのみ）──
+                if (tenant === 'diana' && surveyDef) formatNameAnswers(surveyDef, answers);
 
                 // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
                 const emailAnswer = Object.values(answers).find(v =>
@@ -562,7 +594,6 @@ app.http('response', {
                 // AI提案生成（アンケート設定でONの場合のみ）
                 let aiSuggestion = null;
                 try {
-                    const { resource: surveyDef } = await container.item(surveyId, tenant).read();
                     if (surveyDef && surveyDef.aiSuggestionEnabled) {
                         aiSuggestion = await generateAiSuggestion(surveyDef, answers);
                     }
