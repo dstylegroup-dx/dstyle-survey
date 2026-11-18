@@ -2993,11 +2993,13 @@ app.http('diana-member', {
 // ----------------------------------------------------
 // ✏️ 【応募者の氏名・ダイアナコード・出場区分の修正】アワード閲覧ページの詳細画面から呼ばれる
 // POST /api/contest-applicant
-// body: { tenant, ids: [回答ID...], nameQid, codeQid, name, dia_cd, categoryQid?, category? }
+// body: { tenant, ids: [回答ID...], name, dia_cd, category? }
+//   書き込む設問は、回答ごとにその回答のフォームの設問から選ぶ
 //
 // 応募時の入力誤りを直すため、氏名とダイアナコードの組み合わせを会員DB（customer_master）と
 // 照合し、一致した場合だけ対象の回答（メンバー用・チーフ用・再提出分）をまとめて書き換える。
-// 出場区分は会員DBに正解が無いため照合せず、コンテストの設問の選択肢にある値だけ受け付ける（省略時は変更しない）。
+// 出場区分は会員DBに正解が無いため照合せず、設問の選択肢にある値だけ受け付ける（省略時は変更しない）。
+// 出場区分の設問が無いフォームの回答には書き込まない。
 // 返す status: ok / notfound（コードが無い）/ mismatch（氏名が一致しない）/ invalid / unavailable
 // ----------------------------------------------------
 
@@ -3015,6 +3017,23 @@ function normalizeDianaCode(v) {
     return String(v == null ? '' : v).normalize('NFKC').replace(/[^0-9]/g, '');
 }
 
+// 回答のフォームから、氏名・ダイアナコード・出場区分の設問を探す（優先度順。ふりがなは氏名に含めない）
+function findApplicantQuestions(survey) {
+    const qs = (survey && survey.questions) || [];
+    const find = (keywords) => {
+        for (const kw of keywords) {
+            const q = qs.find(x => String(x.label || '').includes(kw) && !String(x.label || '').includes('ふりがな'));
+            if (q) return q;
+        }
+        return null;
+    };
+    return {
+        nameQ: find(['応募者氏名', '氏名']),
+        codeQ: find(['応募者 ダイアナコード', 'ダイアナコード']),
+        categoryQ: find(['出場区分'])
+    };
+}
+
 app.http('contestApplicant', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -3028,30 +3047,44 @@ app.http('contestApplicant', {
             }
 
             const body = await request.json().catch(() => ({}));
-            const { tenant, ids, nameQid, codeQid } = body;
-            if (!tenant || !Array.isArray(ids) || ids.length === 0 || !nameQid || !codeQid) {
-                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, ids, nameQid, codeQid は必須です' } };
+            const { tenant, ids } = body;
+            if (!tenant || !Array.isArray(ids) || ids.length === 0) {
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, ids は必須です' } };
             }
 
             const code = normalizeDianaCode(body.dia_cd);
             const name = formatPersonName(body.name || '', false);
             const inputName = normalizePersonName(name);
             if (!/^\d{4,12}$/.test(code) || !inputName) return secureJson({ status: 'invalid' });
+            // 出場区分は変更するときだけ送られる（省略時はそのまま）
+            const category = (body.category != null && String(body.category).trim() !== '') ? String(body.category).trim() : null;
 
-            // ---- 出場区分（指定された場合のみ）：コンテストの設問の選択肢にある値か確かめる ----
+            // ---- 対象の回答と、それぞれが回答したフォームの設問を調べる ----
+            // 書き込む設問は回答ごとに、その回答のフォームから選ぶ
+            // （同じコンテストに別のフォームがあっても、そのフォームの設問には書き込まない）
             const container = await getContainer();
-            const categoryQid = body.categoryQid || null;
-            const category = categoryQid ? String(body.category || '').trim() : null;
-            if (categoryQid) {
-                const { resources: defs } = await container.items.query({
-                    query: "SELECT c.questions FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
-                    parameters: [{ name: '@tenant', value: tenant }]
-                }).fetchAll();
-                const options = new Set();
-                defs.forEach(d => (d.questions || []).forEach(q => {
-                    if (q.id === categoryQid) (q.options || []).forEach(o => options.add(String(o)));
-                }));
-                if (!options.has(category)) return secureJson({ status: 'invalid' });
+            const defCache = {};
+            const plans = [];
+            for (const id of ids) {
+                let doc = null;
+                try { ({ resource: doc } = await container.item(String(id), tenant).read()); } catch (e) {}
+                if (!doc || doc.docType !== 'survey_response' || doc.isDeleted) continue;
+                if (!(doc.surveyId in defCache)) {
+                    let def = null;
+                    try { ({ resource: def } = await container.item(doc.surveyId, tenant).read()); } catch (e) {}
+                    defCache[doc.surveyId] = def || null;
+                }
+                const qs = findApplicantQuestions(defCache[doc.surveyId]);
+                if (!qs.nameQ || !qs.codeQ) continue;
+                plans.push({ doc, qs });
+            }
+            if (plans.length === 0) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: '氏名とダイアナコードの設問がある回答が見つかりません' } };
+
+            // 出場区分：設問のある回答について、選択肢にある値か確かめる
+            if (category !== null) {
+                const withCategory = plans.filter(p => p.qs.categoryQ);
+                const ok = withCategory.length > 0 && withCategory.every(p => (p.qs.categoryQ.options || []).map(String).includes(category));
+                if (!ok) return secureJson({ status: 'invalid' });
             }
 
             if (!process.env.PG_HOST) return secureJson({ status: 'unavailable' });
@@ -3072,17 +3105,19 @@ app.http('contestApplicant', {
             if (!hit) return secureJson({ status: 'mismatch' });
 
             // ---- 対象の回答を書き換える（修正履歴を残す）----
+            const categoryQids = [...new Set(plans.filter(p => p.qs.categoryQ).map(p => p.qs.categoryQ.id))];
             const editedBy = tokenDoc.userName || tokenDoc.userEmail || '';
             const now = new Date().toISOString();
             let updated = 0;
-            for (const id of ids) {
-                let doc = null;
-                try { ({ resource: doc } = await container.item(String(id), tenant).read()); } catch (e) {}
-                if (!doc || doc.docType !== 'survey_response' || doc.isDeleted) continue;
+            for (const { doc, qs } of plans) {
                 doc.answers = doc.answers || {};
                 const fields = {};
-                const edits = [[nameQid, name], [codeQid, code]];
-                if (categoryQid) edits.push([categoryQid, category]);
+                const edits = [[qs.nameQ.id, name], [qs.codeQ.id, code]];
+                // 出場区分：フォームに設問がある回答と、同じ設問の回答をすでに持っている回答（メンバー用など）に書き込む
+                if (category !== null) {
+                    const cq = qs.categoryQ ? qs.categoryQ.id : categoryQids.find(id => id in doc.answers);
+                    if (cq) edits.push([cq, category]);
+                }
                 edits.forEach(([qid, v]) => {
                     if (doc.answers[qid] !== v) fields[qid] = { before: doc.answers[qid] ?? null, after: v };
                     doc.answers[qid] = v;
