@@ -1,684 +1,145 @@
-require('dotenv').config();
-const express = require('express');
-const { CosmosClient } = require('@azure/cosmos');
-const crypto = require('crypto');
+// ローカル確認用サーバー（本番では使わない）
+//
+// 本番と同じ処理（src/functions/index.js）をそのまま動かし、
+// 画面のURLの扱いも staticwebapp.config.json に合わせる。
+// API を追加・変更しても、このファイルを直す必要はない。
+//
+// ⚠️ 接続先は api/.env の設定に従う。本番のデータベースを指している場合、
+//    ローカルでの保存・送信は本番のデータを変更する。
+//
+// 起動：cd api && node local-server.js  →  http://localhost:7071
+
+const fs = require('fs');
 const path = require('path');
+const Module = require('module');
+const express = require('express');
+
+const PORT = 7071;
+const ROOT = path.join(__dirname, '..');
+
+// ----------------------------------------------------
+// 本番の関数定義を読み込む
+// ----------------------------------------------------
+// index.js が呼ぶ app.http() を記録し、Express のルートとして登録する。
+// app.timer()（定期メール・定期レポートなど）はローカルでは動かさない。
+const httpFunctions = [];
+const fakeFunctions = {
+    app: {
+        http: (name, options) => httpFunctions.push({ name, ...options }),
+        timer: () => {},
+        setup: () => {}
+    }
+};
+const originalLoad = Module._load;
+Module._load = function (request, ...rest) {
+    if (request === '@azure/functions') return fakeFunctions;
+    return originalLoad.call(this, request, ...rest);
+};
+require('./src/functions/index.js');
+Module._load = originalLoad;
 
 const app = express();
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '..')));
-
 
 // ----------------------------------------------------
-// 🔒 セキュリティヘッダー共通設定
+// API
 // ----------------------------------------------------
-app.use(function(req, res, next) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    res.setHeader('Cache-Control', 'no-store');
+app.use('/api', express.text({ type: () => true, limit: '50mb' }));
+
+function toAzureRequest(req) {
+    const rawBody = typeof req.body === 'string' ? req.body : '';
+    const url = new URL(req.originalUrl, `http://${req.headers.host}`);
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+        if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+    }
+    return {
+        method: req.method,
+        url: url.toString(),
+        headers,
+        query: url.searchParams,
+        params: { ...req.params },
+        text: async () => rawBody,
+        json: async () => JSON.parse(rawBody)
+    };
+}
+
+const context = {
+    log: console.log, info: console.info, warn: console.warn,
+    error: console.error, debug: console.debug, trace: console.trace
+};
+
+function sendAzureResponse(res, result) {
+    const r = result || {};
+    res.status(r.status || 200);
+    for (const [key, value] of Object.entries(r.headers || {})) res.setHeader(key, value);
+    if (r.jsonBody !== undefined) {
+        if (!res.getHeader('Content-Type')) res.setHeader('Content-Type', 'application/json');
+        res.send(JSON.stringify(r.jsonBody));
+    } else if (r.body !== undefined && r.body !== null) {
+        res.send(r.body);
+    } else {
+        res.end();
+    }
+}
+
+for (const fn of httpFunctions) {
+    const route = '/api/' + (fn.route || fn.name).replace(/\{(\w+)\}/g, ':$1');
+    const methods = (fn.methods || ['GET', 'POST']).map(m => m.toLowerCase());
+    for (const method of methods) {
+        app[method](route, async (req, res) => {
+            try {
+                sendAzureResponse(res, await fn.handler(toAzureRequest(req), context));
+            } catch (e) {
+                console.error(`[${fn.name}]`, e);
+                res.status(500).json({ error: e.message });
+            }
+        });
+    }
+}
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not Found' }));
+
+// ----------------------------------------------------
+// 画面（staticwebapp.config.json に合わせる）
+// ----------------------------------------------------
+const swaConfig = JSON.parse(fs.readFileSync(path.join(ROOT, 'staticwebapp.config.json'), 'utf8'));
+
+app.use((req, res, next) => {
+    for (const [key, value] of Object.entries(swaConfig.globalHeaders || {})) {
+        // localhost は http なので HSTS は付けない
+        if (key.toLowerCase() !== 'strict-transport-security') res.setHeader(key, value);
+    }
     next();
 });
 
-// ----------------------------------------------------
-// 🔑 トークン管理（Cosmos DB永続化）
-// ----------------------------------------------------
-async function getContainer() {
-    const client = new CosmosClient(process.env.COSMOS_CONNECTION);
-    return client.database(process.env.COSMOS_DATABASE).container(process.env.COSMOS_CONTAINER);
-}
-
-async function issueToken() {
-    const container = await getContainer();
-    const token = crypto.randomBytes(16).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await container.items.upsert({
-        id: 'token_' + token,
-        docType: 'auth_token',
-        tenant: 'auth_token',
-        token,
-        expiresAt
+for (const r of swaConfig.routes || []) {
+    if (r.route.includes('*')) continue;
+    app.get(r.route, (req, res, next) => {
+        for (const [key, value] of Object.entries(r.headers || {})) res.setHeader(key, value);
+        if (r.redirect) {
+            const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+            return res.redirect(r.statusCode || 302, r.redirect + query);
+        }
+        if (r.rewrite) return res.sendFile(r.rewrite, { root: ROOT });
+        next();
     });
-    return token;
 }
 
-async function verifyToken(token) {
-    if (!token) return false;
-    try {
-        const container = await getContainer();
-        const { resource } = await container.item('token_' + token, 'auth_token').read();
-        if (!resource) return false;
-        if (new Date(resource.expiresAt) < new Date()) {
-            await container.item('token_' + token, 'auth_token').delete().catch(() => {});
-            return false;
-        }
-        return true;
-    } catch (e) {
-        return false;
-    }
+// api/ 以下（.env やサーバーのコード）は画面として配信しない
+app.use('/api', (req, res) => res.status(404).end());
+app.use(express.static(ROOT, { dotfiles: 'ignore' }));
+
+// 該当するファイルがない画面URLは index.html を返す（navigationFallback）
+const fallback = swaConfig.navigationFallback;
+if (fallback) {
+    const excludes = (fallback.exclude || []).map(p =>
+        new RegExp('^' + p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$'));
+    app.get(/.*/, (req, res, next) => {
+        if (excludes.some(re => re.test(req.path))) return next();
+        res.sendFile(fallback.rewrite, { root: ROOT });
+    });
 }
 
-// ----------------------------------------------------
-// 認証
-// ----------------------------------------------------
-app.post('/api/auth', async (req, res) => {
-    const { password, tenant } = req.body;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    const envKey = 'ADMIN_PASSWORD_' + tenant.toUpperCase().replace(/-/g, '_');
-    const correctPW = process.env[envKey];
-    if (!correctPW) return res.status(401).json({ error: 'このテナントは設定されていません' });
-
-    const container = await getContainer();
-
-    if (password === correctPW) {
-        const token = await issueToken();
-        await container.items.create({ id: crypto.randomUUID(), docType: 'access_log', tenant, result: 'success', ip: req.ip || 'localhost', createdAt: new Date().toISOString() }).catch(() => {});
-        return res.json({ token });
-    }
-    await container.items.create({ id: crypto.randomUUID(), docType: 'access_log', tenant, result: 'failure', ip: req.ip || 'localhost', createdAt: new Date().toISOString() }).catch(() => {});
-    res.status(401).json({ error: 'パスワードが違います' });
-});
-
-// ----------------------------------------------------
-// 期間取得・保存
-// ----------------------------------------------------
-app.get('/api/period', async (req, res) => {
-    const { tenant, surveyId } = req.query;
-    if (!tenant && !surveyId) return res.status(400).json({ error: 'tenant または surveyId は必須です' });
-    try {
-        const container = await getContainer();
-        const id = surveyId ? 'period_survey_' + surveyId : 'period_' + tenant;
-        const pk = surveyId ? 'survey_period' : tenant;
-        const { resource } = await container.item(id, pk).read();
-        return res.json({ startDate: resource ? resource.startDate : null, endDate: resource ? resource.endDate : null });
-    } catch (e) { return res.json({ startDate: null, endDate: null }); }
-});
-
-app.post('/api/period', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyId, startDate, endDate } = req.body;
-    try {
-        const container = await getContainer();
-        const id = surveyId ? 'period_survey_' + surveyId : 'period_' + tenant;
-        const pk = surveyId ? 'survey_period' : tenant;
-        await container.items.upsert({ id, tenant: pk, startDate: startDate || null, endDate: endDate || null, updatedAt: new Date().toISOString() });
-        return res.json({ status: 'ok', startDate, endDate });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// アンケート定義 CRUD
-// ----------------------------------------------------
-app.get('/api/surveys', async (req, res) => {
-    const { tenant, id } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        if (id) { const { resource } = await container.item(id, tenant).read(); return res.json(resource); }
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' ORDER BY c.createdAt DESC",
-            parameters: [{ name: "@tenant", value: tenant }]
-        }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/surveys', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole } = req.body;
-    if (!tenant || !title) return res.status(400).json({ error: 'tenant と title は必須です' });
-    try {
-        const container = await getContainer();
-        const newSurvey = {
-            id: 'survey_' + crypto.randomUUID(), docType: 'survey_definition',
-            tenant, title, description: description || '', questions: questions || [],
-            active: active !== undefined ? active : true,
-            thanksMessage: thanksMessage || '',
-            isContest: isContest === true,
-            contestGroupId: contestGroupId || null,
-            contestGroupTitle: contestGroupTitle || null,
-            contestRole: contestRole || null,
-            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-        };
-        await container.items.create(newSurvey);
-        return res.status(201).json(newSurvey);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.put('/api/surveys', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { id, tenant, title, description, questions, active, thanksMessage, isContest, contestGroupId, contestGroupTitle, contestRole } = req.body;
-    if (!id || !tenant) return res.status(400).json({ error: 'id と tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const { resource: existing } = await container.item(id, tenant).read();
-        const updated = {
-            ...existing,
-            title: title ?? existing.title,
-            description: description ?? existing.description,
-            questions: questions ?? existing.questions,
-            active: active !== undefined ? active : existing.active,
-            thanksMessage: thanksMessage !== undefined ? thanksMessage : (existing.thanksMessage || ''),
-            isContest: isContest !== undefined ? isContest : (existing.isContest || false),
-            contestGroupId: contestGroupId !== undefined ? contestGroupId : (existing.contestGroupId || null),
-            contestGroupTitle: contestGroupTitle !== undefined ? contestGroupTitle : (existing.contestGroupTitle || null),
-            contestRole: contestRole !== undefined ? contestRole : (existing.contestRole || null),
-            updatedAt: new Date().toISOString()
-        };
-        await container.items.upsert(updated);
-        return res.json(updated);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.delete('/api/surveys', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { id, tenant } = req.query;
-    if (!id || !tenant) return res.status(400).json({ error: 'id と tenant は必須です' });
-    try {
-        const container = await getContainer();
-        await container.item(id, tenant).delete();
-        return res.json({ status: 'deleted' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 回答データ
-// ----------------------------------------------------
-app.post('/api/response', async (req, res) => {
-    const { surveyId, tenant, answers } = req.body;
-    if (!surveyId || !tenant || !answers) return res.status(400).json({ error: 'surveyId, tenant, answers は必須です' });
-    try {
-        const container = await getContainer();
-
-        // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
-        const emailAnswer = Object.values(answers).find(v =>
-            typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-        );
-        let emailAlreadySentToday = false;
-        if (emailAnswer) {
-            const todayJst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-            const tomorrowJst = new Date(new Date(todayJst).getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-            const { resources: dupCheck } = await container.items.query({
-                query: "SELECT TOP 1 c.id FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' AND c.emailAddress = @email AND c.createdAt >= @today AND c.createdAt < @tomorrow",
-                parameters: [
-                    { name: "@tenant",   value: tenant },
-                    { name: "@surveyId", value: surveyId },
-                    { name: "@email",    value: emailAnswer.trim().toLowerCase() },
-                    { name: "@today",    value: todayJst + 'T00:00:00.000Z' },
-                    { name: "@tomorrow", value: tomorrowJst + 'T00:00:00.000Z' }
-                ]
-            }).fetchAll();
-            if (dupCheck.length > 0) {
-                emailAlreadySentToday = true; // 回答は保存するがメールはスキップ
-                console.log(`[重複メールスキップ] tenant=${tenant} surveyId=${surveyId} email=${emailAnswer.trim()}`);
-                // スキップもメールログに記録
-                await container.items.create({
-                    id: crypto.randomUUID(),
-                    docType: 'email_log',
-                    tenant,
-                    surveyId,
-                    toAddress: emailAnswer.trim(),
-                    subject: '（重複のためスキップ）',
-                    senderName: '',
-                    success: false,
-                    skipped: true,
-                    error: '同一メールアドレスへの本日2回目以降の送信のためスキップしました',
-                    createdAt: new Date().toISOString()
-                }).catch(() => {});
-            }
-        }
-        // ────────────────────────────────────────────────────────
-
-        // 回答を保存（2回目以降も保存する）
-        await container.items.create({
-            id: crypto.randomUUID(),
-            docType: 'survey_response',
-            surveyId, tenant, answers,
-            emailAddress: emailAnswer ? emailAnswer.trim().toLowerCase() : null,
-            createdAt: new Date().toISOString()
-        });
-        return res.status(201).json({ status: 'ok' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/response', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { surveyId, tenant } = req.query;
-    if (!surveyId || !tenant) return res.status(400).json({ error: 'surveyId と tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'survey_response' ORDER BY c.createdAt DESC",
-            parameters: [{ name: "@tenant", value: tenant }, { name: "@surveyId", value: surveyId }]
-        }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.delete('/api/response', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { id, tenant } = req.query;
-    if (!id || !tenant) return res.status(400).json({ error: 'id と tenant は必須です' });
-    try {
-        const container = await getContainer();
-        await container.item(id, tenant).delete();
-        return res.json({ status: 'deleted' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// アクセスログ取得
-// ----------------------------------------------------
-app.get('/api/accesslog', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant } = req.query;
-    try {
-        const container = await getContainer();
-        let query = "SELECT TOP 200 * FROM c WHERE c.docType = 'access_log' ORDER BY c.createdAt DESC";
-        let parameters = [];
-        if (tenant) { query = "SELECT TOP 200 * FROM c WHERE c.docType = 'access_log' AND c.tenant = @tenant ORDER BY c.createdAt DESC"; parameters = [{ name: "@tenant", value: tenant }]; }
-        const { resources } = await container.items.query({ query, parameters }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 回答数サマリー（GROUP BY非依存）
-// ----------------------------------------------------
-app.post('/api/responsecounts', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyIds } = req.body;
-    if (!tenant || !surveyIds) return res.status(400).json({ error: 'tenant と surveyIds は必須です' });
-    try {
-        const container = await getContainer();
-        const counts = {};
-        surveyIds.forEach(id => counts[id] = 0);
-        const { resources } = await container.items.query({
-            query: "SELECT c.surveyId FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND ARRAY_CONTAINS(@ids, c.surveyId)",
-            parameters: [{ name: "@tenant", value: tenant }, { name: "@ids", value: surveyIds }]
-        }).fetchAll();
-        resources.forEach(r => { if (counts[r.surveyId] !== undefined) counts[r.surveyId]++; });
-        return res.json(counts);
-    } catch (e) { return res.json({}); }
-});
-
-
-// ----------------------------------------------------
-// 🎨 デザイン設定（テナント共通 & アンケートごと）
-// ----------------------------------------------------
-app.get('/api/tenantsettings', async (req, res) => {
-    const { tenant, surveyId } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        if (surveyId) {
-            try {
-                const { resource } = await container.item('design_' + surveyId, tenant).read();
-                if (resource) return res.json({ ...resource, _source: 'survey' });
-            } catch (e) {}
-        }
-        try {
-            const { resource } = await container.item('settings_' + tenant, tenant).read();
-            return res.json({ ...(resource || {}), _source: 'tenant' });
-        } catch (e) { return res.json({ _source: 'none' }); }
-    } catch (e) { return res.json({}); }
-});
-
-app.post('/api/tenantsettings', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyId, logoBase64, logoName, headerColor, bgColor, bgType, privacyText, privacyLinkText, privacyLinkUrl, privacyTextColor, privacyBgColor } = req.body;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const id = surveyId ? 'design_' + surveyId : 'settings_' + tenant;
-        const existing = await container.item(id, tenant).read().then(r => r.resource || {}).catch(() => ({}));
-        const updated = {
-            ...existing, id,
-            docType: surveyId ? 'survey_design' : 'tenant_settings',
-            tenant,
-            logoBase64: logoBase64 !== undefined ? logoBase64 : (existing.logoBase64 || ''),
-            logoName: logoName !== undefined ? logoName : (existing.logoName || ''),
-            headerColor: headerColor !== undefined ? headerColor : (existing.headerColor || ''),
-            bgColor: bgColor !== undefined ? bgColor : (existing.bgColor || ''),
-            bgType: bgType !== undefined ? bgType : (existing.bgType || 'solid'),
-            privacyText: privacyText !== undefined ? privacyText : (existing.privacyText || ''),
-            privacyLinkText: privacyLinkText !== undefined ? privacyLinkText : (existing.privacyLinkText || ''),
-            privacyLinkUrl: privacyLinkUrl !== undefined ? privacyLinkUrl : (existing.privacyLinkUrl || ''),
-            privacyTextColor: privacyTextColor !== undefined ? privacyTextColor : (existing.privacyTextColor || ''),
-            privacyBgColor: privacyBgColor !== undefined ? privacyBgColor : (existing.privacyBgColor || ''),
-            updatedAt: new Date().toISOString()
-        };
-        await container.items.upsert(updated);
-        return res.json(updated);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-
-// ----------------------------------------------------
-// 🔮 診断（複数診断対応）
-// ----------------------------------------------------
-app.get('/api/diagnosislist', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC",
-            parameters: [{ name: "@tenant", value: tenant }]
-        }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.json([]); }
-});
-
-app.get('/api/diagnosis', async (req, res) => {
-    const { tenant, diagId, id } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const dId = diagId || id;
-        if (dId) {
-            const { resource } = await container.item(dId, tenant).read();
-            return res.json(resource || {});
-        }
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis' ORDER BY c.updatedAt DESC OFFSET 0 LIMIT 1",
-            parameters: [{ name: "@tenant", value: tenant }]
-        }).fetchAll();
-        return res.json(resources[0] || { questions: [], results: {} });
-    } catch (e) { return res.json({ questions: [], results: {} }); }
-});
-
-app.post('/api/diagnosis', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const body = req.body;
-    const { tenant, diagId, title, description, questions, results } = body;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const id = diagId || ('diag_' + crypto.randomUUID());
-        const updated = { ...body, id, diagId: id, docType: 'diagnosis', tenant, title: title || '', description: description || '', questions: questions || [], results: results || {}, updatedAt: new Date().toISOString() };
-        await container.items.upsert(updated);
-        return res.json(updated);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.delete('/api/diagnosis', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { id, diagId, tenant } = req.query;
-    const dId = id || diagId;
-    if (!dId || !tenant) return res.status(400).json({ error: 'id と tenant は必須です' });
-    try {
-        const container = await getContainer();
-        await container.item(dId, tenant).delete();
-        return res.json({ status: 'deleted' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-
-// ----------------------------------------------------
-// 📧 メール設定
-// ----------------------------------------------------
-app.get('/api/emailsettings', async (req, res) => {
-    const { tenant, surveyId } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const id = surveyId ? 'emailsettings_' + surveyId : 'emailsettings_tenant_' + tenant;
-        try {
-            const { resource } = await container.item(id, tenant).read();
-            return res.json(resource || { emailEnabled: false });
-        } catch (e) {
-            return res.json({ emailEnabled: false });
-        }
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/emailsettings', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyId, emailEnabled, subject, bodyText, senderName } = req.body;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const id = surveyId ? 'emailsettings_' + surveyId : 'emailsettings_tenant_' + tenant;
-        const existing = await container.item(id, tenant).read().then(r => r.resource || {}).catch(() => ({}));
-        const updated = {
-            ...existing, id,
-            docType: 'email_settings',
-            tenant,
-            surveyId: surveyId || null,
-            emailEnabled: emailEnabled !== undefined ? emailEnabled : (existing.emailEnabled || false),
-            subject: subject !== undefined ? subject : (existing.subject || ''),
-            bodyText: bodyText !== undefined ? bodyText : (existing.bodyText || ''),
-            senderName: senderName !== undefined ? senderName : (existing.senderName || ''),
-            updatedAt: new Date().toISOString()
-        };
-        await container.items.upsert(updated);
-        return res.json(updated);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 📨 メール送信ログ取得
-// ----------------------------------------------------
-app.get('/api/emaillog', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyId } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        let query, parameters;
-        if (surveyId) {
-            query = "SELECT TOP 200 * FROM c WHERE c.tenant = @tenant AND c.surveyId = @surveyId AND c.docType = 'email_log' ORDER BY c.createdAt DESC";
-            parameters = [{ name: "@tenant", value: tenant }, { name: "@surveyId", value: surveyId }];
-        } else {
-            query = "SELECT TOP 200 * FROM c WHERE c.tenant = @tenant AND c.docType = 'email_log' ORDER BY c.createdAt DESC";
-            parameters = [{ name: "@tenant", value: tenant }];
-        }
-        const { resources } = await container.items.query({ query, parameters }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-
-// ----------------------------------------------------
-// 📊 診断結果ログ
-// ----------------------------------------------------
-app.post('/api/diagnosislog', async (req, res) => {
-    const { tenant, resultKey, resultTitle, diagTitle, diagId } = req.body;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        await container.items.create({ id: crypto.randomUUID(), docType: 'diagnosis_log', tenant, resultKey, resultTitle, diagTitle: diagTitle || '', diagId: diagId || '', createdAt: new Date().toISOString() });
-        return res.status(201).json({ status: 'ok' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/diagnosislog', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'diagnosis_log' ORDER BY c.createdAt DESC OFFSET 0 LIMIT 500",
-            parameters: [{ name: "@tenant", value: tenant }]
-        }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 既存ログ互換
-// ----------------------------------------------------
-app.all('/api/log', async (req, res) => {
-    if (req.method === 'GET' || req.method === 'DELETE') {
-        if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    }
-    try {
-        const container = await getContainer();
-        if (req.method === 'DELETE') { const { id, tenant } = req.query; await container.item(id, tenant).delete(); return res.json({ status: 'deleted' }); }
-        if (req.method === 'GET') {
-            const { tenant, type } = req.query;
-            const { resources } = await container.items.query({ query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.type = @type", parameters: [{ name: "@tenant", value: tenant }, { name: "@type", value: type }] }).fetchAll();
-            return res.json(resources);
-        }
-        const { tenant, type, data } = req.body;
-        await container.items.create({ id: crypto.randomUUID(), tenant, type, ...data, createdAt: new Date().toISOString() });
-        res.status(201).json({ status: 'ok' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 📅 定期レポート設定
-// ----------------------------------------------------
-app.get('/api/reportsettings', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const id = 'reportsettings_' + tenant;
-        try {
-            const { resource } = await container.item(id, tenant).read();
-            return res.json(resource || { enabled: false, recipients: [], surveyIds: [], dayOfWeek: '1', hour: '9' });
-        } catch (e) {
-            return res.json({ enabled: false, recipients: [], surveyIds: [], dayOfWeek: '1', hour: '9' });
-        }
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/reportsettings', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, enabled, recipients, surveyIds, dayOfWeek, hour } = req.body;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const id = 'reportsettings_' + tenant;
-        const existing = await container.item(id, tenant).read().then(r => r.resource || {}).catch(() => ({}));
-        const updated = {
-            ...existing, id,
-            docType: 'report_settings',
-            tenant,
-            enabled: enabled !== undefined ? enabled : (existing.enabled || false),
-            recipients: recipients !== undefined ? recipients : (existing.recipients || []),
-            surveyIds: surveyIds !== undefined ? surveyIds : (existing.surveyIds || []),
-            dayOfWeek: dayOfWeek !== undefined ? dayOfWeek : (existing.dayOfWeek || '1'),
-            hour: hour !== undefined ? hour : (existing.hour || '9'),
-            updatedAt: new Date().toISOString()
-        };
-        await container.items.upsert(updated);
-        return res.json(updated);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 📊 グループ全体統計
-// ----------------------------------------------------
-app.get('/api/groupstats', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { days } = req.query;
-    const daysNum = parseInt(days || '30');
-    try {
-        const container = await getContainer();
-        const since = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000).toISOString();
-        const tenants = ['herbelle', 'diana', 'dstylehd'];
-        const result = {};
-        for (const tenant of tenants) {
-            const { resources: surveys } = await container.items.query({
-                query: "SELECT c.id, c.title, c.active FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' ORDER BY c.createdAt DESC",
-                parameters: [{ name: "@tenant", value: tenant }]
-            }).fetchAll();
-            const { resources: responses } = await container.items.query({
-                query: "SELECT c.surveyId FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_response' AND c.createdAt >= @since",
-                parameters: [{ name: "@tenant", value: tenant }, { name: "@since", value: since }]
-            }).fetchAll();
-            const countMap = {};
-            responses.forEach(r => { countMap[r.surveyId] = (countMap[r.surveyId] || 0) + 1; });
-            result[tenant] = {
-                surveys: surveys.map(s => ({ id: s.id, title: s.title, active: s.active, count: countMap[s.id] || 0 })),
-                total: responses.length
-            };
-        }
-        return res.json(result);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 📧 一斉メール送信・予約
-// ----------------------------------------------------
-app.get('/api/bulkmail', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant } = req.query;
-    if (!tenant) return res.status(400).json({ error: 'tenant は必須です' });
-    try {
-        const container = await getContainer();
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.docType = 'scheduled_mail' AND c.tenant = @tenant ORDER BY c.scheduledAt ASC",
-            parameters: [{ name: "@tenant", value: tenant }]
-        }).fetchAll();
-        return res.json(resources);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/bulkmail', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    const { tenant, surveyId, toAddresses, subject, bodyText, scheduleMode, scheduledAt } = req.body;
-    if (!tenant || !toAddresses?.length || !subject || !bodyText) {
-        return res.status(400).json({ error: 'tenant, toAddresses, subject, bodyText は必須です' });
-    }
-    try {
-        const container = await getContainer();
-        if (scheduleMode === 'scheduled' && scheduledAt) {
-            await container.items.create({
-                id: crypto.randomUUID(), docType: 'scheduled_mail',
-                tenant, surveyId: surveyId || '', toAddresses, subject, bodyText,
-                scheduledAt, status: 'pending', createdAt: new Date().toISOString()
-            });
-            return res.json({ status: 'scheduled', count: toAddresses.length });
-        }
-        // ローカルではメール送信をシミュレート
-        console.log(`[一斉送信ローカルシミュレート] to=${toAddresses.join(',')} subject=${subject}`);
-        for (const toAddress of toAddresses) {
-            await container.items.create({
-                id: crypto.randomUUID(), docType: 'email_log', tenant,
-                surveyId: surveyId || 'bulk', toAddress: toAddress.trim(),
-                subject, senderName: '一斉メール送信（ローカル）', success: true,
-                skipped: false, error: null, createdAt: new Date().toISOString()
-            }).catch(() => {});
-        }
-        return res.json({ status: 'ok', successCount: toAddresses.length, failCount: 0 });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-app.delete('/api/bulkmail/:id', async (req, res) => {
-    if (!await verifyToken(req.headers['x-admin-token'])) return res.status(401).json({ error: '認証が必要です' });
-    try {
-        const container = await getContainer();
-        const { resources } = await container.items.query({
-            query: "SELECT * FROM c WHERE c.id = @id AND c.docType = 'scheduled_mail'",
-            parameters: [{ name: "@id", value: req.params.id }]
-        }).fetchAll();
-        if (resources.length === 0) return res.status(404).json({ error: '見つかりません' });
-        await container.item(req.params.id, resources[0].tenant).delete();
-        return res.json({ status: 'deleted' });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
-});
-
-// ----------------------------------------------------
-// 起動
-// ----------------------------------------------------
-app.listen(7071, () => {
-    console.log('');
-    console.log('✅ ローカルサーバー起動中');
-    console.log('──────────────────────────────────────────');
-    console.log('ポータル:               http://localhost:7071/index.html');
-    console.log('Herbelleダッシュボード: http://localhost:7071/dashboard-herbelle.html');
-    console.log('Dianaダッシュボード:    http://localhost:7071/dashboard-diana.html');
-    console.log('アンケート(動的):       http://localhost:7071/survey.html?id=xxx&tenant=yyy');
-    console.log('──────────────────────────────────────────');
-    console.log('停止するには Ctrl+C を押してください');
-    console.log('');
+app.listen(PORT, 'localhost', () => {
+    console.log(`ローカルサーバー起動: http://localhost:${PORT}`);
+    console.log(`API ${httpFunctions.length} 件を読み込みました`);
 });

@@ -231,7 +231,7 @@
       auth: {
         clientId: "1f4f2ade-4eeb-4f65-8fbd-394378a63518",
         authority: "https://login.microsoftonline.com/2648ac1f-8786-40fb-80f8-14bd84511449",
-        redirectUri: "https://form.dstylegroup.jp"
+        redirectUri: location.hostname === "localhost" ? location.origin : "https://form.dstylegroup.jp"
       },
       cache: { cacheLocation: "sessionStorage" }
     };
