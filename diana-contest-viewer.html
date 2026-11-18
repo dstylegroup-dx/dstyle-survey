@@ -849,6 +849,8 @@ function mergeContestResponses(parts) {
       _key: g.key,
       _memberId: m ? m.id : null,
       _chiefId:  c ? c.id : null,
+      // 再提出分も含めた全回答のID（氏名・ダイアナコードの修正で使う）
+      _ids: g.member.concat(g.chief).map(x => x.id),
       _memberAt: m ? m.createdAt : null,
       _chiefAt:  c ? c.createdAt : null,
       _resubmit: Math.max(0, g.member.length - 1) + Math.max(0, g.chief.length - 1)
@@ -1665,7 +1667,7 @@ async function renderModal() {
       <div class="detail-section-header">📋 応募内容
         <span style="font-weight:normal;font-size:11px;color:#aaa;margin-left:auto;">応募日時：${r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '-'}</span>
       </div>
-      <div class="detail-section-body"><div class="answer-grid">${answerHtml}</div></div>
+      <div class="detail-section-body">${applicantEditHtml(r)}<div class="answer-grid">${answerHtml}</div></div>
     </div>
     <div class="detail-section">
       <div class="detail-section-header">👤 会員情報（DBから取得）</div>
@@ -1756,6 +1758,107 @@ function mBlock(label, val, unit) {
   </div>`;
 }
 
+// ============================================================
+// 応募者の氏名・ダイアナコードの修正
+// 応募時の入力誤りを直し、会員DBの正しいデータを引けるようにする。
+// 氏名とダイアナコードの組み合わせが会員DBと一致した場合だけ保存する。
+// ============================================================
+const EDIT_NAME_LABELS = ['応募者氏名', '氏名'];
+const EDIT_CODE_LABELS = ['応募者 ダイアナコード', 'ダイアナコード'];
+
+// ラベルに合う設問IDを探す（keywords は優先度順。ふりがなの設問は氏名に含めない）
+function findQid(keywords) {
+  for (const kw of keywords) {
+    const q = questionOrder.find(x => x.label.includes(kw) && !x.label.includes('ふりがな'));
+    if (q) return q.qid;
+  }
+  return null;
+}
+
+function applicantEditHtml(r) {
+  const name = getAnswerByKey(r, EDIT_NAME_LABELS);
+  const code = getAnswerByKey(r, EDIT_CODE_LABELS);
+  return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <button class="btn btn-light" id="applicantEditOpen" onclick="toggleApplicantEdit(true)">✏️ 氏名・ダイアナコードを修正</button>
+    </div>
+    <div id="applicantEditForm" style="display:none;background:#faf5f9;border:1.5px solid #d8c0d0;border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:12px;color:#7B4F6E;margin-bottom:10px;">
+        正しい氏名（漢字またはカナ）とダイアナコードを入力してください。会員DBの登録内容と一致した場合だけ保存します。
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <label style="font-size:12px;color:#666;">応募者氏名<br>
+          <input type="text" class="search-input" id="editApplicantName" value="${esc(name)}" style="width:200px;">
+        </label>
+        <label style="font-size:12px;color:#666;">ダイアナコード<br>
+          <input type="text" class="search-input" id="editApplicantCode" value="${esc(code)}" inputmode="numeric" style="width:180px;">
+        </label>
+        <button class="btn btn-primary" id="applicantEditSave" onclick="saveApplicantEdit()">照合して保存</button>
+        <button class="btn btn-secondary" onclick="toggleApplicantEdit(false)">キャンセル</button>
+      </div>
+    </div>`;
+}
+
+function toggleApplicantEdit(open) {
+  document.getElementById('applicantEditForm').style.display = open ? 'block' : 'none';
+  document.getElementById('applicantEditOpen').style.display = open ? 'none' : '';
+  if (open) document.getElementById('editApplicantName').focus();
+}
+
+async function saveApplicantEdit() {
+  const r = filteredResponses[currentDetailIndex];
+  if (!r) return;
+  const name = document.getElementById('editApplicantName').value;
+  const code = document.getElementById('editApplicantCode').value;
+  const nameQid = findQid(EDIT_NAME_LABELS);
+  const codeQid = findQid(EDIT_CODE_LABELS);
+  if (!nameQid || !codeQid) { alert('このコンテストには氏名またはダイアナコードの設問がありません。'); return; }
+  if (!name.trim() || !code.trim()) { alert('氏名とダイアナコードを入力してください。'); return; }
+
+  const ids = (r._ids && r._ids.length) ? r._ids : [r.id];
+  const btn = document.getElementById('applicantEditSave');
+  btn.disabled = true;
+  btn.textContent = '⏳ 照合中...';
+  let data = null;
+  try {
+    const res = await fetch(BASE_URL + '/api/contest-applicant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
+      body: JSON.stringify({ tenant: TENANT, ids, nameQid, codeQid, name, dia_cd: code })
+    });
+    data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  } catch (e) {
+    alert('保存できませんでした: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '照合して保存';
+    return;
+  }
+
+  const messages = {
+    notfound:    '該当する会員が見つかりません。\nダイアナコードを確認してください。',
+    mismatch:    '該当する会員が見つかりません。\n氏名とダイアナコードの組み合わせが会員DBの登録内容と一致しません。',
+    invalid:     '氏名とダイアナコード（数字4〜12桁）を正しく入力してください。',
+    unavailable: '会員DBに接続できないため、照合できません。'
+  };
+  if (data.status !== 'ok') {
+    alert(messages[data.status] || '照合できませんでした。');
+    btn.disabled = false;
+    btn.textContent = '照合して保存';
+    return;
+  }
+
+  // 応募一覧を読み直し（コードが変わると、メンバー用・チーフ用のまとまりも変わるため）、同じ応募者を開き直す
+  await loadResponses();
+  const idx = filteredResponses.findIndex(x => ((x._ids && x._ids.length) ? x._ids : [x.id]).some(id => ids.includes(id)));
+  if (idx < 0) {
+    closeModal();
+    alert('修正しました。（現在の絞り込み条件では表示されません）');
+    return;
+  }
+  await showDetail(idx);
+}
+
 async function navigate(dir) {
   const newIdx = currentDetailIndex + dir;
   if (newIdx < 0 || newIdx >= filteredResponses.length) return;
@@ -1772,6 +1875,8 @@ function onOverlayClick(e) { if (e.target === document.getElementById('detailMod
 // キーボードナビ
 document.addEventListener('keydown', e => {
   if (!document.getElementById('detailModal').classList.contains('show')) return;
+  // 入力欄での矢印キーは文字の移動に使う
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   if (e.key === 'ArrowLeft') navigate(-1);
   if (e.key === 'ArrowRight') navigate(1);
   if (e.key === 'Escape') closeModal();

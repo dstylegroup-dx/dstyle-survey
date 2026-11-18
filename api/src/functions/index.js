@@ -2963,3 +2963,97 @@ app.http('diana-member', {
         }
     }
 });
+// ----------------------------------------------------
+// ✏️ 【応募者の氏名・ダイアナコードの修正】アワード閲覧ページの詳細画面から呼ばれる
+// POST /api/contest-applicant
+// body: { tenant, ids: [回答ID...], nameQid, codeQid, name, dia_cd }
+//
+// 応募時の入力誤りを直すため、氏名とダイアナコードの組み合わせを会員DB（customer_master）と
+// 照合し、一致した場合だけ対象の回答（メンバー用・チーフ用・再提出分）をまとめて書き換える。
+// 返す status: ok / notfound（コードが無い）/ mismatch（氏名が一致しない）/ invalid / unavailable
+// ----------------------------------------------------
+
+// 比較用：全角・半角をそろえ、空白・中黒を除き、カタカナをひらがなにする
+function normalizePersonName(v) {
+    return String(v == null ? '' : v)
+        .normalize('NFKC')
+        .replace(/[\s　・･]/g, '')
+        .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+        .toLowerCase();
+}
+
+// ダイアナコード：全角・半角をそろえ、数字以外（空白・ハイフンなど）を除く
+function normalizeDianaCode(v) {
+    return String(v == null ? '' : v).normalize('NFKC').replace(/[^0-9]/g, '');
+}
+
+app.http('contestApplicant', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'contest-applicant',
+    handler: async (request, context) => {
+        try {
+            const tokenDoc = await getTokenDoc(request.headers.get('x-admin-token'));
+            if (!tokenDoc) return { status: 401, headers: SECURITY_HEADERS, jsonBody: { error: '認証が必要です' } };
+            if ((tokenDoc.role || 'admin') !== 'admin') {
+                return { status: 403, headers: SECURITY_HEADERS, jsonBody: { error: 'この操作は許可されていません' } };
+            }
+
+            const body = await request.json().catch(() => ({}));
+            const { tenant, ids, nameQid, codeQid } = body;
+            if (!tenant || !Array.isArray(ids) || ids.length === 0 || !nameQid || !codeQid) {
+                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant, ids, nameQid, codeQid は必須です' } };
+            }
+
+            const code = normalizeDianaCode(body.dia_cd);
+            const name = formatPersonName(body.name || '', false);
+            const inputName = normalizePersonName(name);
+            if (!/^\d{4,12}$/.test(code) || !inputName) return secureJson({ status: 'invalid' });
+            if (!process.env.PG_HOST) return secureJson({ status: 'unavailable' });
+
+            // ---- 会員DBと照合（漢字・カナのどちらで入力しても一致とみなす）----
+            const schema = process.env.PG_SCHEMA || 'public';
+            const { rows } = await getPgPool().query(
+                `SELECT last_name_kanji, first_name_kanji, last_name_kana, first_name_kana
+                 FROM ${schema}.customer_master
+                 WHERE transfer_delete_flag::text = '0' AND TRIM(diana_code::text) = $1`,
+                [code]
+            );
+            if (rows.length === 0) return secureJson({ status: 'notfound' });
+            const hit = rows.some(r =>
+                normalizePersonName((r.last_name_kanji || '') + (r.first_name_kanji || '')) === inputName ||
+                normalizePersonName((r.last_name_kana  || '') + (r.first_name_kana  || '')) === inputName
+            );
+            if (!hit) return secureJson({ status: 'mismatch' });
+
+            // ---- 対象の回答を書き換える（修正履歴を残す）----
+            const container = await getContainer();
+            const editedBy = tokenDoc.userName || tokenDoc.userEmail || '';
+            const now = new Date().toISOString();
+            let updated = 0;
+            for (const id of ids) {
+                let doc = null;
+                try { ({ resource: doc } = await container.item(String(id), tenant).read()); } catch (e) {}
+                if (!doc || doc.docType !== 'survey_response' || doc.isDeleted) continue;
+                doc.answers = doc.answers || {};
+                const fields = {};
+                [[nameQid, name], [codeQid, code]].forEach(([qid, v]) => {
+                    if (doc.answers[qid] !== v) fields[qid] = { before: doc.answers[qid] ?? null, after: v };
+                    doc.answers[qid] = v;
+                });
+                if (Object.keys(fields).length === 0) continue;
+                doc.updatedAt = now;
+                doc.editHistory = doc.editHistory || [];
+                doc.editHistory.push({ editedAt: now, editedBy, fields });
+                await container.item(doc.id, tenant).replace(doc);
+                updated++;
+            }
+            clearCache('contest:');   // チーフ用画面にも修正をすぐ反映する
+            context.log(`[応募者修正] tenant=${tenant} ids=${ids.join(',')} updated=${updated} by=${editedBy}`);
+            return secureJson({ status: 'ok', updated, name, dia_cd: code });
+        } catch (e) {
+            context.log(`[contest-applicant] エラー: ${e.message}`);
+            return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
+        }
+    }
+});
