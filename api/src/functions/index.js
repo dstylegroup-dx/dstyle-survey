@@ -1821,6 +1821,10 @@ const STAFF_GROUP_IDS = [
     '84b52c84-a162-43e0-a4be-30bc13ff36b0'  // 全社連絡用
 ];
 const CHIEF_TENANT_KEY = 'diana';                                // 対象テナント（アンケート側）
+// チーフ用画面には出さないフォーム（コンテスト対象でも、応募一覧（本部用）にだけ出す）
+const CHIEF_HIDDEN_SURVEYS = [
+    'survey_380f2d9c-a52d-458b-81b1-18fd753e34d7'   // 次年度エントリー用フォーム
+];
 
 // チーフ用トークンの発行元（サブドメインはGUID形式・ドメイン名形式の両方を許容）
 const CHIEF_METADATA_URL = `https://${CHIEF_TENANT_ID}.ciamlogin.com/${CHIEF_TENANT_ID}/v2.0/.well-known/openid-configuration`;
@@ -2407,7 +2411,7 @@ app.http('contestEntries', {
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
                     parameters: [{ name: "@tenant", value: CHIEF_TENANT_KEY }]
                 }).fetchAll();
-                return resources || [];
+                return (resources || []).filter(s => CHIEF_HIDDEN_SURVEYS.indexOf(s.id) < 0);
             });
 
             // グループ単位にまとめる
