@@ -424,66 +424,38 @@ https://github.com/dstylegroup-dx/dstyle-survey/settings/secrets/actions
 
 ## 7. ローカル開発環境
 
-本番にデプロイする前にローカルで動作確認できます。
+本番と同じ API・同じ画面URLで、デプロイせずに動作確認できます。
 
-### 構成
+`api/local-server.js` は本番の処理（`api/src/functions/index.js`）をそのまま読み込み、画面のURLも `staticwebapp.config.json` に合わせて返します。API を追加・変更しても `local-server.js` を直す必要はありません。
 
-```
-api/
-├── .env                  # 環境変数（gitignore済み・機密情報を記載）
-├── local-server.js       # Expressベースのローカルサーバー
-├── local.settings.json   # Azure Functions設定（gitignore済み）
-└── src/functions/
-    └── index.js          # APIの本体
-```
+> ⚠️ 接続先は `api/.env` の設定に従います。本番のデータベースを指している場合、ローカルで回答の送信・アンケートの保存などを行うと**本番のデータが変わります**。
+>
+> 定期実行の処理（定期メール・定期レポートなど）はローカルでは動きません。
 
 ### .env ファイルの設定
 
-`api/.env` に以下を記載してください（値は実際のものに変更）：
-
-```
-COSMOS_CONNECTION=AccountEndpoint=https://{CosmosDBのエンドポイント};AccountKey={アカウントキー};
-COSMOS_DATABASE=dstyle-survey
-COSMOS_CONTAINER=logs
-ADMIN_PASSWORD_HERBELLE_CHITOSEFUNABASHI={パスワード}
-ADMIN_PASSWORD_DIANA={パスワード}
-```
-
-> ⚠️ `.env` ファイルは `.gitignore` に登録済みのため、GitHubには公開されません。
+`api/.env` に本番の Azure Functions と同じ環境変数を記載してください（`.gitignore` 済み）。
 
 ### 起動方法
 
 ```bash
 cd api
+npm install
 node local-server.js
 ```
 
-### 対応APIエンドポイント（local-server.js）
+`http://localhost:7071` を開きます。URL は本番と同じ形（`/dashboard-diana`、`/chief-contest` など）で使えます。
 
-| エンドポイント | メソッド | 認証 | 説明 |
-|-------------|---------|------|------|
-| `/api/auth` | POST | 不要 | 認証・トークン発行 |
-| `/api/surveys` | GET | 不要 | アンケート定義一覧・単体取得 |
-| `/api/surveys` | POST | 必要 | アンケート定義新規作成 |
-| `/api/surveys` | PUT | 必要 | アンケート定義更新 |
-| `/api/surveys` | DELETE | 必要 | アンケート定義削除 |
-| `/api/response` | POST | 不要 | 回答保存 |
-| `/api/response` | GET | 必要 | 回答取得 |
-| `/api/response` | DELETE | 必要 | 回答削除 |
-| `/api/period` | GET | 不要 | 受付期間取得 |
-| `/api/period` | POST | 必要 | 受付期間保存 |
-| `/api/log` | POST/GET/DELETE | GET/DELETE必要 | 旧形式互換 |
+### ログインに必要な設定（初回のみ・Azure 管理者が実施）
 
-### ローカル確認URL
+ローカルで Microsoft アカウントのログインを通すには、Microsoft Entra ID のアプリ登録で、リダイレクト URI（シングルページ アプリケーション）に次を追加します。追加しても本番のログインには影響しません。
 
-| 画面 | URL |
-|------|-----|
-| フォーム管理ポータル | http://localhost:7071/index.html |
-| Herbelleダッシュボード | http://localhost:7071/dashboard-herbelle.html |
-| Dianaダッシュボード | http://localhost:7071/dashboard-diana.html |
-| アンケート（動的） | http://localhost:7071/survey.html?id={survey_id}&tenant={tenant} |
-
-> 💡 `func start` は社内ネットワークのSSL証明書の関係で動作しないため、`local-server.js`（Express）を使用します。
+| アプリ登録 | 追加するリダイレクト URI | 使う画面 |
+|---|---|---|
+| dstyle-survey（`1f4f2ade-…`） | `http://localhost:7071` | ポータル・フォーム管理 |
+| dstyle-survey（`1f4f2ade-…`） | `http://localhost:7071/diana-contest-viewer.html` | GPアワード 応募一覧 |
+| dstyle-survey（`1f4f2ade-…`） | `http://localhost:7071/chief-contest.html` | チーフ用画面（社員ログイン） |
+| DstyleSurvey-Chief-SPA（`5503ac94-…`） | `http://localhost:7071/chief-contest.html` | チーフ用画面（チーフログイン） |
 
 ---
 
@@ -501,7 +473,7 @@ node local-server.js
 | Permission denied | アクセス権がない | 管理者にCollaborator招待を依頼 |
 | アンケートが「受付期間外」と表示される | 期間設定が古い | ダッシュボードから期間を更新 |
 | 期間設定が保存できない | トークン切れ・認証エラー | 一度ログアウトして再ログイン |
-| ローカルで動かない | local-server.jsが古い | local-server.jsを最新版に更新 |
+| ローカルでログインできない | リダイレクト URI が未登録 | 「7. ローカル開発環境」のログイン設定を参照 |
 | Cloud Shellでリソースが見つからない | サブスクリプションが違う | `az account set --subscription "株式会社Dstyleホールディングス"` を実行 |
 
 ### CORSエラーの対処
