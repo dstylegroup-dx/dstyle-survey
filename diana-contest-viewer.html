@@ -851,6 +851,8 @@ function mergeContestResponses(parts) {
       _chiefId:  c ? c.id : null,
       // 再提出分も含めた全回答のID（氏名・ダイアナコードの修正で使う）
       _ids: g.member.concat(g.chief).map(x => x.id),
+      // メンバー用フォームが回答した設問（【チーフ】を付けるかの判定に使う）
+      _memberKeys: m ? Object.keys(m.answers || {}) : [],
       _memberAt: m ? m.createdAt : null,
       _chiefAt:  c ? c.createdAt : null,
       _resubmit: Math.max(0, g.member.length - 1) + Math.max(0, g.chief.length - 1)
@@ -889,13 +891,15 @@ async function loadResponses() {
       return { survey: s, role: surveyRole(s), labelMap: labelMap, responses: (await resRes.json()) || [] };
     }));
 
-    // 質問ラベルマップを構築（複数アンケートの場合、チーフ側は【チーフ】を接頭）
+    // 質問ラベルマップを構築（複数アンケートの場合、チーフ用だけの設問に【チーフ】を接頭）
+    // メンバー用と同じ設問（設問IDが共通）は、どちらのフォームの回答か区別できないため付けない
     questionLabelMap = {};
     questionOrder = [];
     // メンバー用 → チーフ用 の順に並べる
     const ordered = parts.slice().sort((a, b) => (a.role === 'member' ? 0 : 1) - (b.role === 'member' ? 0 : 1));
     ordered.forEach(p => {
       Object.entries(p.labelMap).forEach(([qid, label]) => {
+        if (qid in questionLabelMap) return;   // 先に登録した設問（共通設問）はそのまま
         const shown = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
         questionLabelMap[qid] = shown;
         questionOrder.push({ qid, label: shown, role: p.role });
@@ -1014,6 +1018,14 @@ function getBirthday(r) {
   return { value: fromDb, fromDb: !!fromDb };
 }
 
+// 設問の表示名。【チーフ】はチーフ用フォームの回答にだけ付ける
+// （メンバー用フォームもチーフ用の設問IDで回答を送ることがあるため、設問定義だけでは決めない）
+function answerLabel(r, qid) {
+  const label = questionLabelMap[qid] || qid;
+  const memberKeys = r._memberKeys || (r._role === 'member' ? Object.keys(r.answers || {}) : []);
+  return memberKeys.includes(qid) ? label.replace(/^【チーフ】/, '') : label;
+}
+
 function getAnswerEntries(r) {
   const answers = r.answers || {};
 
@@ -1033,7 +1045,7 @@ function getAnswerEntries(r) {
       return true;
     })
     .map(([k, v]) => {
-      const label = questionLabelMap[k] || k;
+      const label = answerLabel(r, k);
       const value = (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v);
       return { key: label, rawKey: k, value };
     });

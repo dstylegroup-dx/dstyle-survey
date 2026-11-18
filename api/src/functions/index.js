@@ -1952,7 +1952,8 @@ function mergeContestResponses(parts) {
             memberAt: m ? m.createdAt : null,
             chiefAt: c ? c.createdAt : null,
             resubmit: Math.max(0, g.member.length - 1) + Math.max(0, g.chief.length - 1),
-            answers: Object.assign({}, m ? m.answers : {}, c ? c.answers : {})
+            answers: Object.assign({}, m ? m.answers : {}, c ? c.answers : {}),
+            memberKeys: m ? Object.keys(m.answers || {}) : []   // メンバー用フォームが回答した設問
         };
     });
 
@@ -1967,7 +1968,8 @@ function mergeContestResponses(parts) {
             memberAt: u.role === 'member' ? (u.r.createdAt || null) : null,
             chiefAt:  u.role === 'chief'  ? (u.r.createdAt || null) : null,
             resubmit: 0,
-            answers: u.r.answers || {}
+            answers: u.r.answers || {},
+            memberKeys: u.role === 'member' ? Object.keys(u.r.answers || {}) : []
         });
     });
 
@@ -2441,12 +2443,14 @@ app.http('contestEntries', {
                 parts.push({ survey: s, role: surveyRole(s), labelMap, responses: responses || [] });
             }
 
-            // 質問ラベル（複数アンケートの場合、チーフ側は【チーフ】を接頭）
+            // 質問ラベル（複数アンケートの場合、チーフ用だけの設問に【チーフ】を接頭）
+            // メンバー用と同じ設問（設問IDが共通）は、どちらのフォームの回答か区別できないため付けない
             // メンバー用 → チーフ用 の順に並べる
             const questionLabels = {};
             const orderedParts = parts.slice().sort((a, b) => (a.role === 'member' ? 0 : 1) - (b.role === 'member' ? 0 : 1));
             orderedParts.forEach(p => {
                 Object.entries(p.labelMap).forEach(([qid, label]) => {
+                    if (qid in questionLabels) return;   // 先に登録した設問（共通設問）はそのまま
                     questionLabels[qid] = (p.role === 'chief' && parts.length > 1) ? '【チーフ】' + label : label;
                 });
             });

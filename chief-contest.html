@@ -755,7 +755,7 @@ function renderDetail() {
     .filter(function(k) { return !fileQids[k]; })
     .map(function(k) {
       const v = (e.answers || {})[k];
-      return { label: questionLabels[k] || k, value: (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v) };
+      return { label: answerLabel(e, k), value: (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v == null ? '' : v) };
     });
 
   // メンバー用とチーフ用で同じ設問がある場合、値が一致していればチーフ側を隠す
@@ -895,6 +895,13 @@ function dbItem(label, value) {
 // ============================================================
 // ヘルパー
 // ============================================================
+// 設問の表示名。【チーフ】はチーフ用フォームの回答にだけ付ける
+// （メンバー用フォームもチーフ用の設問IDで回答を送ることがあるため、設問定義だけでは決めない）
+function answerLabel(e, qid) {
+  const label = questionLabels[qid] || qid;
+  return (e.memberKeys || []).indexOf(qid) >= 0 ? label.replace(/^【チーフ】/, '') : label;
+}
+
 function answerByKeywords(e, keywords) {
   const answers = e.answers || {};
   for (const kw of keywords) {
