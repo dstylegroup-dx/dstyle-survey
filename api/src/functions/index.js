@@ -2968,12 +2968,13 @@ app.http('diana-member', {
     }
 });
 // ----------------------------------------------------
-// ✏️ 【応募者の氏名・ダイアナコードの修正】アワード閲覧ページの詳細画面から呼ばれる
+// ✏️ 【応募者の氏名・ダイアナコード・出場区分の修正】アワード閲覧ページの詳細画面から呼ばれる
 // POST /api/contest-applicant
-// body: { tenant, ids: [回答ID...], nameQid, codeQid, name, dia_cd }
+// body: { tenant, ids: [回答ID...], nameQid, codeQid, name, dia_cd, categoryQid?, category? }
 //
 // 応募時の入力誤りを直すため、氏名とダイアナコードの組み合わせを会員DB（customer_master）と
 // 照合し、一致した場合だけ対象の回答（メンバー用・チーフ用・再提出分）をまとめて書き換える。
+// 出場区分は会員DBに正解が無いため照合せず、コンテストの設問の選択肢にある値だけ受け付ける（省略時は変更しない）。
 // 返す status: ok / notfound（コードが無い）/ mismatch（氏名が一致しない）/ invalid / unavailable
 // ----------------------------------------------------
 
@@ -3013,6 +3014,23 @@ app.http('contestApplicant', {
             const name = formatPersonName(body.name || '', false);
             const inputName = normalizePersonName(name);
             if (!/^\d{4,12}$/.test(code) || !inputName) return secureJson({ status: 'invalid' });
+
+            // ---- 出場区分（指定された場合のみ）：コンテストの設問の選択肢にある値か確かめる ----
+            const container = await getContainer();
+            const categoryQid = body.categoryQid || null;
+            const category = categoryQid ? String(body.category || '').trim() : null;
+            if (categoryQid) {
+                const { resources: defs } = await container.items.query({
+                    query: "SELECT c.questions FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND c.isContest = true AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)",
+                    parameters: [{ name: '@tenant', value: tenant }]
+                }).fetchAll();
+                const options = new Set();
+                defs.forEach(d => (d.questions || []).forEach(q => {
+                    if (q.id === categoryQid) (q.options || []).forEach(o => options.add(String(o)));
+                }));
+                if (!options.has(category)) return secureJson({ status: 'invalid' });
+            }
+
             if (!process.env.PG_HOST) return secureJson({ status: 'unavailable' });
 
             // ---- 会員DBと照合（漢字・カナのどちらで入力しても一致とみなす）----
@@ -3031,7 +3049,6 @@ app.http('contestApplicant', {
             if (!hit) return secureJson({ status: 'mismatch' });
 
             // ---- 対象の回答を書き換える（修正履歴を残す）----
-            const container = await getContainer();
             const editedBy = tokenDoc.userName || tokenDoc.userEmail || '';
             const now = new Date().toISOString();
             let updated = 0;
@@ -3041,7 +3058,9 @@ app.http('contestApplicant', {
                 if (!doc || doc.docType !== 'survey_response' || doc.isDeleted) continue;
                 doc.answers = doc.answers || {};
                 const fields = {};
-                [[nameQid, name], [codeQid, code]].forEach(([qid, v]) => {
+                const edits = [[nameQid, name], [codeQid, code]];
+                if (categoryQid) edits.push([categoryQid, category]);
+                edits.forEach(([qid, v]) => {
                     if (doc.answers[qid] !== v) fields[qid] = { before: doc.answers[qid] ?? null, after: v };
                     doc.answers[qid] = v;
                 });
@@ -3054,7 +3073,7 @@ app.http('contestApplicant', {
             }
             clearCache('contest:');   // チーフ用画面にも修正をすぐ反映する
             context.log(`[応募者修正] tenant=${tenant} ids=${ids.join(',')} updated=${updated} by=${editedBy}`);
-            return secureJson({ status: 'ok', updated, name, dia_cd: code });
+            return secureJson({ status: 'ok', updated, name, dia_cd: code, category });
         } catch (e) {
             context.log(`[contest-applicant] エラー: ${e.message}`);
             return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };

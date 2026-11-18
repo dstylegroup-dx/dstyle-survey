@@ -778,6 +778,7 @@ let questionLabelMap = {};
 // 両フォームの全設問を、フォームの並び順で保持する
 // （どちらか一方が未提出でも、同じ項目が空欄で並ぶようにするため）
 let questionOrder = []; // { q_XXXXXXXXX: '氏名' } のマップ
+let questionDefs = {};  // 設問ID → 設問定義
 
 // ── マージキー（サロンコード＋ダイアナコード）─────────────────
 // 照合はダイアナコードのみ（応募フォームからサロンコード欄を廃止したため）
@@ -887,7 +888,10 @@ async function loadResponses() {
       if (!resRes.ok) throw new Error('回答取得エラー HTTP ' + resRes.status + '（' + s.title + '）');
       const def = defRes.ok ? await defRes.json() : s;
       const labelMap = {};
-      (def.questions || []).forEach(q => { if (q.id && q.label) labelMap[q.id] = q.label; });
+      (def.questions || []).forEach(q => {
+        if (q.id && q.label) labelMap[q.id] = q.label;
+        if (q.id) questionDefs[q.id] = q;   // 選択肢の取得に使う（出場区分の修正など）
+      });
       return { survey: s, role: surveyRole(s), labelMap: labelMap, responses: (await resRes.json()) || [] };
     }));
 
@@ -1771,12 +1775,14 @@ function mBlock(label, val, unit) {
 }
 
 // ============================================================
-// 応募者の氏名・ダイアナコードの修正
+// 応募者の氏名・ダイアナコード・出場区分の修正
 // 応募時の入力誤りを直し、会員DBの正しいデータを引けるようにする。
 // 氏名とダイアナコードの組み合わせが会員DBと一致した場合だけ保存する。
+// 出場区分は会員DBに正解が無いため照合せず、設問の選択肢から選び直す。
 // ============================================================
 const EDIT_NAME_LABELS = ['応募者氏名', '氏名'];
 const EDIT_CODE_LABELS = ['応募者 ダイアナコード', 'ダイアナコード'];
+const EDIT_CATEGORY_LABELS = ['出場区分'];
 
 // ラベルに合う設問IDを探す（keywords は優先度順。ふりがなの設問は氏名に含めない）
 function findQid(keywords) {
@@ -1790,13 +1796,27 @@ function findQid(keywords) {
 function applicantEditHtml(r) {
   const name = getAnswerByKey(r, EDIT_NAME_LABELS);
   const code = getAnswerByKey(r, EDIT_CODE_LABELS);
+  // 出場区分：設問の選択肢から選ぶ（今の値が選択肢に無い場合は、その値も残して表示する）
+  const categoryQid = findQid(EDIT_CATEGORY_LABELS);
+  const categoryDef = categoryQid ? questionDefs[categoryQid] : null;
+  const categoryOptions = (categoryDef && categoryDef.options) || [];
+  const category = categoryQid ? String((r.answers || {})[categoryQid] || '') : '';
+  const categoryHtml = categoryOptions.length === 0 ? '' : `
+        <label style="font-size:12px;color:#666;">出場区分<br>
+          <select class="search-input" id="editApplicantCategory" style="width:160px;">
+            ${category && !categoryOptions.includes(category) ? `<option value="${esc(category)}" selected>${esc(category)}（現在の値）</option>` : ''}
+            ${category ? '' : '<option value="" selected>（未入力）</option>'}
+            ${categoryOptions.map(o => `<option value="${esc(o)}"${o === category ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+          </select>
+        </label>`;
   return `
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-      <button class="btn btn-light" id="applicantEditOpen" onclick="toggleApplicantEdit(true)">✏️ 氏名・ダイアナコードを修正</button>
+      <button class="btn btn-light" id="applicantEditOpen" onclick="toggleApplicantEdit(true)">✏️ 氏名・ダイアナコード・出場区分を修正</button>
     </div>
     <div id="applicantEditForm" style="display:none;background:#faf5f9;border:1.5px solid #d8c0d0;border-radius:10px;padding:14px 16px;margin-bottom:14px;">
       <div style="font-size:12px;color:#7B4F6E;margin-bottom:10px;">
-        正しい氏名（漢字またはカナ）とダイアナコードを入力してください。会員DBの登録内容と一致した場合だけ保存します。
+        正しい氏名（漢字またはカナ）とダイアナコードを入力してください。会員DBの登録内容と一致した場合だけ保存します。<br>
+        出場区分は照合せず、選んだ値で保存します。
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
         <label style="font-size:12px;color:#666;">応募者氏名<br>
@@ -1804,7 +1824,7 @@ function applicantEditHtml(r) {
         </label>
         <label style="font-size:12px;color:#666;">ダイアナコード<br>
           <input type="text" class="search-input" id="editApplicantCode" value="${esc(code)}" inputmode="numeric" style="width:180px;">
-        </label>
+        </label>${categoryHtml}
         <button class="btn btn-primary" id="applicantEditSave" onclick="saveApplicantEdit()">照合して保存</button>
         <button class="btn btn-secondary" onclick="toggleApplicantEdit(false)">キャンセル</button>
       </div>
@@ -1828,6 +1848,14 @@ async function saveApplicantEdit() {
   if (!name.trim() || !code.trim()) { alert('氏名とダイアナコードを入力してください。'); return; }
 
   const ids = (r._ids && r._ids.length) ? r._ids : [r.id];
+  const payload = { tenant: TENANT, ids, nameQid, codeQid, name, dia_cd: code };
+  // 出場区分は変えたときだけ送る（未入力・選択肢に無い現在の値はそのまま残す）
+  const categorySel = document.getElementById('editApplicantCategory');
+  const categoryQid = findQid(EDIT_CATEGORY_LABELS);
+  if (categorySel && categoryQid && categorySel.value && categorySel.value !== String((r.answers || {})[categoryQid] || '')) {
+    payload.categoryQid = categoryQid;
+    payload.category = categorySel.value;
+  }
   const btn = document.getElementById('applicantEditSave');
   btn.disabled = true;
   btn.textContent = '⏳ 照合中...';
@@ -1836,7 +1864,7 @@ async function saveApplicantEdit() {
     const res = await fetch(BASE_URL + '/api/contest-applicant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken || '' },
-      body: JSON.stringify({ tenant: TENANT, ids, nameQid, codeQid, name, dia_cd: code })
+      body: JSON.stringify(payload)
     });
     data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
@@ -1850,7 +1878,7 @@ async function saveApplicantEdit() {
   const messages = {
     notfound:    '該当する会員が見つかりません。\nダイアナコードを確認してください。',
     mismatch:    '該当する会員が見つかりません。\n氏名とダイアナコードの組み合わせが会員DBの登録内容と一致しません。',
-    invalid:     '氏名とダイアナコード（数字4〜12桁）を正しく入力してください。',
+    invalid:     '氏名とダイアナコード（数字4〜12桁）を正しく入力し、出場区分は選択肢から選んでください。',
     unavailable: '会員DBに接続できないため、照合できません。'
   };
   if (data.status !== 'ok') {
