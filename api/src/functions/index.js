@@ -403,7 +403,9 @@ app.http('surveys', {
                 if (!tenant) return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: 'tenant は必須です' } };
                 if (id) {
                     const { resource } = await container.item(id, tenant).read();
-                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: resource };
+                    // 応募資格の確認が必要なフォームは、画面で送信前に確認できるよう印を付けて返す
+                    const body = resource && ENTRY_WEIGHT_CHECK[resource.id] ? Object.assign({}, resource, { entryCheck: true }) : resource;
+                    return { status: 200, headers: SECURITY_HEADERS, jsonBody: body };
                 }
                 const { resources } = await container.items.query({
                     query: "SELECT * FROM c WHERE c.tenant = @tenant AND c.docType = 'survey_definition' AND (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false) ORDER BY c.createdAt DESC",
@@ -542,6 +544,23 @@ app.http('response', {
 
                 // ── 氏名・ふりがなの整形（ダイアナのみ）──
                 if (tenant === 'diana' && surveyDef) formatNameAnswers(surveyDef, answers);
+
+                // ── 応募資格の確認（対象のフォームのみ）──
+                // 画面でも送信前に確認しているが、画面を経由しない送信に備えてここでも確かめる。
+                // 会員DBに問い合わせられない場合は止めない
+                if (surveyDef && ENTRY_WEIGHT_CHECK[surveyDef.id]) {
+                    const qs = findEntryCheckQuestions(surveyDef);
+                    if (qs) {
+                        try {
+                            const st = await checkEntryEligibility(answers[qs.codeQ.id], answers[qs.nameQ.id], ENTRY_WEIGHT_CHECK[surveyDef.id].ratio);
+                            if (ENTRY_CHECK_MESSAGES[st]) {
+                                return { status: 400, headers: SECURITY_HEADERS, jsonBody: { error: ENTRY_CHECK_MESSAGES[st], status: st } };
+                            }
+                        } catch (e) {
+                            context.log(`[応募資格の確認エラー] surveyId=${surveyId} error=${e.message}`);
+                        }
+                    }
+                }
 
                 // ── メールアドレス 1日1回チェック（送信スキップ方式）──────
                 const emailAnswer = Object.values(answers).find(v =>
@@ -3077,6 +3096,126 @@ app.http('contestApplicant', {
         } catch (e) {
             context.log(`[contest-applicant] エラー: ${e.message}`);
             return { status: 500, headers: SECURITY_HEADERS, jsonBody: { error: e.message } };
+        }
+    }
+});
+
+// ----------------------------------------------------
+// 🎫 【応募資格の確認】次年度エントリー用フォームの送信前に呼ばれる
+// POST /api/entry-check   body: { surveyId, dia_cd, name }
+//
+// 氏名とダイアナコードの組み合わせで会員DBの採寸情報（body_check）を探し、
+// 初回採寸の体重が理想体重の ratio 倍以上なら応募できる。
+//   ・初回採寸の体重：最も古いボディチェックの「体重」
+//   ・理想体重：最新のボディチェックの「理想値_体重」（応募一覧（本部用）の採寸表の理想値と同じ）
+// 返す status: ok / notfound（会員が見つからない）/ nodata（採寸情報が無い）
+//             / unknown（体重・理想体重が記録されておらず判定できない）/ ineligible（条件を満たさない）
+//             / invalid / unavailable / skip（確認の対象外のフォーム）/ error
+//
+// ⚠️ 公開ページ（未認証）から呼ばれるため、合否のみ返す（氏名・体重などは返さない）
+//    gp-check と同じ照会回数の制限を共有する
+// ----------------------------------------------------
+
+// 応募資格の確認が必要なフォーム（アンケートID → 条件）
+const ENTRY_WEIGHT_CHECK = {
+    'survey_380f2d9c-a52d-458b-81b1-18fd753e34d7': { ratio: 1.4 }   // 次年度エントリー用フォーム
+};
+
+const ENTRY_CHECK_MESSAGES = {
+    notfound:   '氏名とダイアナコードの組み合わせに一致する会員が見つかりません。入力内容をご確認ください。',
+    nodata:     '採寸情報が登録されていないため、応募できません。',
+    unknown:    '採寸情報に体重または理想体重が記録されていないため、応募条件を確認できません。',
+    ineligible: '応募条件（初回採寸の体重が理想体重の1.4倍以上）を満たしていないため、応募できません。',
+    invalid:    '氏名とダイアナコードを正しく入力してください。'
+};
+
+// アンケートから確認に使う設問（氏名・ダイアナコード）を探す
+function findEntryCheckQuestions(survey) {
+    const qs = (survey && survey.questions) || [];
+    const codeQ = qs.find(q => String(q.label || '').includes('ダイアナコード'));
+    const nameQ = qs.find(q => String(q.label || '').includes('氏名') && !String(q.label || '').includes('ふりがな'));
+    return (codeQ && nameQ) ? { codeQ, nameQ } : null;
+}
+
+// 確認の本体（応募の保存時にも同じ判定を使う）
+async function checkEntryEligibility(diaCd, name, ratio) {
+    const code = normalizeDianaCode(diaCd);
+    const input = normalizePersonName(name);
+    if (!/^\d{4,12}$/.test(code) || !input) return 'invalid';
+    if (!process.env.PG_HOST) return 'unavailable';
+
+    const schema = process.env.PG_SCHEMA || 'public';
+    const pool = getPgPool();
+
+    // ① 会員：氏名（漢字・カナのどちらでも可）とダイアナコードの組み合わせ
+    const cust = await pool.query(
+        `SELECT TRIM(diana_code::text) AS diana_code,
+                last_name_kanji, first_name_kanji, last_name_kana, first_name_kana
+         FROM ${schema}.customer_master
+         WHERE transfer_delete_flag::text = '0' AND TRIM(diana_code::text) = $1`,
+        [code]
+    );
+    const hit = cust.rows.find(r =>
+        normalizePersonName((r.last_name_kanji || '') + (r.first_name_kanji || '')) === input ||
+        normalizePersonName((r.last_name_kana  || '') + (r.first_name_kana  || '')) === input
+    );
+    if (!hit) return 'notfound';
+
+    // ② 採寸情報（応募一覧（本部用）の採寸表と同じく、チェック日の古い順）
+    const bc = await pool.query(
+        `SELECT "体重", "理想値_体重"
+         FROM ${schema}.body_check
+         WHERE "ダイアナコード"::text = $1
+         ORDER BY "チェック日" ASC`,
+        [hit.diana_code]
+    );
+    if (bc.rows.length === 0) return 'nodata';
+
+    // ③ 初回採寸の体重と理想体重を比べる
+    const first = parseFloat(bc.rows[0]['体重']);
+    const ideal = parseFloat(bc.rows[bc.rows.length - 1]['理想値_体重']);
+    if (!(first > 0) || !(ideal > 0)) return 'unknown';
+    // 小数の誤差で境界（ちょうど1.4倍）を落とさないよう、0.01kg単位に丸めて比べる
+    const threshold = Math.round(ideal * ratio * 100) / 100;
+    return first >= threshold ? 'ok' : 'ineligible';
+}
+
+app.http('entryCheck', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'entry-check',
+    handler: async (request, context) => {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        try {
+            const body = await request.json().catch(() => ({}));
+            const rule = ENTRY_WEIGHT_CHECK[String(body.surveyId || '')];
+            if (!rule) return secureJson({ status: 'skip' });
+            // 1分あたり20回まで（gp-check と共有）
+            if (!checkRateLimit(ip, 20, 60 * 1000)) {
+                return { status: 429, headers: SECURITY_HEADERS, jsonBody: { error: '照会が多すぎます。しばらく待ってからお試しください。' } };
+            }
+
+            const status = await checkEntryEligibility(body.dia_cd, body.name, rule.ratio);
+
+            // 照会履歴を記録（異常な連続照会を後から検知できるようにする）
+            try {
+                const container = await getContainer();
+                await container.items.create({
+                    id: crypto.randomUUID(),
+                    docType: 'access_log',
+                    tenant: 'diana',
+                    app: 'entry-check',
+                    surveyId: body.surveyId,
+                    result: status,
+                    ip,
+                    createdAt: new Date().toISOString()
+                }).catch(() => {});
+            } catch (e) {}
+
+            return secureJson({ status, message: ENTRY_CHECK_MESSAGES[status] || '' });
+        } catch (e) {
+            context.log('[entry-check] エラー: ' + e.message);
+            return secureJson({ status: 'error' });
         }
     }
 });

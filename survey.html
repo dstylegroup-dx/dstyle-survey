@@ -736,6 +736,17 @@ input[type="number"]::-webkit-inner-spin-button,
           try { answers[q.id] = JSON.parse(hidden.value || '[]').join(', ') || '（未アップロード）'; } catch(e) { answers[q.id] = '（未アップロード）'; }
         }
       });
+      // 応募資格の確認が必要なフォームは、送信前に会員DBの採寸情報で確かめる
+      if (survey.entryCheck) {
+        btn.textContent = '確認中...';
+        var entryOk = await checkEntry(survey, answers);
+        if (!entryOk) {
+          btn.disabled = false;
+          btn.textContent = '送信する 📩';
+          return;
+        }
+      }
+
       // 確認画面が有効な場合は、ここでいったん止めて内容を確認してもらう
       if (survey.confirmEnabled) {
         btn.disabled = false;
@@ -746,6 +757,38 @@ input[type="number"]::-webkit-inner-spin-button,
 
       await sendAnswers(survey, answers, btn, errorMsg);
     });
+
+    // ────────────────────────────────────────────────────
+    // 応募資格の確認（氏名・ダイアナコード → 採寸情報）
+    // 満たさない場合はアラートを出して false を返す。
+    // 会員DBに問い合わせられない場合は止めない（保存時にサーバーでも確認する）
+    // ────────────────────────────────────────────────────
+    async function checkEntry(survey, answers) {
+      var codeQ = null, nameQ = null;
+      survey.questions.forEach(function(q) {
+        var label = String(q.label || '');
+        if (!codeQ && label.indexOf('ダイアナコード') >= 0) codeQ = q;
+        if (!nameQ && label.indexOf('氏名') >= 0 && label.indexOf('ふりがな') < 0) nameQ = q;
+      });
+      if (!codeQ || !nameQ) return true;
+      try {
+        var res = await fetch(BASE_URL + '/api/entry-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ surveyId: SURVEY_ID, dia_cd: answers[codeQ.id], name: answers[nameQ.id] })
+        });
+        if (res.status === 429) {
+          alert('照会が多すぎます。しばらく待ってからお試しください。');
+          return false;
+        }
+        var data = await res.json().catch(function() { return {}; });
+        if (data.message) {
+          alert(data.message);
+          return false;
+        }
+      } catch (e) {}
+      return true;
+    }
 
     // ────────────────────────────────────────────────────
     // 送信処理（確認画面の有無にかかわらず共通）
